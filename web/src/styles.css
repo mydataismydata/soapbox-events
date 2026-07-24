@@ -256,9 +256,12 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .wiz-foot { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; }
 
 /* --- flyer designer ---------------------------------------------------- */
-.designer { display: grid; grid-template-columns: minmax(290px, 340px) 1fr; gap: 18px;
+/* Templates across the top, then fields beside the preview, then the images. */
+.designer-wrap { display: flex; flex-direction: column; }
+/* The fields stay compact so the preview gets as much width as possible. */
+.designer { display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); gap: 18px;
   align-items: start; }
-.style-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.style-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .style-card { border: 1.5px solid var(--line-strong); border-radius: 9px; padding: 9px 11px;
   cursor: pointer; background: #fff; text-align: left; font-family: inherit; }
 .style-card:hover { border-color: var(--accent); }
@@ -266,15 +269,14 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   box-shadow: 0 0 0 1px var(--accent) inset; }
 .style-card .s-name { font-weight: 700; font-size: 13.5px; }
 .style-card .s-desc { font-size: 11.5px; color: var(--muted); margin-top: 1px; line-height: 1.35; }
-.col-select { display: flex; gap: 8px; margin-bottom: 10px; }
-.col-select .btn { flex: 1; }
-.img-slots { display: flex; flex-direction: column; gap: 12px; }
+.img-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.img-slot { border: 1px solid var(--line); border-radius: 9px; padding: 10px 11px 11px; }
 .img-slot-label { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--muted); margin-bottom: 5px; }
+  color: var(--muted); margin-bottom: 6px; }
 .img-slot .img-cap { margin-top: 8px; }
-.img-slots .img-slot + .img-slot { border-top: 1px solid var(--line); padding-top: 12px; }
-.preview-frame { width: 100%; height: 640px; border: 1px solid var(--line); border-radius: 10px;
-  background: #fff; }
+/* Height is set from the rendered flyer so long designs need no scrollbar. */
+.preview-frame { display: block; width: 100%; min-height: 420px; border: 1px solid var(--line);
+  border-radius: 10px; background: #fff; overflow: hidden; }
 .email-frame { width: 100%; height: 560px; border: 1px solid var(--line); border-radius: 10px;
   background: #fff; }
 
@@ -346,6 +348,8 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   .wiz { grid-template-columns: 1fr; }
   .wiz-rail { position: static; flex-direction: row; flex-wrap: wrap; }
   .designer { grid-template-columns: 1fr; }
+  .style-grid { grid-template-columns: 1fr 1fr; }
+  .img-slots { grid-template-columns: 1fr; }
   .grid2, .grid3, .field-row, .field-row3 { grid-template-columns: 1fr; }
   .page { padding: 18px 14px 60px; }
 }

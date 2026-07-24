@@ -95,12 +95,13 @@ leave and resume any time (it stays a draft until you send or publish).
    the largest allowed party size, and whether the public page shows the
    guest list (first names + last initial). The *shareable link* toggle
    controls whether strangers with the link can RSVP.
-3. **Invitation & flyer** — design the flyer: pick one of five patriotic
-   templates (Blue, White, Red, Retro, Landscape), each with its own fixed
-   red-white-blue colors, then set fonts, title size, three short text slots
-   (eyebrow / tagline / footnote), and up to three featured images shown side
-   by side in 1/2/3 columns (e.g. featured speakers), each with an optional
-   caption. The preview is live and pixel-identical to the public page. Below it, write
+3. **Invitation & flyer** — design the flyer: pick one of four patriotic
+   templates (Blue, White, Red, Retro), each with its own fixed
+   red-white-blue colors, then set fonts, title size, four short text slots
+   (eyebrow / tagline / footnote / contact), and up to three featured images
+   shown side by side (e.g. featured speakers), each with an optional
+   caption. Long text shrinks and wraps automatically so it always stays
+   inside the flyer. The preview is live and pixel-identical to the public page. Below it, write
    the email: start from a template, insert placeholders, and *Preview
    email* to see the real rendering.
 4. **Guests** — tick groups, tick individual contacts, and add brand-new

@@ -353,6 +353,27 @@ let guests = [];
   check('flyer preview renders', fp.status === 200 && fpHtml.includes('Preview Party'));
   check('flyer preview renders multiple images',
     fpHtml.includes('/files/prevIMGone') && fpHtml.includes('/files/prevIMGtwo'));
+
+  const pres = await A.api('GET', '/api/flyer/presets');
+  const ids = (pres.data?.styles || []).map((s) => s.id);
+  check('four templates, landscape retired',
+    ids.join(',') === 'blue,white,red,retro', ids.join(','));
+
+  // A long tagline must shrink and wrap rather than run off the flyer's edge.
+  const longTag = 'Doors open early for coffee, live music, and a neighbourhood potluck supper';
+  for (const style of ids) {
+    const lp = await A.raw('POST', '/api/flyer/preview', {
+      body: { event: { title: 'A Rather Long Event Title For Testing', date: future },
+        flyer: { style, tagline: longTag } },
+    });
+    const lhtml = await lp.text();
+    check(`${style}: long tagline wraps and shrinks`,
+      lhtml.includes(longTag) && !/white-space:nowrap/.test(lhtml));
+  }
+  const dropped = await A.raw('POST', '/api/flyer/preview', {
+    body: { event: { title: 'Legacy', date: future }, flyer: { style: 'landscape' } },
+  });
+  check('retired landscape style falls back', dropped.status === 200);
 }
 
 // --- public pages ----------------------------------------------------------

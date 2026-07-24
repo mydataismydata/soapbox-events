@@ -10,10 +10,12 @@ let cachedPresets = null;
 export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'event' }) {
   const [presets, setPresets] = useState(cachedPresets);
   const [srcdoc, setSrcdoc] = useState('');
+  const [previewHeight, setPreviewHeight] = useState(640);
   const [uploadingSlot, setUploadingSlot] = useState(-1);
   const toast = useToast();
   const timer = useRef(null);
   const fileRef = useRef(null);
+  const frameRef = useRef(null);
   const pendingSlot = useRef(0);
 
   useEffect(() => {
@@ -38,16 +40,47 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
     return () => clearTimeout(timer.current);
   }, [JSON.stringify(eventBasics), JSON.stringify(flyer), mode]);
 
+  // Grow the preview iframe to fit the flyer, so even a long design shows in
+  // full with no inner scrollbar. A srcdoc frame is same-origin, so we can
+  // measure the rendered document and watch it for late changes (image loads).
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return undefined;
+    let ro = null;
+    const measure = () => {
+      const doc = frame.contentDocument;
+      if (!doc || !doc.body) return;
+      // Measure the body box itself — scrollHeight would floor at the frame's
+      // own height, which grows every pass once we resize it.
+      const h = Math.ceil(doc.body.getBoundingClientRect().height);
+      // The frame's border sits inside its height, so add it back.
+      const border = Math.max(0, frame.offsetHeight - frame.clientHeight);
+      if (h > 0) setPreviewHeight(h + border);
+    };
+    const attach = () => {
+      measure();
+      const doc = frame.contentDocument;
+      if (!doc || !doc.body || typeof ResizeObserver === 'undefined') return;
+      ro?.disconnect();
+      ro = new ResizeObserver(measure);
+      ro.observe(doc.body);
+    };
+    frame.addEventListener('load', attach);
+    attach();
+    return () => { frame.removeEventListener('load', attach); ro?.disconnect(); };
+  }, [srcdoc]);
+
   function set(patch) {
     onChange({ ...flyer, ...patch });
   }
 
-  // Featured images live in parallel arrays (imageTokens / imageCaptions) with
-  // imageColumns slots. imageToken / imageCaption mirror the first slot so older
+  // Featured images live in parallel arrays (imageTokens / imageCaptions), one
+  // entry per slot. imageToken / imageCaption mirror the first slot so older
   // readers still work. These helpers always write both the arrays and mirror.
-  function writeImages(tokens, captions, columns) {
+  function writeImages(tokens, captions) {
+    const filled = tokens.filter(Boolean).length;
     set({
-      imageColumns: columns,
+      imageColumns: Math.max(1, filled),
       imageTokens: tokens,
       imageCaptions: captions,
       imageToken: tokens[0] || '',
@@ -73,9 +106,8 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
         reader.readAsDataURL(file);
       });
       const up = await api.post('/api/uploads', { name: file.name, data: dataUrl });
-      const cols = imageCols();
-      const tokens = imageSlots(cols).map((t, i) => (i === slot ? up.token : t));
-      writeImages(tokens, captionSlots(cols), cols);
+      const tokens = imageSlots().map((t, i) => (i === slot ? up.token : t));
+      writeImages(tokens, captionSlots());
       toast('Image added to the flyer');
     } catch (err) {
       toast(err.message, 'bad');
@@ -85,152 +117,137 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
     }
   }
 
-  // Read the current featured-image state as fixed-length arrays. Older flyers
+  // Read the current featured-image state as three fixed slots. Older flyers
   // stored a single imageToken/imageCaption — fold those into slot 0.
-  function imageCols() {
-    return Math.min(3, Math.max(1, Number(flyer.imageColumns) || 1));
-  }
-  function imageSlots(n) {
+  function imageSlots() {
     const arr = Array.isArray(flyer.imageTokens) && flyer.imageTokens.length
       ? flyer.imageTokens : (flyer.imageToken ? [flyer.imageToken] : []);
-    return Array.from({ length: n }, (_, i) => arr[i] || '');
+    return Array.from({ length: 3 }, (_, i) => arr[i] || '');
   }
-  function captionSlots(n) {
+  function captionSlots() {
     const arr = Array.isArray(flyer.imageCaptions) && flyer.imageCaptions.length
       ? flyer.imageCaptions : (flyer.imageCaption ? [flyer.imageCaption] : []);
-    return Array.from({ length: n }, (_, i) => arr[i] || '');
+    return Array.from({ length: 3 }, (_, i) => arr[i] || '');
   }
 
-  function setColumns(n) {
-    writeImages(imageSlots(n), captionSlots(n), n);
-  }
   function setImageAt(i, token) {
-    const cols = imageCols();
-    const tokens = imageSlots(cols).map((t, k) => (k === i ? token : t));
-    const captions = captionSlots(cols).map((c, k) => (k === i && !token ? '' : c));
-    writeImages(tokens, captions, cols);
+    const tokens = imageSlots().map((t, k) => (k === i ? token : t));
+    const captions = captionSlots().map((c, k) => (k === i && !token ? '' : c));
+    writeImages(tokens, captions);
   }
   function setCaptionAt(i, caption) {
-    const cols = imageCols();
-    const captions = captionSlots(cols).map((c, k) => (k === i ? caption : c));
-    writeImages(imageSlots(cols), captions, cols);
+    const captions = captionSlots().map((c, k) => (k === i ? caption : c));
+    writeImages(imageSlots(), captions);
   }
 
   if (!presets) return null;
-  const cols = imageCols();
-  const tokens = imageSlots(cols);
-  const captions = captionSlots(cols);
+  const tokens = imageSlots();
+  const captions = captionSlots();
 
   return (
-    <div className="designer">
-      <div>
-        <Field label="Template" hint="Each template has its own fixed patriotic colors.">
-          <div className="style-grid">
-            {presets.styles.map((s) => (
-              <button key={s.id} type="button"
-                className={`style-card ${flyer.style === s.id ? 'active' : ''}`}
-                onClick={() => set({ style: s.id })}>
-                <div className="s-name">{s.label}</div>
-                <div className="s-desc">{s.description}</div>
-              </button>
-            ))}
-          </div>
-        </Field>
+    <div className="designer-wrap">
+      <Field label="Template" hint="Each template has its own fixed patriotic colors.">
+        <div className="style-grid">
+          {presets.styles.map((s) => (
+            <button key={s.id} type="button"
+              className={`style-card ${flyer.style === s.id ? 'active' : ''}`}
+              onClick={() => set({ style: s.id })}>
+              <div className="s-name">{s.label}</div>
+              <div className="s-desc">{s.description}</div>
+            </button>
+          ))}
+        </div>
+      </Field>
 
-        <div className="field-row">
-          <Field label="Fonts">
-            <select value={flyer.font} onChange={(e) => set({ font: e.target.value })}>
-              {presets.fonts.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-            </select>
+      <div className="designer">
+        <div>
+          <div className="field-row">
+            <Field label="Fonts">
+              <select value={flyer.font} onChange={(e) => set({ font: e.target.value })}>
+                {presets.fonts.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Title size">
+              <select value={flyer.scale} onChange={(e) => set({ scale: e.target.value })}>
+                {presets.scales.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+            </Field>
+          </div>
+
+          <Field label="Eyebrow line" hint="The short line above the title.">
+            <input value={flyer.eyebrow} maxLength={60} placeholder="You're invited"
+              onChange={(e) => set({ eyebrow: e.target.value })} />
           </Field>
-          <Field label="Title size">
-            <select value={flyer.scale} onChange={(e) => set({ scale: e.target.value })}>
-              {presets.scales.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
+          <Field label="Tagline" hint="One sentence under the title (optional).">
+            <input value={flyer.tagline} maxLength={140} placeholder="Dinner, dancing, and good company"
+              onChange={(e) => set({ tagline: e.target.value })} />
           </Field>
+          <Field label="Footnote" hint="Small print at the bottom (optional).">
+            <input value={flyer.note} maxLength={200} placeholder="Rain or shine · Free parking on 5th"
+              onChange={(e) => set({ note: e.target.value })} />
+          </Field>
+          <Field label="Contact" hint="Who to reach with questions — shown in the details (optional).">
+            <input value={flyer.contact || ''} maxLength={120} placeholder="Questions? Jane · (555) 100-2000"
+              onChange={(e) => set({ contact: e.target.value })} />
+          </Field>
+
+          {mode === 'event' ? (
+            <>
+              <label className="checkbox">
+                <input type="checkbox" checked={flyer.showHost}
+                  onChange={(e) => set({ showHost: e.target.checked })} />
+                <span><span className="cb-label">Show host line</span>
+                  <div className="cb-sub">Displays “Hosted by {eventBasics.host_name || '…'}” on the flyer.</div></span>
+              </label>
+              <label className="checkbox">
+                <input type="checkbox" checked={!!flyer.showAddress}
+                  onChange={(e) => set({ showAddress: e.target.checked })} />
+                <span><span className="cb-label">Show venue address</span>
+                  <div className="cb-sub">The venue name and time always show; turn this on to add the street address.</div></span>
+              </label>
+            </>
+          ) : null}
         </div>
 
-        <Field label="Eyebrow line" hint="The short line above the title.">
-          <input value={flyer.eyebrow} maxLength={60} placeholder="You're invited"
-            onChange={(e) => set({ eyebrow: e.target.value })} />
-        </Field>
-        <Field label="Tagline" hint="One sentence under the title (optional).">
-          <input value={flyer.tagline} maxLength={140} placeholder="Dinner, dancing, and good company"
-            onChange={(e) => set({ tagline: e.target.value })} />
-        </Field>
-        <Field label="Footnote" hint="Small print at the bottom (optional).">
-          <input value={flyer.note} maxLength={200} placeholder="Rain or shine · Free parking on 5th"
-            onChange={(e) => set({ note: e.target.value })} />
-        </Field>
-        <Field label="Contact" hint="Who to reach with questions — shown in the details (optional).">
-          <input value={flyer.contact || ''} maxLength={120} placeholder="Questions? Jane · (555) 100-2000"
-            onChange={(e) => set({ contact: e.target.value })} />
-        </Field>
+        <div>
+          <iframe ref={frameRef} className="preview-frame" title="Flyer preview" scrolling="no"
+            style={{ height: previewHeight }} srcDoc={srcdoc} />
+          <p className="small muted" style={{ textAlign: 'center', marginTop: 6 }}>
+            {mode === 'broadcast'
+              ? 'Live preview — the masthead at the top of the email and web version.'
+              : 'Live preview — exactly what guests see on the event page.'}
+          </p>
+        </div>
+      </div>
 
-        {mode === 'event' ? (
-          <>
-            <label className="checkbox">
-              <input type="checkbox" checked={flyer.showHost}
-                onChange={(e) => set({ showHost: e.target.checked })} />
-              <span><span className="cb-label">Show host line</span>
-                <div className="cb-sub">Displays “Hosted by {eventBasics.host_name || '…'}” on the flyer.</div></span>
-            </label>
-            <label className="checkbox">
-              <input type="checkbox" checked={!!flyer.showAddress}
-                onChange={(e) => set({ showAddress: e.target.checked })} />
-              <span><span className="cb-label">Show venue address</span>
-                <div className="cb-sub">The venue name and time always show; turn this on to add the street address.</div></span>
-            </label>
-          </>
-        ) : null}
-
-        <Field label="Featured images"
-          hint="Optional. Show one image, or up to three side by side — e.g. featured speakers. JPEG/PNG/GIF/WebP up to 5 MB.">
-          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
-            style={{ display: 'none' }} onChange={(e) => uploadImage(e.target.files?.[0])} />
-          <div className="col-select" role="group" aria-label="Number of featured images">
-            {[1, 2, 3].map((n) => (
-              <button key={n} type="button"
-                className={`btn btn-sm ${cols === n ? 'btn-primary' : ''}`}
-                onClick={() => setColumns(n)}>
-                {n === 1 ? '1 image' : `${n} images`}
-              </button>
-            ))}
-          </div>
-          <div className="img-slots">
-            {tokens.map((tok, i) => (
-              <div className="img-slot" key={i}>
-                {cols > 1 ? <div className="img-slot-label">Image {i + 1}</div> : null}
-                <div className="row">
-                  <button type="button" className="btn" disabled={uploadingSlot !== -1}
-                    onClick={() => pickImage(i)}>
-                    {uploadingSlot === i ? 'Uploading…' : tok ? 'Replace' : 'Add image'}
-                  </button>
-                  {tok ? (
-                    <button type="button" className="btn btn-ghost" onClick={() => setImageAt(i, '')}>
-                      Remove
-                    </button>
-                  ) : null}
-                </div>
+      <Field label="Featured images"
+        hint="Optional. Add up to three — one shows on its own, two or three sit side by side (e.g. featured speakers). JPEG/PNG/GIF/WebP up to 5 MB.">
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
+          style={{ display: 'none' }} onChange={(e) => uploadImage(e.target.files?.[0])} />
+        <div className="img-slots">
+          {tokens.map((tok, i) => (
+            <div className="img-slot" key={i}>
+              <div className="img-slot-label">Image {i + 1}</div>
+              <div className="row">
+                <button type="button" className="btn" disabled={uploadingSlot !== -1}
+                  onClick={() => pickImage(i)}>
+                  {uploadingSlot === i ? 'Uploading…' : tok ? 'Replace' : 'Add image'}
+                </button>
                 {tok ? (
-                  <input className="img-cap" value={captions[i] || ''} maxLength={160}
-                    placeholder={cols > 1 ? 'Caption / speaker name (optional)' : "Caption (optional) — e.g. Last year's rally"}
-                    onChange={(e) => setCaptionAt(i, e.target.value)} />
+                  <button type="button" className="btn btn-ghost" onClick={() => setImageAt(i, '')}>
+                    Remove
+                  </button>
                 ) : null}
               </div>
-            ))}
-          </div>
-        </Field>
-      </div>
-
-      <div>
-        <iframe className="preview-frame" title="Flyer preview" srcDoc={srcdoc} />
-        <p className="small muted" style={{ textAlign: 'center', marginTop: 6 }}>
-          {mode === 'broadcast'
-            ? 'Live preview — the masthead at the top of the email and web version.'
-            : 'Live preview — exactly what guests see on the event page.'}
-        </p>
-      </div>
+              {tok ? (
+                <input className="img-cap" value={captions[i] || ''} maxLength={160}
+                  placeholder="Caption / name (optional)"
+                  onChange={(e) => setCaptionAt(i, e.target.value)} />
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </Field>
     </div>
   );
 }

@@ -12,7 +12,6 @@ export const STYLES = [
   { id: 'white', label: 'White', description: 'Cream between waving red stripes on top and a star-spangled flag below; navy ribbon.' },
   { id: 'red', label: 'Red', description: 'Bold red inside a starred white border, a small waving flag, tagline on a straight ribbon.' },
   { id: 'retro', label: 'Retro', description: 'Vintage navy, red and parchment stripes. All type — no photo needed.' },
-  { id: 'landscape', label: 'Landscape', description: 'Wide, clean white with faint stars and cropped flags in opposite corners.' },
 ];
 
 // Each style carries its own fixed colours. `accent` is what the invitation
@@ -22,7 +21,6 @@ const THEMES = {
   white: { bg: '#ffffff', ink: '#17274e', accent: '#17274e', accent2: '#b0202f', red: '#c02c34', navy: '#17274e', ribbon: '#17274e', ribbonInk: '#ffffff', ribbonDark: '#0f1c39' },
   red: { bg: '#bb392c', ink: '#ffffff', accent: '#bb392c', accent2: '#16264c', red: '#bb392c', navy: '#16264c', ribbon: '#16264c', ribbonInk: '#ffffff' },
   retro: { bg: '#1e3a5f', ink: '#ece3cb', accent: '#1e3a5f', accent2: '#c0432f', red: '#c0432f', navy: '#1e3a5f', parchment: '#ddd2b4' },
-  landscape: { bg: '#ffffff', ink: '#17274e', accent: '#17274e', accent2: '#b0202f', red: '#b0202f', navy: '#17274e' },
 };
 
 export const FONTS = [
@@ -261,12 +259,15 @@ function starRow(count, { size, color, gap = 0.4 }) {
   return `<span style="color:${color}; font-size:${px(size)}; letter-spacing:${px(size * gap)};">${s}</span>`;
 }
 
-// Shrink a one-line field when it's long enough to overflow, so long titles /
-// taglines stay on one line instead of spilling past the edge. `budget` ≈ how
-// many characters fit at `base` px in the available width.
-function fitSize(text, base, budget) {
+// Shrink a text field when it runs longer than the space allows, so long
+// titles / taglines stay inside the flyer instead of spilling past the edge.
+// `budget` ≈ how many characters fit on one line at `base` px. Text that can
+// wrap gains height as well as width, so it only needs the square-root of the
+// reduction; everything is floored so it never shrinks into illegibility.
+function fitSize(text, base, budget, { min = 0.5 } = {}) {
   const len = String(text || '').length;
-  return len <= budget ? base : Math.max(base * 0.5, base * (budget / len));
+  if (len <= budget) return base;
+  return Math.max(base * min, base * Math.sqrt(budget / len));
 }
 
 // "RSVP Requested" pill, shown when the event collects RSVPs.
@@ -277,7 +278,11 @@ function rsvpBadge(scale, { bg, ink, marginTop = 0 }) {
 }
 
 // A centred banner for the tagline. `folded` has 3-D end tails tucking behind
-// the face; `straight` is a flat bar with flag-notched ends.
+// the face; `straight` is a flat bar with flag-notched ends. Both cap their
+// width and wrap — a long tagline shrinks and then runs onto a second line
+// rather than pushing out past the flyer's edge.
+const RIBBON_MAX = 400;
+
 function foldedRibbon(text, { bandColor, ink, dark, scale, font }) {
   if (!text) return '';
   const h = 38 * scale;
@@ -286,23 +291,25 @@ function foldedRibbon(text, { bandColor, ink, dark, scale, font }) {
   const tail = (side) => `<span style="position:absolute; top:${px(drop)}; ${side}:${px(-tw + 4)};
     width:${px(tw)}; height:${px(h)}; background:${dark}; z-index:1;
     clip-path:polygon(${side === 'left' ? '0 0, 100% 0, 100% 100%, 0 100%, 24% 50%' : '0 0, 100% 0, 76% 50%, 100% 100%, 0 100%'});"></span>`;
-  const band = `<span style="position:relative; z-index:2; display:inline-block; background:${bandColor}; color:${ink};
-    font-family:${font.heading}; font-weight:800; font-size:${px(fitSize(text, 14.5 * scale, 30))}; letter-spacing:0.08em;
-    text-transform:uppercase; text-align:center; white-space:nowrap; padding:${px(9 * scale)} ${px(26 * scale)};">${esc(text)}</span>`;
-  return `<span style="position:relative; display:inline-block; margin-top:${px(20 * scale)};">${tail('left')}${tail('right')}${band}</span>`;
+  const band = `<span style="position:relative; z-index:2; display:inline-block; max-width:${px(RIBBON_MAX * scale)};
+    background:${bandColor}; color:${ink}; font-family:${font.heading}; font-weight:800;
+    font-size:${px(fitSize(text, 14.5 * scale, 34, { min: 0.62 }))}; letter-spacing:0.08em; line-height:1.3;
+    text-transform:uppercase; text-align:center; padding:${px(9 * scale)} ${px(26 * scale)};">${esc(text)}</span>`;
+  return `<span style="position:relative; display:inline-block; max-width:100%; margin-top:${px(20 * scale)};">${tail('left')}${tail('right')}${band}</span>`;
 }
 
 function straightRibbon(text, { bandColor, ink, scale, font }) {
   if (!text) return '';
   const notch = px(14 * scale);
-  return `<span style="display:inline-block; margin-top:${px(20 * scale)}; background:${bandColor}; color:${ink};
-    font-family:${font.heading}; font-weight:800; font-size:${px(fitSize(text, 15 * scale, 30))}; letter-spacing:0.08em;
-    text-transform:uppercase; text-align:center; white-space:nowrap; padding:${px(10 * scale)} ${px(34 * scale)};
+  return `<span style="display:inline-block; max-width:${px(RIBBON_MAX * scale)}; margin-top:${px(20 * scale)};
+    background:${bandColor}; color:${ink}; font-family:${font.heading}; font-weight:800;
+    font-size:${px(fitSize(text, 15 * scale, 34, { min: 0.62 }))}; letter-spacing:0.08em; line-height:1.3;
+    text-transform:uppercase; text-align:center; padding:${px(10 * scale)} ${px(34 * scale)};
     clip-path:polygon(0 0, 100% 0, calc(100% - ${notch}) 50%, 100% 100%, 0 100%, ${notch} 50%);">${esc(text)}</span>`;
 }
 
-// Shared centred date/time/venue/host block used by the white, red and
-// landscape templates. `ink` is the main colour, `sub` the muted one.
+// Shared centred date/time/venue/host block used by the white and red
+// templates. `ink` is the main colour, `sub` the muted one.
 function metaStacked({ event, flyer, hostLine, scale, ink, sub }) {
   const w = whenParts(event);
   const parts = [];
@@ -458,9 +465,9 @@ function renderRetro({ event, flyer, colors, font, scale, images, hostLine, hide
   const dividerRow = lineStarDivider({ color: c.navy, bg: c.parchment, scale, full: true, marginTop: 0 });
   // Stripes alternate red (parchment text) / parchment (navy text) down the page.
   const stripes = [];
-  if (flyer.tagline) stripes.push({ tone: 'red', html: `<div style="font-family:${font.body}; font-size:${px(18 * scale)}; line-height:1.35; color:${c.parchment};">${esc(flyer.tagline)}</div>` });
+  if (flyer.tagline) stripes.push({ tone: 'red', html: `<div style="font-family:${font.body}; font-size:${px(fitSize(flyer.tagline, 18 * scale, 46, { min: 0.65 }))}; line-height:1.35; color:${c.parchment};">${esc(flyer.tagline)}</div>` });
   if (!hasImg) stripes.push({ tone: 'parch', html: dividerRow });
-  if (flyer.note) stripes.push({ tone: 'red', html: `<div style="font-family:${font.body}; font-size:${px(15 * scale)}; color:${c.parchment}; line-height:1.3;">${esc(flyer.note)}</div>` });
+  if (flyer.note) stripes.push({ tone: 'red', html: `<div style="font-family:${font.body}; font-size:${px(fitSize(flyer.note, 15 * scale, 60, { min: 0.7 }))}; color:${c.parchment}; line-height:1.3;">${esc(flyer.note)}</div>` });
   if (!hideEventMeta) {
     const vb = venueTimeBits(event, flyer);
     const dt = [vb.date, vb.time].filter(Boolean).map((b, i) => `<span style="color:${i % 2 ? c.red : c.navy};">${esc(b)}</span>`).join(`<span style="color:${c.navy}; font-weight:800;"> // </span>`);
@@ -475,57 +482,7 @@ function renderRetro({ event, flyer, colors, font, scale, images, hostLine, hide
   return `<div style="font-family:${font.body};">${topArea}${stripeHtml}</div>`;
 }
 
-function renderLandscape({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta }) {
-  const c = colors;
-  // Faint stars clustered in the corners opposite the flags — small enough to
-  // stay clear of the centred text.
-  const starField = (id, style) => `<svg viewBox="0 0 120 90" xmlns="http://www.w3.org/2000/svg" style="${style}">
-    <defs><pattern id="${id}" width="20" height="17" patternUnits="userSpaceOnUse">
-      <text x="3" y="13" font-size="11" fill="#ccd1df">&#9733;</text></pattern></defs>
-    <rect width="120" height="90" fill="url(#${id})"/></svg>`;
-  // Flags in opposite corners: top-right and bottom-left.
-  const flagTR = wavyStripeFlag({
-    vw: 200, vh: 150, stripes: 7, red: c.red, white: '#ffffff', amp: 8, period: 130, phase: 0.5,
-    canton: true, cantonColor: c.navy, id: 'lstr',
-    style: 'position:absolute; top:-38px; right:-38px; width:26%; transform:rotate(12deg); z-index:0;',
-  });
-  const flagBL = wavyStripeFlag({
-    vw: 200, vh: 150, stripes: 7, red: c.red, white: '#ffffff', amp: 8, period: 130, phase: 0.9,
-    canton: true, cantonColor: c.navy, id: 'lsbl',
-    style: 'position:absolute; bottom:-38px; left:-38px; width:26%; transform:rotate(12deg); z-index:0;',
-  });
-  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.navy, '#ffffff'), marginTop: 16 });
-  const tagline = flyer.tagline ? `<div style="display:flex; align-items:center; justify-content:center; gap:${px(14 * scale)}; margin-top:${px(12 * scale)};">
-    <div style="height:2px; width:${px(44 * scale)}; background:${c.red}; flex:none;"></div>
-    <span style="font-family:${font.heading}; font-weight:800; font-size:${px(fitSize(flyer.tagline, 18 * scale, 24))}; letter-spacing:0.2em; color:${c.navy}; white-space:nowrap;">${esc(flyer.tagline)}</span>
-    <div style="height:2px; width:${px(44 * scale)}; background:${c.red}; flex:none;"></div></div>` : '';
-  const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp' ? rsvpBadge(scale, { bg: c.navy, ink: '#ffffff', marginTop: 12 }) : '';
-  const vb = hideEventMeta ? null : venueTimeBits(event, flyer);
-  const dt = vb ? [vb.date, vb.time].filter(Boolean).join(' · ') : '';
-  const meta = hideEventMeta ? '' : `
-    ${dt ? `<div style="margin-top:${px(12 * scale)}; font-size:${px(14 * scale)}; font-weight:600; color:${tint(c.navy, 0.85)};">${esc(dt)}</div>` : ''}
-    ${vb && vb.venue ? `<div style="margin-top:${px(4 * scale)}; font-size:${px(14 * scale)}; font-weight:700; color:${c.navy};">${esc(vb.venue)}</div>` : ''}
-    ${hostLine ? `<div style="margin-top:${px(6 * scale)}; font-size:${px(11 * scale)}; text-transform:uppercase; letter-spacing:0.16em; color:${tint(c.navy, 0.7)};">${esc(hostLine)}</div>` : ''}
-    ${flyer.contact ? `<div style="margin-top:${px(4 * scale)}; font-size:${px(12 * scale)}; color:${tint(c.navy, 0.75)};">${esc(flyer.contact)}</div>` : ''}`;
-  return `
-    <div style="position:relative; overflow:hidden; background:${c.bg}; color:${c.navy};
-         font-family:${font.body}; padding:${px(40 * scale)} ${px(90 * scale)}; text-align:center;">
-      ${starField('lsftl', 'position:absolute; top:12px; left:12px; width:24%; z-index:0;')}
-      ${starField('lsfbr', 'position:absolute; bottom:12px; right:12px; width:24%; z-index:0;')}
-      ${flagTR}${flagBL}
-      <div style="position:relative; z-index:1;">
-        <div style="margin-bottom:${px(6 * scale)};">${starRow(1, { size: 13 * scale, color: c.red })} ${starRow(1, { size: 15 * scale, color: c.navy })} ${starRow(1, { size: 13 * scale, color: c.red })}</div>
-        ${flyer.eyebrow ? `<div style="font-family:${font.heading}; font-weight:700; font-size:${px(fitSize(flyer.eyebrow, 22 * scale, 20))}; letter-spacing:0.35em; text-transform:uppercase; color:${c.navy};">${esc(flyer.eyebrow)}</div>` : ''}
-        <div style="font-family:${font.heading}; font-weight:800; font-size:${px(fitSize(event.title, 50 * scale, 16))}; line-height:1.02; text-transform:uppercase; margin-top:${px(6 * scale)}; color:${c.navy};">${esc(event.title || 'Untitled event')}</div>
-        ${tagline}
-        ${rsvp}
-        ${img}
-        ${meta}
-      </div>
-    </div>`;
-}
-
-const RENDERERS = { blue: renderBlue, white: renderWhite, red: renderRed, retro: renderRetro, landscape: renderLandscape };
+const RENDERERS = { blue: renderBlue, white: renderWhite, red: renderRed, retro: renderRetro };
 
 // hideEventMeta drops the date/time/venue/host block so the same styles power
 // a broadcast "masthead" (title + eyebrow + tagline + image), which has no
@@ -542,7 +499,9 @@ export function renderFlyer({ event, flyer: rawFlyer, imageUrl = '', imageUrls =
   const images = [];
   resolved.forEach((u, i) => { if (u) images.push({ url: String(u), caption: flyer.imageCaptions[i] || '' }); });
   const inner = (RENDERERS[flyer.style] || renderBlue)({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta });
-  return `<div style="max-width:640px; margin:0 auto; overflow:hidden; border-radius:12px;
+  // overflow-wrap is inherited, so one declaration here keeps a single very
+  // long word (a URL, say) inside every template.
+  return `<div style="max-width:640px; margin:0 auto; overflow:hidden; border-radius:12px; overflow-wrap:break-word;
     box-shadow:0 2px 8px rgba(10,10,15,0.12), 0 12px 40px rgba(10,10,15,0.12);">${inner}</div>`;
 }
 

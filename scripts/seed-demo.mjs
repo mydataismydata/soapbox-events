@@ -150,7 +150,7 @@ db.prepare(`
   'Clubhouse',
   '12 Main Street, Springfield',
   daysFromNow(35), '17:00', '20:00',
-  JSON.stringify({ style: 'landscape', font: 'sans', scale: 'm', eyebrow: 'Open house', tagline: 'Everyone welcome', note: '', showHost: false })
+  JSON.stringify({ style: 'white', font: 'sans', scale: 'm', eyebrow: 'Open house', tagline: 'Everyone welcome', note: '', showHost: false })
 );
 
 // --- event 3: a draft the wizard can pick up -------------------------------

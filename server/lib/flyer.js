@@ -7,12 +7,21 @@
 import { esc } from './html.js';
 import { formatDate, formatTimeRange } from './format.js';
 
+// `landscape: true` marks the wide templates: they run side-on, with the type
+// on the left and a single tall photo down the right, so they take one image
+// instead of three and render on a wider card.
 export const STYLES = [
   { id: 'blue', label: 'Blue', description: 'Navy field with a flag waving in from the top-right; tagline on a light-blue ribbon.' },
   { id: 'white', label: 'White', description: 'Cream between waving red stripes on top and a star-spangled flag below; navy ribbon.' },
   { id: 'red', label: 'Red', description: 'Bold red inside a starred white border, a small waving flag, tagline on a straight ribbon.' },
   { id: 'retro', label: 'Retro', description: 'Vintage navy, red and parchment stripes. All type — no photo needed.' },
+  { id: 'spotlight', label: 'Spotlight', landscape: true, description: 'Wide. Bright-blue-to-midnight gradient, details on a white card, your photo standing at the right.' },
+  { id: 'panel', label: 'Panel', landscape: true, description: 'Wide. Deep navy with a huge headline, an oversized date and a full-height photo panel.' },
 ];
+
+export function isLandscape(style) {
+  return STYLES.some((s) => s.id === style && s.landscape);
+}
 
 // Each style carries its own fixed colours. `accent` is what the invitation
 // email header and the public page furniture use; the rest are template-specific.
@@ -21,6 +30,10 @@ const THEMES = {
   white: { bg: '#ffffff', ink: '#17274e', accent: '#17274e', accent2: '#b0202f', red: '#c02c34', navy: '#17274e', ribbon: '#17274e', ribbonInk: '#ffffff', ribbonDark: '#0f1c39' },
   red: { bg: '#bb392c', ink: '#ffffff', accent: '#bb392c', accent2: '#16264c', red: '#bb392c', navy: '#16264c', ribbon: '#16264c', ribbonInk: '#ffffff' },
   retro: { bg: '#1e3a5f', ink: '#ece3cb', accent: '#1e3a5f', accent2: '#c0432f', red: '#c0432f', navy: '#1e3a5f', parchment: '#ddd2b4' },
+  spotlight: { bg: '#0a1440', ink: '#ffffff', accent: '#12307f', accent2: '#e4f065', red: '#c02c39', navy: '#0a1440',
+    // Bright blue on the left running down to near-black navy on the right.
+    gradient: 'linear-gradient(102deg, #1e6dff 0%, #1a49c4 26%, #12307f 52%, #0a1440 78%, #050a24 100%)' },
+  panel: { bg: '#2e3a5c', ink: '#f4eddd', accent: '#2e3a5c', accent2: '#c9bda2', red: '#b0202f', navy: '#2e3a5c', parchment: '#f4eddd' },
 };
 
 export const FONTS = [
@@ -77,11 +90,14 @@ export function normalizeFlyer(raw) {
   let tokens = Array.isArray(f.imageTokens) ? f.imageTokens : [];
   let caps = Array.isArray(f.imageCaptions) ? f.imageCaptions : [];
   if (!tokens.length && f.imageToken) { tokens = [f.imageToken]; caps = caps.length ? caps : [f.imageCaption]; }
-  f.imageTokens = tokens.slice(0, 3).map(validToken);
+  // The wide templates have one photo well, so they keep a single image even if
+  // the flyer was designed on a portrait template first.
+  const maxImages = isLandscape(f.style) ? 1 : 3;
+  f.imageTokens = tokens.slice(0, maxImages).map(validToken);
   f.imageCaptions = f.imageTokens.map((_, i) => String(caps[i] ?? '').slice(0, 160));
   let cols = parseInt(f.imageColumns, 10);
   if (!(cols >= 1 && cols <= 3)) cols = 1;
-  f.imageColumns = Math.min(3, Math.max(cols, f.imageTokens.filter(Boolean).length || 1));
+  f.imageColumns = Math.min(maxImages, Math.max(cols, f.imageTokens.filter(Boolean).length || 1));
   f.imageToken = f.imageTokens[0] || '';
   f.imageCaption = f.imageCaptions[0] || '';
   return f;
@@ -331,6 +347,52 @@ function venueTimeBits(event, flyer) {
   return { date: w.date, time: w.time, venue };
 }
 
+// --- wide (landscape) helpers ----------------------------------------------
+
+// Tiny line icons for the wide templates' detail rows.
+const ICON_PATHS = {
+  pin: 'M12 2C8.1 2 5 5.1 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z',
+  phone: 'M6.6 10.8a15.5 15.5 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11.4 21 3 12.6 3 2.9c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.6.1.3 0 .7-.2 1l-2.3 2.3z',
+  clock: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 10.6V6h-2v7.6l5.2 3.1 1-1.7-4.2-2.4z',
+  cal: 'M7 2v2H5.5A2.5 2.5 0 0 0 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5A2.5 2.5 0 0 0 18.5 4H17V2h-2v2H9V2H7zm12 8v9H5v-9h14z',
+  arrow: 'M9 5l7 7-7 7',
+};
+
+function iconDot(name, { size, bg, ink, border = 'none' }) {
+  const s = Math.round(size * 0.56);
+  const stroke = name === 'arrow';
+  return `<span style="display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;
+    width:${px(size)}; height:${px(size)}; border-radius:999px; background:${bg}; border:${border};"><svg viewBox="0 0 24 24"
+    width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg"
+    fill="${stroke ? 'none' : ink}" ${stroke ? `stroke="${ink}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"` : ''}
+    ><path d="${ICON_PATHS[name]}"/></svg></span>`;
+}
+
+// The single featured image of a wide template. It sits in a column that
+// stretches to the card's full height, so a tall picture uses every pixel of it
+// and a short one is centred in the space instead of being stretched.
+function widePhoto(image, { minHeight, fit = 'cover', radius = 0, bg = 'transparent', scale, colors, captionColor }) {
+  if (!image) return '';
+  const cap = image.caption
+    ? `<div style="position:absolute; left:0; right:0; bottom:0; padding:${px(10 * scale)} ${px(14 * scale)};
+        background:rgba(6,10,26,0.55); color:${captionColor || '#ffffff'}; font-size:${px(12.5 * scale)};
+        line-height:1.35; text-align:center;">${esc(image.caption)}</div>`
+    : '';
+  return `<div style="position:relative; align-self:stretch; width:100%; min-height:${px(minHeight)}; overflow:hidden;
+    background:${bg}; border-radius:${px(radius)};">
+    <img src="${esc(image.url)}" alt="" style="position:absolute; top:0; left:0; width:100%; height:100%;
+      object-fit:${fit}; object-position:center; display:block;">${cap}</div>`;
+}
+
+// "2026-12-25" -> { day: '25', month: 'DEC' } for the Panel template's
+// oversized date. Anything unparseable simply drops the block.
+const MONTH_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+function bigDateParts(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return null;
+  const [, m, d] = String(iso).split('-').map(Number);
+  return { day: String(d), month: MONTH_ABBR[m - 1] || '' };
+}
+
 // --- templates -------------------------------------------------------------
 
 function renderBlue({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta }) {
@@ -482,7 +544,136 @@ function renderRetro({ event, flyer, colors, font, scale, images, hostLine, hide
   return `<div style="font-family:${font.body};">${topArea}${stripeHtml}</div>`;
 }
 
-const RENDERERS = { blue: renderBlue, white: renderWhite, red: renderRed, retro: renderRetro };
+// Wide: a blue gradient running bright-to-midnight left to right, the type on
+// the left with the details on a white card, and one tall photo down the right.
+function renderSpotlight({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta }) {
+  const c = colors;
+  const w = whenParts(event);
+  const vb = venueTimeBits(event, flyer);
+  const photo = images[0]
+    ? `<div style="flex:1 1 34%; min-width:230px; box-sizing:border-box; display:flex;">${widePhoto(images[0], {
+      minHeight: 280 * scale, fit: 'contain', scale, colors: c })}</div>`
+    : '';
+
+  // Detail rows sit on a white card, venue/contact on the left of a hairline
+  // rule and the date/time on its right — as many cells as there is content.
+  const row = (name, text) => `<div style="display:flex; align-items:center; gap:${px(10 * scale)};">
+    ${iconDot(name, { size: 25 * scale, bg: c.accent, ink: '#ffffff' })}
+    <span style="font-family:${font.heading}; font-weight:700; color:#16203f; line-height:1.25;
+      font-size:${px(fitSize(text, 14 * scale, 24, { min: 0.72 }))};">${esc(text)}</span></div>`;
+  const cell = (rows) => `<div style="flex:1 1 auto; min-width:0; display:grid; gap:${px(9 * scale)};">${rows.join('')}</div>`;
+  const cells = [];
+  if (!hideEventMeta) {
+    const place = [];
+    if (vb.venue) place.push(row('pin', vb.venue));
+    if (flyer.contact) place.push(row('phone', flyer.contact));
+    const when = [];
+    if (w.date) when.push(row('cal', w.date));
+    if (w.time) when.push(row('clock', w.time));
+    if (place.length) cells.push(cell(place));
+    if (when.length) cells.push(cell(when));
+  }
+  const card = cells.length
+    ? `<div style="display:flex; align-items:stretch; gap:${px(16 * scale)}; background:#ffffff;
+        border-radius:${px(10 * scale)}; padding:${px(15 * scale)} ${px(18 * scale)}; margin-top:${px(22 * scale)};">
+        ${cells.join(`<div style="width:1px; background:rgba(20,30,70,0.16);"></div>`)}</div>`
+    : '';
+  const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp' ? rsvpBadge(scale, { bg: c.accent2, ink: '#101c40', marginTop: 18 }) : '';
+
+  const left = `<div style="flex:1 1 ${photo ? '55%' : '100%'}; min-width:300px; box-sizing:border-box;
+      display:flex; flex-direction:column; justify-content:center; padding:${px(40 * scale)} ${px(34 * scale)};">
+    ${flyer.eyebrow ? `<div style="display:flex; align-items:center; gap:${px(9 * scale)};">
+      <span style="color:${c.accent2}; font-size:${px(15 * scale)}; line-height:1;">&#9733;</span>
+      <span style="font-family:${font.heading}; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;
+        font-size:${px(fitSize(flyer.eyebrow, 15 * scale, 30, { min: 0.7 }))};">${esc(flyer.eyebrow)}</span></div>` : ''}
+    <div style="font-family:${font.heading}; font-weight:800; text-transform:uppercase; line-height:1.0;
+      font-size:${px(fitSize(event.title, 54 * scale, 14))}; margin-top:${px(flyer.eyebrow ? 14 : 0)};">${esc(event.title || 'Untitled event')}</div>
+    ${flyer.tagline ? `<div style="font-family:${font.heading}; font-weight:800; color:${c.accent2};
+      text-transform:uppercase; letter-spacing:0.02em; line-height:1.15; margin-top:${px(8 * scale)};
+      font-size:${px(fitSize(flyer.tagline, 26 * scale, 22, { min: 0.5 }))};">${esc(flyer.tagline)}</div>` : ''}
+    ${card}
+    ${rsvp}
+    ${flyer.note ? `<div style="margin-top:${px(16 * scale)}; color:rgba(255,255,255,0.82);
+      font-size:${px(fitSize(flyer.note, 13.5 * scale, 66, { min: 0.75 }))}; line-height:1.4;">${esc(flyer.note)}</div>` : ''}
+    ${hostLine ? `<div style="margin-top:${px(16 * scale)}; font-style:italic; color:${c.accent2};
+      font-size:${px(15 * scale)};">${esc(hostLine)}</div>` : ''}
+  </div>`;
+
+  return `<div style="background:${c.bg}; background-image:${c.gradient}; color:${c.ink}; font-family:${font.body};
+    display:flex; flex-wrap:wrap; align-items:stretch;">${left}${photo}</div>`;
+}
+
+// Wide: a deep navy card — huge headline with outlined badges, the footnote
+// broken into pill rows beside an oversized date, and a full-height photo panel.
+function renderPanel({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta }) {
+  const c = colors;
+  const cream = c.ink;
+  const soft = tint(cream, 0.62);
+  const line = tint(cream, 0.34);
+  const w = whenParts(event);
+  const vb = venueTimeBits(event, flyer);
+  const photo = images[0]
+    ? `<div style="flex:1 1 36%; min-width:240px; box-sizing:border-box; display:flex; padding:${px(18 * scale)};">${widePhoto(images[0], {
+      minHeight: 300 * scale, fit: 'contain', radius: 6 * scale, scale, colors: c })}</div>`
+    : '';
+
+  const badge = (text) => `<div style="width:${px(94 * scale)}; height:${px(94 * scale)}; border-radius:999px;
+    border:1px solid ${line}; display:flex; align-items:center; justify-content:center; text-align:center;
+    padding:${px(10 * scale)}; font-family:${font.heading}; font-weight:700; text-transform:uppercase;
+    letter-spacing:0.05em; line-height:1.25; font-size:${px(fitSize(text, 11.5 * scale, 15, { min: 0.68 }))};">${esc(text)}</div>`;
+  const badges = [flyer.eyebrow, hostLine].filter(Boolean).map(badge);
+
+  // The footnote doubles as a bullet list here: split it on · | ; so a couple of
+  // short points become their own pill rows, as the template is drawn for.
+  const points = String(flyer.note || '').split(/\s*[·•|;]\s*/).map((s) => s.trim()).filter(Boolean).slice(0, 3);
+  const pills = points.map((t) => `<div style="display:flex; align-items:center; gap:${px(12 * scale)};
+    border:1px solid ${line}; border-radius:999px; padding:${px(9 * scale)} ${px(16 * scale)};">
+    ${iconDot('arrow', { size: 26 * scale, bg: 'transparent', ink: cream, border: `1px solid ${line}` })}
+    <span style="font-family:${font.heading}; font-weight:700; text-transform:uppercase; line-height:1.25;
+      font-size:${px(fitSize(t, 13 * scale, 34, { min: 0.7 }))};">${esc(t)}</span></div>`);
+  const bd = hideEventMeta ? null : bigDateParts(event.date);
+  const dateBlock = bd ? `<div style="flex:0 0 auto; text-align:center;">
+    <div style="font-family:${font.heading}; font-weight:800; font-size:${px(54 * scale)}; line-height:0.88;">${esc(bd.day)}</div>
+    <div style="font-family:${font.heading}; font-weight:800; font-size:${px(30 * scale)}; line-height:1;">${esc(bd.month)}</div>
+    ${w.time ? `<div style="font-size:${px(12.5 * scale)}; margin-top:${px(6 * scale)}; color:${soft};">${esc(w.time)}</div>` : ''}
+  </div>` : '';
+  const midRow = pills.length || dateBlock
+    ? `<div style="display:flex; align-items:center; gap:${px(20 * scale)}; margin-top:${px(22 * scale)};">
+        ${pills.length ? `<div style="flex:1 1 auto; min-width:0; display:grid; gap:${px(10 * scale)};">${pills.join('')}</div>` : '<div style="flex:1 1 auto;"></div>'}
+        ${dateBlock}</div>`
+    : '';
+  const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp' ? rsvpBadge(scale, { bg: c.accent2, ink: c.navy, marginTop: 18 }) : '';
+  const footBits = [flyer.contact, vb.venue].filter(Boolean);
+  const foot = !hideEventMeta && footBits.length
+    ? `<div style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:${px(12 * scale)};
+        margin-top:${px(24 * scale)}; padding-top:${px(14 * scale)}; border-top:1px solid ${line};
+        font-family:${font.heading}; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;
+        font-size:${px(12.5 * scale)}; color:${soft};">${footBits.map((b) => `<span>${esc(b)}</span>`).join('')}</div>`
+    : '';
+
+  const left = `<div style="flex:1 1 ${photo ? '54%' : '100%'}; min-width:300px; box-sizing:border-box;
+      display:flex; flex-direction:column; justify-content:center; padding:${px(34 * scale)} ${px(32 * scale)};">
+    <div style="display:flex; align-items:flex-start; gap:${px(16 * scale)};">
+      <div style="flex:1 1 auto; min-width:0; font-family:${font.heading}; font-weight:800; text-transform:uppercase;
+        line-height:0.95; font-size:${px(fitSize(event.title, 58 * scale, 12))};">${esc(event.title || 'Untitled event')}</div>
+      ${badges.length ? `<div style="flex:0 0 auto; display:flex; flex-direction:column; gap:${px(10 * scale)};">${badges.join('')}</div>` : ''}
+    </div>
+    ${flyer.tagline ? `<div style="margin-top:${px(18 * scale)}; font-family:${font.heading}; font-weight:700;
+      text-transform:uppercase; line-height:1.35; color:${tint(cream, 0.9)};
+      font-size:${px(fitSize(flyer.tagline, 16 * scale, 74, { min: 0.72 }))};">${esc(flyer.tagline)}</div>` : ''}
+    ${midRow}
+    ${rsvp}
+    ${foot}
+  </div>`;
+
+  return `<div style="background:${c.bg}; color:${cream}; font-family:${font.body};
+    display:flex; flex-wrap:wrap; align-items:stretch;">${left}${photo}</div>`;
+}
+
+const RENDERERS = {
+  blue: renderBlue, white: renderWhite, red: renderRed, retro: renderRetro,
+  spotlight: renderSpotlight, panel: renderPanel,
+};
 
 // hideEventMeta drops the date/time/venue/host block so the same styles power
 // a broadcast "masthead" (title + eyebrow + tagline + image), which has no
@@ -499,9 +690,16 @@ export function renderFlyer({ event, flyer: rawFlyer, imageUrl = '', imageUrls =
   const images = [];
   resolved.forEach((u, i) => { if (u) images.push({ url: String(u), caption: flyer.imageCaptions[i] || '' }); });
   const inner = (RENDERERS[flyer.style] || renderBlue)({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta });
+  // The wide templates need more room than the 640px portrait card, and more
+  // than the public page's text column: they break out of it and centre on the
+  // viewport instead. On a phone the card simply fills the screen and its two
+  // columns stack.
+  const box = isLandscape(flyer.style)
+    ? `width:min(920px, calc(100vw - 32px)); margin-left:50%; transform:translateX(-50%);`
+    : 'max-width:640px; margin:0 auto;';
   // overflow-wrap is inherited, so one declaration here keeps a single very
   // long word (a URL, say) inside every template.
-  return `<div style="max-width:640px; margin:0 auto; overflow:hidden; border-radius:12px; overflow-wrap:break-word;
+  return `<div style="${box} overflow:hidden; border-radius:12px; overflow-wrap:break-word;
     box-shadow:0 2px 8px rgba(10,10,15,0.12), 0 12px 40px rgba(10,10,15,0.12);">${inner}</div>`;
 }
 
@@ -511,7 +709,8 @@ export function renderFlyerDocument({ event, flyer, imageUrl, imageUrls, hideEve
   const html = renderFlyer({ event, flyer, imageUrl, imageUrls, hideEventMeta });
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<style>body { margin:0; padding:22px 10px; background:${mixWithWhite(colors.ink, 0.07)}; color-scheme: light; }</style>
+<style>*, *::before, *::after { box-sizing: border-box; }
+body { margin:0; padding:22px 10px; background:${mixWithWhite(colors.ink, 0.07)}; color-scheme: light; }</style>
 </head><body>${html}</body></html>`;
 }
 

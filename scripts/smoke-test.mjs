@@ -356,8 +356,10 @@ let guests = [];
 
   const pres = await A.api('GET', '/api/flyer/presets');
   const ids = (pres.data?.styles || []).map((s) => s.id);
-  check('four templates, landscape retired',
-    ids.join(',') === 'blue,white,red,retro', ids.join(','));
+  check('six templates, four portrait then two wide',
+    ids.join(',') === 'blue,white,red,retro,spotlight,panel', ids.join(','));
+  const wideIds = (pres.data?.styles || []).filter((s) => s.landscape).map((s) => s.id);
+  check('wide templates flagged for the designer', wideIds.join(',') === 'spotlight,panel', wideIds.join(','));
 
   // A long tagline must shrink and wrap rather than run off the flyer's edge.
   const longTag = 'Doors open early for coffee, live music, and a neighbourhood potluck supper';
@@ -374,6 +376,19 @@ let guests = [];
     body: { event: { title: 'Legacy', date: future }, flyer: { style: 'landscape' } },
   });
   check('retired landscape style falls back', dropped.status === 200);
+
+  // The wide templates take a single image, whatever the flyer arrived with.
+  for (const style of wideIds) {
+    const wp = await A.raw('POST', '/api/flyer/preview', {
+      body: { event: { title: 'Preview Party', date: future, venue_name: 'The Pavilion', start_time: '18:00' },
+        flyer: { style, imageColumns: 3, imageTokens: ['prevIMGone', 'prevIMGtwo', 'prevIMGthr'] } },
+    });
+    const whtml = await wp.text();
+    check(`${style}: one image only`,
+      whtml.includes('/files/prevIMGone') && !whtml.includes('/files/prevIMGtwo'));
+    check(`${style}: renders a wide side-by-side card`,
+      whtml.includes('flex-wrap:wrap') && whtml.includes('min(920px'));
+  }
 }
 
 // --- public pages ----------------------------------------------------------

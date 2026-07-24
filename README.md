@@ -9,11 +9,11 @@ organizations from one installation**, with hard isolation between them.
 
 **Events & invitations**
 - Guided 5-step wizard: details → RSVP options → invitation & flyer → guests → review & send
-- Flyer designer with 4 ready-made patriotic templates (Blue, White, Red,
-  Retro), each with its own fixed red-white-blue color scheme,
-  5 font pairings, adjustable title sizes, and up to three featured images
-  shown side by side (e.g. featured speakers), each template framing them
-  differently
+- Flyer designer with 6 ready-made templates — four portrait (Blue, White,
+  Red, Retro) and two wide (Spotlight, Panel) — each with its own fixed
+  color scheme, 5 font pairings, adjustable title sizes, and featured
+  images: up to three side by side on the portrait templates (e.g. featured
+  speakers), or one full-height photo down the side on the wide ones
 - Live preview — the exact renderer that guests see powers the design preview
 - Invitation emails with prominent, fixed-color **Accept / Decline buttons**,
   automatic event-details card, plain-text alternative, and per-guest

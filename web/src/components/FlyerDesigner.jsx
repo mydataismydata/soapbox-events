@@ -74,6 +74,11 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
     onChange({ ...flyer, ...patch });
   }
 
+  // The wide (landscape) templates put one tall photo down their right-hand
+  // side, so they offer a single image slot instead of three.
+  const wide = Boolean(presets?.styles.find((s) => s.id === flyer.style)?.landscape);
+  const slotCount = wide ? 1 : 3;
+
   // Featured images live in parallel arrays (imageTokens / imageCaptions), one
   // entry per slot. imageToken / imageCaption mirror the first slot so older
   // readers still work. These helpers always write both the arrays and mirror.
@@ -117,17 +122,18 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
     }
   }
 
-  // Read the current featured-image state as three fixed slots. Older flyers
-  // stored a single imageToken/imageCaption — fold those into slot 0.
+  // Read the current featured-image state as fixed slots — three normally, one
+  // on a wide template. Older flyers stored a single imageToken/imageCaption,
+  // so fold those into slot 0.
   function imageSlots() {
     const arr = Array.isArray(flyer.imageTokens) && flyer.imageTokens.length
       ? flyer.imageTokens : (flyer.imageToken ? [flyer.imageToken] : []);
-    return Array.from({ length: 3 }, (_, i) => arr[i] || '');
+    return Array.from({ length: slotCount }, (_, i) => arr[i] || '');
   }
   function captionSlots() {
     const arr = Array.isArray(flyer.imageCaptions) && flyer.imageCaptions.length
       ? flyer.imageCaptions : (flyer.imageCaption ? [flyer.imageCaption] : []);
-    return Array.from({ length: 3 }, (_, i) => arr[i] || '');
+    return Array.from({ length: slotCount }, (_, i) => arr[i] || '');
   }
 
   function setImageAt(i, token) {
@@ -144,110 +150,142 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
   const tokens = imageSlots();
   const captions = captionSlots();
 
-  return (
-    <div className="designer-wrap">
-      <Field label="Template" hint="Each template has its own fixed patriotic colors.">
-        <div className="style-grid">
-          {presets.styles.map((s) => (
-            <button key={s.id} type="button"
-              className={`style-card ${flyer.style === s.id ? 'active' : ''}`}
-              onClick={() => set({ style: s.id })}>
-              <div className="s-name">{s.label}</div>
-              <div className="s-desc">{s.description}</div>
-            </button>
-          ))}
-        </div>
-      </Field>
-
-      <div className="designer">
-        <div>
-          <div className="field-row">
-            <Field label="Fonts">
-              <select value={flyer.font} onChange={(e) => set({ font: e.target.value })}>
-                {presets.fonts.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Title size">
-              <select value={flyer.scale} onChange={(e) => set({ scale: e.target.value })}>
-                {presets.scales.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-              </select>
-            </Field>
-          </div>
-
-          <Field label="Eyebrow line" hint="The short line above the title.">
-            <input value={flyer.eyebrow} maxLength={60} placeholder="You're invited"
-              onChange={(e) => set({ eyebrow: e.target.value })} />
-          </Field>
-          <Field label="Tagline" hint="One sentence under the title (optional).">
-            <input value={flyer.tagline} maxLength={140} placeholder="Dinner, dancing, and good company"
-              onChange={(e) => set({ tagline: e.target.value })} />
-          </Field>
-          <Field label="Footnote" hint="Small print at the bottom (optional).">
-            <input value={flyer.note} maxLength={200} placeholder="Rain or shine · Free parking on 5th"
-              onChange={(e) => set({ note: e.target.value })} />
-          </Field>
-          <Field label="Contact" hint="Who to reach with questions — shown in the details (optional).">
-            <input value={flyer.contact || ''} maxLength={120} placeholder="Questions? Jane · (555) 100-2000"
-              onChange={(e) => set({ contact: e.target.value })} />
-          </Field>
-
-          {mode === 'event' ? (
-            <>
-              <label className="checkbox">
-                <input type="checkbox" checked={flyer.showHost}
-                  onChange={(e) => set({ showHost: e.target.checked })} />
-                <span><span className="cb-label">Show host line</span>
-                  <div className="cb-sub">Displays “Hosted by {eventBasics.host_name || '…'}” on the flyer.</div></span>
-              </label>
-              <label className="checkbox">
-                <input type="checkbox" checked={!!flyer.showAddress}
-                  onChange={(e) => set({ showAddress: e.target.checked })} />
-                <span><span className="cb-label">Show venue address</span>
-                  <div className="cb-sub">The venue name and time always show; turn this on to add the street address.</div></span>
-              </label>
-            </>
-          ) : null}
-        </div>
-
-        <div>
-          <iframe ref={frameRef} className="preview-frame" title="Flyer preview" scrolling="no"
-            style={{ height: previewHeight }} srcDoc={srcdoc} />
-          <p className="small muted" style={{ textAlign: 'center', marginTop: 6 }}>
-            {mode === 'broadcast'
-              ? 'Live preview — the masthead at the top of the email and web version.'
-              : 'Live preview — exactly what guests see on the event page.'}
-          </p>
-        </div>
+  const templates = (
+    <Field label="Template" hint="Each template has its own fixed patriotic colors.">
+      <div className="style-grid">
+        {presets.styles.map((s) => (
+          <button key={s.id} type="button"
+            className={`style-card ${flyer.style === s.id ? 'active' : ''}`}
+            onClick={() => set({ style: s.id })}>
+            <div className="s-name">{s.label}{s.landscape ? <span className="s-tag">Wide</span> : null}</div>
+            <div className="s-desc">{s.description}</div>
+          </button>
+        ))}
       </div>
+    </Field>
+  );
 
-      <Field label="Featured images"
-        hint="Optional. Add up to three — one shows on its own, two or three sit side by side (e.g. featured speakers). JPEG/PNG/GIF/WebP up to 5 MB.">
-        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
-          style={{ display: 'none' }} onChange={(e) => uploadImage(e.target.files?.[0])} />
-        <div className="img-slots">
-          {tokens.map((tok, i) => (
-            <div className="img-slot" key={i}>
-              <div className="img-slot-label">Image {i + 1}</div>
-              <div className="row">
-                <button type="button" className="btn" disabled={uploadingSlot !== -1}
-                  onClick={() => pickImage(i)}>
-                  {uploadingSlot === i ? 'Uploading…' : tok ? 'Replace' : 'Add image'}
-                </button>
-                {tok ? (
-                  <button type="button" className="btn btn-ghost" onClick={() => setImageAt(i, '')}>
-                    Remove
-                  </button>
-                ) : null}
-              </div>
+  const preview = (
+    <div>
+      <iframe ref={frameRef} className="preview-frame" title="Flyer preview" scrolling="no"
+        style={{ height: previewHeight }} srcDoc={srcdoc} />
+      <p className="small muted" style={{ textAlign: 'center', marginTop: 6 }}>
+        {mode === 'broadcast'
+          ? 'Live preview — the masthead at the top of the email and web version.'
+          : 'Live preview — exactly what guests see on the event page.'}
+      </p>
+    </div>
+  );
+
+  const images = (
+    <Field label={wide ? 'Featured image' : 'Featured images'}
+      hint={wide
+        ? 'Optional. One photo, shown full height down the right-hand side. JPEG/PNG/GIF/WebP up to 5 MB.'
+        : 'Optional. Add up to three — one shows on its own, two or three sit side by side (e.g. featured speakers). JPEG/PNG/GIF/WebP up to 5 MB.'}>
+      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
+        style={{ display: 'none' }} onChange={(e) => uploadImage(e.target.files?.[0])} />
+      <div className="img-slots">
+        {tokens.map((tok, i) => (
+          <div className="img-slot" key={i}>
+            {wide ? null : <div className="img-slot-label">Image {i + 1}</div>}
+            <div className="row">
+              <button type="button" className="btn" disabled={uploadingSlot !== -1}
+                onClick={() => pickImage(i)}>
+                {uploadingSlot === i ? 'Uploading…' : tok ? 'Replace' : 'Add image'}
+              </button>
               {tok ? (
-                <input className="img-cap" value={captions[i] || ''} maxLength={160}
-                  placeholder="Caption / name (optional)"
-                  onChange={(e) => setCaptionAt(i, e.target.value)} />
+                <button type="button" className="btn btn-ghost" onClick={() => setImageAt(i, '')}>
+                  Remove
+                </button>
               ) : null}
             </div>
-          ))}
-        </div>
+            {tok ? (
+              <input className="img-cap" value={captions[i] || ''} maxLength={160}
+                placeholder="Caption / name (optional)"
+                onChange={(e) => setCaptionAt(i, e.target.value)} />
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </Field>
+  );
+
+  const fields = (
+    <div className={wide ? 'field-cols' : ''}>
+      <div className="field-row">
+        <Field label="Fonts">
+          <select value={flyer.font} onChange={(e) => set({ font: e.target.value })}>
+            {presets.fonts.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+          </select>
+        </Field>
+        <Field label="Title size">
+          <select value={flyer.scale} onChange={(e) => set({ scale: e.target.value })}>
+            {presets.scales.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+        </Field>
+      </div>
+
+      <Field label="Eyebrow line" hint="The short line above the title.">
+        <input value={flyer.eyebrow} maxLength={60} placeholder="You're invited"
+          onChange={(e) => set({ eyebrow: e.target.value })} />
       </Field>
+      <Field label="Tagline" hint="One sentence under the title (optional).">
+        <input value={flyer.tagline} maxLength={140} placeholder="Dinner, dancing, and good company"
+          onChange={(e) => set({ tagline: e.target.value })} />
+      </Field>
+      <Field label="Footnote"
+        hint={wide && flyer.style === 'panel'
+          ? 'Small print at the bottom. Separate points with · to get up to three bullet rows.'
+          : 'Small print at the bottom (optional).'}>
+        <input value={flyer.note} maxLength={200} placeholder="Rain or shine · Free parking on 5th"
+          onChange={(e) => set({ note: e.target.value })} />
+      </Field>
+      <Field label="Contact" hint="Who to reach with questions — shown in the details (optional).">
+        <input value={flyer.contact || ''} maxLength={120} placeholder="Questions? Jane · (555) 100-2000"
+          onChange={(e) => set({ contact: e.target.value })} />
+      </Field>
+
+      {mode === 'event' ? (
+        <>
+          <label className="checkbox">
+            <input type="checkbox" checked={flyer.showHost}
+              onChange={(e) => set({ showHost: e.target.checked })} />
+            <span><span className="cb-label">Show host line</span>
+              <div className="cb-sub">Displays “Hosted by {eventBasics.host_name || '…'}” on the flyer.</div></span>
+          </label>
+          <label className="checkbox">
+            <input type="checkbox" checked={!!flyer.showAddress}
+              onChange={(e) => set({ showAddress: e.target.checked })} />
+            <span><span className="cb-label">Show venue address</span>
+              <div className="cb-sub">The venue name and time always show; turn this on to add the street address.</div></span>
+          </label>
+        </>
+      ) : null}
+    </div>
+  );
+
+  // A wide template needs the full width for its preview, so it stacks:
+  // templates, preview, fields, image. The portrait templates keep the fields
+  // beside the preview.
+  if (wide) {
+    return (
+      <div className="designer-wrap">
+        {templates}
+        {preview}
+        <div style={{ marginTop: 16 }}>{fields}</div>
+        {images}
+      </div>
+    );
+  }
+
+  return (
+    <div className="designer-wrap">
+      {templates}
+      <div className="designer">
+        {fields}
+        {preview}
+      </div>
+      {images}
     </div>
   );
 }

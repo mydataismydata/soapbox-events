@@ -261,7 +261,13 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 /* The fields stay compact so the preview gets as much width as possible. */
 .designer { display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); gap: 18px;
   align-items: start; }
-.style-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.style-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+/* Wide templates stack their blocks, so the fields spread across the width. */
+.field-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 0 18px; align-items: start; }
+.s-tag { display: inline-block; margin-left: 6px; vertical-align: 1px; background: var(--accent-soft);
+  color: var(--accent); border-radius: 4px; padding: 0 5px; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; }
 .style-card { border: 1.5px solid var(--line-strong); border-radius: 9px; padding: 9px 11px;
   cursor: pointer; background: #fff; text-align: left; font-family: inherit; }
 .style-card:hover { border-color: var(--accent); }

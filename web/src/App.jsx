@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { api, onUnauthorized } from './api.js';
-import { ToastProvider, Spinner } from './ui.jsx';
+import { ToastProvider, ThemeProvider, ThemeToggle, Spinner } from './ui.jsx';
+import Icon from './icons.jsx';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import EventsList from './pages/EventsList.jsx';
@@ -21,43 +22,132 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+// Grouped like the reference layouts: what you send, who you send it to, and
+// the reusable pieces. `group` starts a new labelled section in the rail.
 const NAV = [
-  { to: '/', label: 'Dashboard', icon: '⌂', end: true },
-  { to: '/events', label: 'Events', icon: '🎟' },
-  { to: '/broadcasts', label: 'Broadcasts', icon: '📣' },
-  { to: '/contacts', label: 'Contacts', icon: '👤' },
-  { to: '/groups', label: 'Groups', icon: '👥' },
-  { to: '/venues', label: 'Venues', icon: '📍' },
-  { to: '/templates', label: 'Templates', icon: '📝' },
-  { to: '/settings', label: 'Settings', icon: '⚙' },
+  { to: '/', label: 'Dashboard', icon: 'home', end: true },
+  { to: '/events', label: 'Events', icon: 'ticket' },
+  { to: '/broadcasts', label: 'Broadcasts', icon: 'megaphone' },
+  { group: 'Audience' },
+  { to: '/contacts', label: 'Contacts', icon: 'user' },
+  { to: '/groups', label: 'Groups', icon: 'users' },
+  { group: 'Library' },
+  { to: '/venues', label: 'Venues', icon: 'pin' },
+  { to: '/templates', label: 'Templates', icon: 'file' },
+  { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
+
+const COLLAPSE_KEY = 'soapbox.sidebar.collapsed';
+
+// The topbar label follows the route: deepest matching nav entry wins, so
+// /events/12/edit still reads "Events".
+function sectionLabel(pathname) {
+  const items = NAV.filter((n) => n.to);
+  const match = items
+    .filter((n) => (n.end ? pathname === n.to : pathname.startsWith(n.to)))
+    .sort((a, b) => b.to.length - a.to.length)[0];
+  return match?.label || 'Soapbox';
+}
+
+function initials(name) {
+  return (name || '?')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('');
+}
 
 function Layout({ children }) {
   const { user, org, app, logout } = useAuth();
+  const location = useLocation();
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; }
+  });
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Picking a destination closes the mobile drawer.
+  useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') setDrawerOpen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  function toggleRail() {
+    // Under 900px the rail is an off-canvas drawer; above it, a width toggle.
+    if (window.matchMedia('(max-width: 900px)').matches) {
+      setDrawerOpen((v) => !v);
+      return;
+    }
+    setCollapsed((v) => {
+      const next = !v;
+      try { localStorage.setItem(COLLAPSE_KEY, next ? '1' : '0'); } catch { /* private mode */ }
+      return next;
+    });
+  }
+
   return (
-    <div className="shell">
+    <div className={`shell ${collapsed ? 'is-collapsed' : ''} ${drawerOpen ? 'is-open' : ''}`}>
       <aside className="sidebar">
-        <div className="side-brand">Soap<span className="tick">box</span></div>
-        <div className="side-org" title={org.name}>{org.name}</div>
-        <nav className="side-nav">
-          {NAV.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end}>
-              <span className="nav-ico">{item.icon}</span>
-              {item.label}
+        <div className="side-head">
+          <div className="side-mark" aria-hidden="true">S</div>
+          <div className="side-id">
+            <div className="side-name">Soapbox</div>
+            <div className="side-org" title={org.name}>{org.name}</div>
+          </div>
+        </div>
+
+        <nav className="side-nav" aria-label="Main">
+          {NAV.map((item) => (item.group ? (
+            <div className="side-group" key={`g-${item.group}`}>{item.group}</div>
+          ) : (
+            <NavLink key={item.to} to={item.to} end={item.end} title={item.label}>
+              <span className="nav-ico"><Icon name={item.icon} size={17} /></span>
+              <span className="nav-label">{item.label}</span>
             </NavLink>
-          ))}
+          )))}
         </nav>
-        <div className="side-footer">
-          <div className="who" title={user.email}>{user.name}</div>
-          <button onClick={logout}>Sign out</button>
-          {app?.build ? (
-            <div className="side-build" title={`Version ${app.version}`}>
-              v{app.version} · build {app.build}
-            </div>
-          ) : null}
+
+        <div className="side-foot">
+          <div className="side-avatar" aria-hidden="true">{initials(user.name)}</div>
+          <div className="side-who">
+            <div className="who-name" title={user.name}>{user.name}</div>
+            <div className="who-meta" title={user.email}>{user.email}</div>
+          </div>
+          <button className="side-btn" onClick={logout} title="Sign out" aria-label="Sign out">
+            <Icon name="logout" size={16} />
+          </button>
         </div>
       </aside>
-      <main className="main">{children}</main>
+
+      {drawerOpen ? (
+        <button className="scrim" aria-label="Close menu" onClick={() => setDrawerOpen(false)} />
+      ) : null}
+
+      <main className="main">
+        <header className="topbar">
+          <button
+            className="icon-btn"
+            onClick={toggleRail}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <Icon name="panelLeft" size={17} />
+          </button>
+          <span className="topbar-title">{sectionLabel(location.pathname)}</span>
+          <div className="topbar-actions">
+            {app?.build ? (
+              <span className="build-chip" title={`Version ${app.version}`}>
+                v{app.version} · build {app.build}
+              </span>
+            ) : null}
+            <ThemeToggle />
+          </div>
+        </header>
+        {children}
+      </main>
     </div>
   );
 }
@@ -80,14 +170,20 @@ export default function App() {
   }, []);
 
   if (state.loading) {
-    return <div style={{ paddingTop: '30vh' }}><Spinner /></div>;
+    return (
+      <ThemeProvider>
+        <div style={{ paddingTop: '30vh' }}><Spinner /></div>
+      </ThemeProvider>
+    );
   }
 
   if (!state.user) {
     return (
-      <ToastProvider>
-        <Login onLogin={(me) => setState({ loading: false, user: me.user, org: me.org, app: me.app || null })} />
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <Login onLogin={(me) => setState({ loading: false, user: me.user, org: me.org, app: me.app || null })} />
+        </ToastProvider>
+      </ThemeProvider>
     );
   }
 
@@ -104,27 +200,29 @@ export default function App() {
 
   return (
     <AuthContext.Provider value={auth}>
-      <ToastProvider>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/events" element={<EventsList />} />
-            <Route path="/events/new" element={<EventWizard />} />
-            <Route path="/events/:id" element={<EventDetail />} />
-            <Route path="/events/:id/edit" element={<EventWizard />} />
-            <Route path="/broadcasts" element={<BroadcastsList />} />
-            <Route path="/broadcasts/new" element={<BroadcastWizard />} />
-            <Route path="/broadcasts/:id" element={<BroadcastDetail />} />
-            <Route path="/broadcasts/:id/edit" element={<BroadcastWizard />} />
-            <Route path="/contacts" element={<Contacts />} />
-            <Route path="/groups" element={<Groups />} />
-            <Route path="/venues" element={<Venues />} />
-            <Route path="/templates" element={<Templates />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Layout>
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/events" element={<EventsList />} />
+              <Route path="/events/new" element={<EventWizard />} />
+              <Route path="/events/:id" element={<EventDetail />} />
+              <Route path="/events/:id/edit" element={<EventWizard />} />
+              <Route path="/broadcasts" element={<BroadcastsList />} />
+              <Route path="/broadcasts/new" element={<BroadcastWizard />} />
+              <Route path="/broadcasts/:id" element={<BroadcastDetail />} />
+              <Route path="/broadcasts/:id/edit" element={<BroadcastWizard />} />
+              <Route path="/contacts" element={<Contacts />} />
+              <Route path="/groups" element={<Groups />} />
+              <Route path="/venues" element={<Venues />} />
+              <Route path="/templates" element={<Templates />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Layout>
+        </ToastProvider>
+      </ThemeProvider>
     </AuthContext.Provider>
   );
 }

@@ -127,7 +127,8 @@ node scripts/create-org.mjs --slug myorg --name "My Organization" \
 
 For production setup (VPS requirements, HTTPS, SMTP2GO configuration, DNS,
 backups) see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**. For a tour of the
-app itself see **[docs/GUIDE.md](docs/GUIDE.md)**.
+app itself see **[docs/GUIDE.md](docs/GUIDE.md)**. For the admin UI's design
+tokens and shared components see **[docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md)**.
 
 ## Configuration
 

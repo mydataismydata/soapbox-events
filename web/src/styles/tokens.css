@@ -1,0 +1,187 @@
+/* ---------------------------------------------------------------------------
+   Design tokens
+   ---------------------------------------------------------------------------
+   Every colour, radius, shadow and spacing step in the admin app comes from
+   here. Components never hard-code a hex value, so the dark theme is just a
+   second set of values for the same names — see [data-theme='dark'] below.
+
+   Naming
+     --c-*      colour
+     --r-*      corner radius
+     --sp-*     spacing step (4px scale)
+     --fs-*     font size
+     --sh-*     shadow
+     --z-*      stacking order
+--------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* --- neutral ramp (light) ------------------------------------------- */
+  --c-canvas: #f4f5f7;          /* app background behind the surfaces */
+  --c-surface: #ffffff;         /* cards, tables, inputs */
+  --c-surface-2: #fafafb;       /* table headers, toolbars, inset areas */
+  --c-surface-3: #f2f3f5;       /* hover fills, chips */
+  --c-line: #e7e8ec;            /* thin neutral border — the default */
+  --c-line-strong: #d6d8de;     /* input borders, dividers that must read */
+  --c-ink: #14161a;             /* primary text */
+  --c-ink-2: #454a53;           /* secondary text */
+  /* Muted has to clear AA on --c-canvas (the lightest thing it lands on),
+     not just on white — page subtitles sit directly on the canvas. */
+  --c-muted: #676d7a;           /* labels, hints, meta */
+  /* Faint is the lightest tier that still carries text, so it is held at the
+     AA threshold on --c-surface rather than pushed lighter for looks. */
+  --c-faint: #6f7582;
+
+  /* --- accent: a restrained deep teal ---------------------------------- */
+  --c-accent: #0f766e;
+  --c-accent-hover: #115e59;
+  --c-accent-ink: #ffffff;
+  --c-accent-soft: #e6f2f0;     /* tinted fill behind selected options */
+  --c-accent-line: #99ccc6;     /* tinted border for selected options */
+  --c-accent-text: #0b5f58;     /* accent text that passes AA on surfaces */
+
+  /* --- status --------------------------------------------------------- */
+  --c-ok: #15803d;
+  --c-ok-soft: #e8f5ec;
+  --c-ok-line: #b7dfc4;
+  --c-bad: #c02626;
+  --c-bad-soft: #fdeaea;
+  --c-bad-line: #f2bdbd;
+  --c-warn: #a55a00;
+  --c-warn-soft: #fdf1e0;
+  --c-warn-line: #f0d3a8;
+  --c-info: #1d4ed8;
+  --c-info-soft: #eaeffc;
+  --c-info-line: #bfd0f5;
+
+  /* --- sidebar (dark in both themes) ----------------------------------- */
+  --c-side: #101114;
+  --c-side-2: #1a1c21;          /* hover / active fill */
+  --c-side-ink: #a7adba;
+  --c-side-ink-strong: #ffffff;
+  --c-side-line: rgba(255, 255, 255, 0.08);
+  --c-side-faint: #868d9b;
+
+  /* --- focus ----------------------------------------------------------- */
+  --c-focus: #0f766e;
+  --ring: 0 0 0 3px color-mix(in srgb, var(--c-focus) 26%, transparent);
+  --ring-bad: 0 0 0 3px color-mix(in srgb, var(--c-bad) 24%, transparent);
+
+  /* --- radii: modest --------------------------------------------------- */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 10px;
+  --r-xl: 14px;
+  --r-pill: 999px;
+
+  /* --- spacing --------------------------------------------------------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+
+  /* --- type ------------------------------------------------------------ */
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-base: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 24px;
+
+  /* --- shadows: subtle -------------------------------------------------- */
+  --sh-xs: 0 1px 1px rgba(16, 20, 28, 0.03);
+  --sh-sm: 0 1px 2px rgba(16, 20, 28, 0.05), 0 1px 1px rgba(16, 20, 28, 0.03);
+  --sh-md: 0 4px 12px rgba(16, 20, 28, 0.08);
+  --sh-lg: 0 16px 40px rgba(16, 20, 28, 0.18);
+
+  /* --- layout ----------------------------------------------------------- */
+  --side-w: 232px;
+  --side-w-collapsed: 62px;
+  --topbar-h: 50px;
+  --page-max: 1180px;
+  /* Shared control height — buttons and inputs line up on the same baseline
+     wherever they sit side by side. */
+  --control-h: 36px;
+  --control-h-sm: 30px;
+  --control-h-lg: 42px;
+
+  --transition: 120ms ease;
+
+  /* --- misc ------------------------------------------------------------- */
+  --z-drawer: 60;
+  --z-overlay: 70;
+  --z-toast: 90;
+}
+
+/* --------------------------------------------------------------------------
+   Dark theme — same token names, dark values. Applied by ThemeProvider as
+   data-theme="dark" on <html>; "system" resolves to one of the two.
+-------------------------------------------------------------------------- */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --c-canvas: #0c0d10;
+  --c-surface: #16181d;
+  --c-surface-2: #1b1e24;
+  --c-surface-3: #23262d;
+  --c-line: #272a31;
+  --c-line-strong: #363a43;
+  --c-ink: #eceef2;
+  --c-ink-2: #c2c7d0;
+  --c-muted: #949aa6;
+  --c-faint: #8b919c;
+
+  --c-accent: #2dd4bf;
+  --c-accent-hover: #5eead4;
+  --c-accent-ink: #06231f;
+  --c-accent-soft: #14312e;
+  --c-accent-line: #2a5c56;
+  --c-accent-text: #5eead4;
+
+  --c-ok: #4ade80;
+  --c-ok-soft: #14291c;
+  --c-ok-line: #2b5537;
+  --c-bad: #f87171;
+  --c-bad-soft: #2e1717;
+  --c-bad-line: #5c2b2b;
+  --c-warn: #fbbf24;
+  --c-warn-soft: #2c2312;
+  --c-warn-line: #574220;
+  --c-info: #93b4fd;
+  --c-info-soft: #16203a;
+  --c-info-line: #2c3f6b;
+
+  --c-side: #0a0b0d;
+  --c-side-2: #191b20;
+  --c-side-ink: #9ba1ad;
+  --c-side-line: rgba(255, 255, 255, 0.07);
+
+  --c-focus: #2dd4bf;
+
+  --sh-xs: 0 1px 1px rgba(0, 0, 0, 0.4);
+  --sh-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 1px rgba(0, 0, 0, 0.3);
+  --sh-md: 0 4px 14px rgba(0, 0, 0, 0.5);
+  --sh-lg: 0 18px 44px rgba(0, 0, 0, 0.65);
+}
+
+/* Older engines without color-mix still get a visible focus ring. */
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  :root {
+    --ring: 0 0 0 3px rgba(15, 118, 110, 0.26);
+    --ring-bad: 0 0 0 3px rgba(192, 38, 38, 0.24);
+  }
+  :root[data-theme='dark'] {
+    --ring: 0 0 0 3px rgba(45, 212, 191, 0.3);
+    --ring-bad: 0 0 0 3px rgba(248, 113, 113, 0.28);
+  }
+}

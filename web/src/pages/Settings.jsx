@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, timeAgo } from '../api.js';
 import { useAuth } from '../App.jsx';
-import { Spinner, Modal, Field, useToast, Badge } from '../ui.jsx';
+import { Spinner, Modal, Field, useToast, Badge, Banner, Card, Icon } from '../ui.jsx';
 
 function SendingCard({ data, isAdmin, onSaved }) {
   const toast = useToast();
@@ -36,25 +36,23 @@ function SendingCard({ data, isAdmin, onSaved }) {
   const simulation = quota && quota.mode === 'simulation';
 
   return (
-    <div className="card card-pad">
-      <h2 className="card-title">Email sending</h2>
-
+    <Card title="Email sending">
       {quota ? (
         simulation ? (
-          <div className="banner banner-warn">
+          <Banner tone="warn">
             <strong>Simulation mode.</strong> No SMTP2GO API key is configured, so emails are rendered
             and logged (viewable in each event's email log) but not delivered. Add a key below or set
             <code> SMTP2GO_API_KEY</code> on the server to go live.
-          </div>
+          </Banner>
         ) : (
-          <div className="banner banner-ok">
+          <Banner tone="ok">
             <strong>Live sending via SMTP2GO.</strong>{' '}
             {quota.error
               ? `Quota lookup failed: ${quota.error}`
               : `${quota.used} of ${quota.max} emails used this cycle — ${quota.remaining} remaining` +
                 (quota.cycle_end ? ` (cycle ends ${quota.cycle_end.slice(0, 10)})` : '')}
             {' '}· {quota.month_emails} sent by this organization this month.
-          </div>
+          </Banner>
         )
       ) : null}
 
@@ -89,7 +87,7 @@ function SendingCard({ data, isAdmin, onSaved }) {
           {busy ? 'Saving…' : 'Save sending settings'}
         </button>
       ) : <p className="small muted">Only administrators can change sending settings.</p>}
-    </div>
+    </Card>
   );
 }
 
@@ -109,22 +107,27 @@ function UsersCard() {
   if (!users) return <div className="card card-pad"><Spinner /></div>;
 
   return (
-    <div className="card">
-      <div className="card-pad spread">
-        <h2 className="card-title" style={{ margin: 0 }}>Team members</h2>
+    <Card flush title="Team members"
+      actions={
         <button className="btn btn-sm btn-primary" onClick={() => {
           setForm({ name: '', email: '', role: 'member' });
           setModal({ type: 'new' });
-        }}>+ Add user</button>
-      </div>
+        }}><Icon name="plus" size={14} /> Add user</button>
+      }>
       <div className="table-wrap">
         <table className="table">
-          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Last sign-in</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Last sign-in</th>
+            <th><span className="sr-only">Actions</span></th></tr></thead>
           <tbody>
             {users.map((u) => (
               <tr key={u.id}>
-                <td><span className="t-main">{u.name}</span>{u.id === me.id ? <span className="muted"> (you)</span> : null}
-                  {!u.active ? <Badge tone="gray">Deactivated</Badge> : null}</td>
+                <td>
+                  <div className="row" style={{ gap: 6 }}>
+                    <span className="t-main">{u.name}</span>
+                    {u.id === me.id ? <span className="muted">(you)</span> : null}
+                    {!u.active ? <Badge tone="gray" dot>Deactivated</Badge> : null}
+                  </div>
+                </td>
                 <td className="t-sub">{u.email}</td>
                 <td>{u.role === 'admin' ? <Badge tone="indigo">Admin</Badge> : <Badge>Member</Badge>}</td>
                 <td className="t-sub">{u.last_login_at ? timeAgo(u.last_login_at) : 'never'}</td>
@@ -177,9 +180,9 @@ function UsersCard() {
                 }}>Create user</button>
             </>
           }>
-          <Field label="Name *"><input value={form.name} autoFocus
+          <Field label="Name" required><input value={form.name} autoFocus
             onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-          <Field label="Email *"><input type="email" value={form.email}
+          <Field label="Email" required><input type="email" value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
           <Field label="Role">
             <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
@@ -198,10 +201,10 @@ function UsersCard() {
           <button className="btn btn-sm mt" onClick={async () => {
             try { await navigator.clipboard.writeText(modal.value); toast('Copied'); }
             catch { toast('Could not copy', 'bad'); }
-          }}>Copy to clipboard</button>
+          }}><Icon name="copy" size={14} /> Copy to clipboard</button>
         </Modal>
       ) : null}
-    </div>
+    </Card>
   );
 }
 
@@ -211,8 +214,7 @@ function AccountCard() {
   const [next, setNext] = useState('');
   const [busy, setBusy] = useState(false);
   return (
-    <div className="card card-pad">
-      <h2 className="card-title">Your account</h2>
+    <Card title="Your account">
       <div className="field-row">
         <Field label="Current password">
           <input type="password" value={current} autoComplete="current-password"
@@ -233,7 +235,7 @@ function AccountCard() {
           } catch (err) { toast(err.message, 'bad'); }
           finally { setBusy(false); }
         }}>Change password</button>
-    </div>
+    </Card>
   );
 }
 
@@ -267,8 +269,7 @@ export default function Settings() {
         </div>
       </div>
 
-      <div className="card card-pad">
-        <h2 className="card-title">Organization</h2>
+      <Card title="Organization">
         <div className="field-row">
           <Field label="Display name" hint="Shown to guests on event pages and in email footers.">
             <input value={orgName} maxLength={200} disabled={!isAdmin}
@@ -291,10 +292,9 @@ export default function Settings() {
               finally { setBusy(false); }
             }}>Save</button>
         ) : null}
-      </div>
+      </Card>
 
-      <div className="card card-pad">
-        <h2 className="card-title">Event defaults</h2>
+      <Card title="Event defaults">
         <p className="small muted" style={{ marginTop: 0 }}>
           Prefilled when you create a new event. You can still change the times on any event.
         </p>
@@ -320,7 +320,7 @@ export default function Settings() {
               finally { setBusy(false); }
             }}>Save</button>
         ) : <p className="small muted">Only administrators can change event defaults.</p>}
-      </div>
+      </Card>
 
       <SendingCard data={data} isAdmin={isAdmin} onSaved={load} />
 
@@ -328,22 +328,27 @@ export default function Settings() {
 
       <AccountCard />
 
-      <div className="card card-pad">
-        <h2 className="card-title">Export your data</h2>
+      <Card title="Export your data">
         <p className="small muted" style={{ marginTop: 0 }}>
           Everything is yours, always. CSVs open in any spreadsheet; the JSON backup contains all
           records. For a byte-perfect backup of every organization, copy the server's <code>data/</code> directory.
         </p>
         <div className="row">
-          <a className="btn" href="/api/export/contacts.csv">Contacts CSV</a>
-          <a className="btn" href="/api/export/groups.csv">Groups CSV</a>
-          <a className="btn" href="/api/export/venues.csv">Venues CSV</a>
-          <a className="btn" href="/api/export/events.csv">Events CSV</a>
-          <a className="btn" href="/api/export/broadcasts.csv">Broadcasts CSV</a>
-          <a className="btn" href="/api/export/emails.csv">Email log CSV</a>
-          <a className="btn" href="/api/export/backup.json">Full JSON backup</a>
+          {[
+            ['contacts.csv', 'Contacts CSV'],
+            ['groups.csv', 'Groups CSV'],
+            ['venues.csv', 'Venues CSV'],
+            ['events.csv', 'Events CSV'],
+            ['broadcasts.csv', 'Broadcasts CSV'],
+            ['emails.csv', 'Email log CSV'],
+            ['backup.json', 'Full JSON backup'],
+          ].map(([file, label]) => (
+            <a key={file} className="btn btn-sm" href={`/api/export/${file}`}>
+              <Icon name="download" size={14} /> {label}
+            </a>
+          ))}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

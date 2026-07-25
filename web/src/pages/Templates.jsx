@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
-import { Spinner, Modal, ConfirmModal, Empty, Field, useToast, Badge, insertAtCursor } from '../ui.jsx';
+import {
+  Spinner, Modal, ConfirmModal, Empty, Field, useToast, Badge, insertAtCursor, Card, Icon,
+} from '../ui.jsx';
 import TagButtons from '../components/TagButtons.jsx';
 
 function TemplateModal({ template, onClose, onSaved }) {
@@ -38,7 +40,7 @@ function TemplateModal({ template, onClose, onSaved }) {
           </button>
         </>
       }>
-      <Field label="Template name *">
+      <Field label="Template name" required>
         <input value={form.name} maxLength={120} autoFocus
           onChange={(e) => setForm({ ...form, name: e.target.value })} />
       </Field>
@@ -79,38 +81,44 @@ export default function Templates() {
           <p className="page-sub">Reusable message text with placeholders. Pick one inside the event wizard.</p>
         </div>
         <div className="head-actions">
-          <button className="btn btn-primary" onClick={() => setModal({ type: 'new' })}>+ New template</button>
+          <button className="btn btn-primary" onClick={() => setModal({ type: 'new' })}>
+            <Icon name="plus" size={15} /> New template
+          </button>
         </div>
       </div>
 
       {templates.length === 0 ? (
-        <div className="card">
-          <Empty icon="📝" title="No templates yet"
+        <Card flush>
+          <Empty icon="file" title="No templates yet"
             action={<button className="btn btn-primary" onClick={() => setModal({ type: 'new' })}>Create a template</button>}>
             Write your invitation wording once, reuse it for every event.
           </Empty>
-        </div>
+        </Card>
       ) : (
         <div className="grid2">
           {templates.map((t) => (
             <div key={t.id} className="card card-pad">
               <div className="spread">
-                <h3 style={{ margin: 0, fontSize: 15 }}>{t.name}</h3>
-                {t.is_default ? <Badge tone="indigo">Default</Badge> : null}
+                <h3 style={{ margin: 0, fontSize: 14 }}>{t.name}</h3>
+                {t.is_default ? <Badge tone="indigo" dot>Default</Badge> : null}
               </div>
               <p className="small muted" style={{ margin: '4px 0 2px' }}><strong>Subject:</strong> {t.subject || '—'}</p>
               <p className="small muted" style={{
                 margin: 0, whiteSpace: 'pre-line', maxHeight: 72, overflow: 'hidden',
               }}>{t.body.slice(0, 220)}{t.body.length > 220 ? '…' : ''}</p>
               <div className="row mt">
-                <button className="btn btn-sm" onClick={() => setModal({ type: 'edit', template: t })}>Edit</button>
+                <button className="btn btn-sm" onClick={() => setModal({ type: 'edit', template: t })}>
+                  <Icon name="pencil" size={14} /> Edit
+                </button>
                 {!t.is_default ? (
                   <button className="btn btn-sm" disabled={busy} onClick={async () => {
                     try { await api.post(`/api/templates/${t.id}/default`); toast('Default template set'); load(); }
                     catch (err) { toast(err.message, 'bad'); }
                   }}>Make default</button>
                 ) : null}
-                <button className="btn btn-sm btn-ghost" onClick={() => setModal({ type: 'delete', template: t })}>Delete</button>
+                <button className="btn btn-sm btn-ghost" onClick={() => setModal({ type: 'delete', template: t })}>
+                  <Icon name="trash" size={14} /> Delete
+                </button>
               </div>
             </div>
           ))}

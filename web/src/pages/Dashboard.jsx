@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, timeAgo } from '../api.js';
 import { useAuth } from '../App.jsx';
-import { Spinner, Empty, ResponseBadge, Badge } from '../ui.jsx';
+import {
+  Spinner, Empty, ResponseBadge, Badge, Banner, Card, StatGrid, Stat, Icon,
+} from '../ui.jsx';
 
 function QuotaValue({ quota }) {
   if (!quota) return '—';
@@ -41,6 +43,14 @@ function EventMiniTiles({ ev }) {
   );
 }
 
+function SeeAll({ to, children }) {
+  return (
+    <Link className="btn btn-sm" to={to}>
+      {children} <Icon name="chevronRight" size={13} />
+    </Link>
+  );
+}
+
 export default function Dashboard() {
   const { user, org } = useAuth();
   const [data, setData] = useState(null);
@@ -50,7 +60,7 @@ export default function Dashboard() {
     api.get('/api/dashboard').then(setData).catch((e) => setError(e.message));
   }, []);
 
-  if (error) return <div className="page"><div className="banner banner-bad">{error}</div></div>;
+  if (error) return <div className="page"><Banner tone="bad">{error}</Banner></div>;
   if (!data) return <div className="page"><Spinner /></div>;
 
   const { counts, upcoming, recent, broadcasts = [], quota, month_emails } = data;
@@ -65,61 +75,43 @@ export default function Dashboard() {
           <p className="page-sub">Here's what's happening at {org.name}.</p>
         </div>
         <div className="head-actions">
-          <Link className="btn btn-primary" to="/events/new">+ New event</Link>
+          <Link className="btn btn-primary" to="/events/new">
+            <Icon name="plus" size={15} /> New event
+          </Link>
         </div>
       </div>
 
-      <div className="stat-grid">
-        <div className="stat">
-          <div className="label">Upcoming events</div>
-          <div className="value">{counts.upcoming}</div>
-          <div className="sub">{counts.drafts} draft{counts.drafts === 1 ? '' : 's'}</div>
-        </div>
-        <div className="stat">
-          <div className="label">Contacts</div>
-          <div className="value">{counts.contacts}</div>
-          <div className="sub">{counts.groups} group{counts.groups === 1 ? '' : 's'}</div>
-        </div>
-        <div className="stat">
-          <div className="label">Emails this month</div>
-          <div className="value">{month_emails}</div>
-          <div className="sub">{quota?.configured ? 'via SMTP2GO' : 'simulation mode'}</div>
-        </div>
-        <div className="stat">
-          <div className="label">Email quota left</div>
-          <div className="value"><QuotaValue quota={quota} /></div>
-          <div className="sub">
-            {quota?.configured && !quota.error
-              ? `${quota.used} of ${quota.max} used this cycle`
-              : quota?.configured ? quota.error : 'no SMTP2GO key yet'}
-          </div>
-        </div>
-      </div>
+      <StatGrid>
+        <Stat icon="ticket" label="Upcoming events" value={counts.upcoming}
+          sub={`${counts.drafts} draft${counts.drafts === 1 ? '' : 's'}`} />
+        <Stat icon="user" label="Contacts" value={counts.contacts}
+          sub={`${counts.groups} group${counts.groups === 1 ? '' : 's'}`} />
+        <Stat icon="mail" label="Emails this month" value={month_emails}
+          sub={quota?.configured ? 'via SMTP2GO' : 'simulation mode'} />
+        <Stat icon="send" label="Email quota left" value={<QuotaValue quota={quota} />}
+          sub={quota?.configured && !quota.error
+            ? `${quota.used} of ${quota.max} used this cycle`
+            : quota?.configured ? quota.error : 'no SMTP2GO key yet'} />
+      </StatGrid>
 
       {gettingStarted ? (
-        <div className="card card-pad">
-          <h2 className="card-title">Get started</h2>
+        <Card title="Get started">
           <p className="muted" style={{ marginTop: 0 }}>
             Three steps and your first invitations are out the door:
           </p>
-          <ol style={{ margin: '0 0 14px', paddingLeft: 20, lineHeight: 2 }}>
+          <ol style={{ margin: '0 0 16px', paddingLeft: 20, lineHeight: 2 }}>
             <li><Link to="/contacts">Add or import your contacts</Link> — paste a CSV straight from a spreadsheet.</li>
             <li><Link to="/groups">Organize them into groups</Link> (optional, but handy for recurring audiences).</li>
             <li><Link to="/events/new">Create your first event</Link> — the wizard walks you through details, design, and sending.</li>
           </ol>
           <Link className="btn btn-primary" to="/events/new">Create your first event</Link>
-        </div>
+        </Card>
       ) : null}
 
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-pad">
-          <div className="spread">
-            <h2 className="card-title" style={{ margin: 0 }}>Upcoming events</h2>
-            <Link className="small" to="/events">All events →</Link>
-          </div>
-        </div>
+      <Card flush title="Upcoming events" actions={<SeeAll to="/events">All events</SeeAll>}
+        style={{ marginBottom: 16 }}>
         {upcoming.length === 0 ? (
-          <Empty icon="🗓" title="Nothing scheduled">Events with future dates appear here.</Empty>
+          <Empty icon="calendar" title="Nothing scheduled">Events with future dates appear here.</Empty>
         ) : (
           <div className="table-wrap">
             <table className="table">
@@ -127,8 +119,10 @@ export default function Dashboard() {
                 {upcoming.map((ev) => (
                   <tr key={ev.id}>
                     <td>
-                      <Link to={`/events/${ev.id}`} className="t-main">{ev.title}</Link>
-                      {ev.status === 'draft' ? <Badge tone="amber">Draft</Badge> : null}
+                      <div className="row" style={{ gap: 7 }}>
+                        <Link to={`/events/${ev.id}`} className="t-main">{ev.title}</Link>
+                        {ev.status === 'draft' ? <Badge tone="amber" dot>Draft</Badge> : null}
+                      </div>
                       <div className="t-sub">{ev.when}{ev.venue_name ? ` · ${ev.venue_name}` : ''}</div>
                     </td>
                     <td style={{ textAlign: 'right' }}>
@@ -140,18 +134,12 @@ export default function Dashboard() {
             </table>
           </div>
         )}
-      </div>
+      </Card>
 
       <div className="grid2" style={{ alignItems: 'start' }}>
-        <div className="card">
-          <div className="card-pad">
-            <div className="spread">
-              <h2 className="card-title" style={{ margin: 0 }}>Broadcasts</h2>
-              <Link className="small" to="/broadcasts">All broadcasts →</Link>
-            </div>
-          </div>
+        <Card flush title="Broadcasts" actions={<SeeAll to="/broadcasts">All broadcasts</SeeAll>}>
           {broadcasts.length === 0 ? (
-            <Empty icon="📣" title="No broadcasts yet">Email blasts to your contacts show up here.</Empty>
+            <Empty icon="megaphone" title="No broadcasts yet">Email blasts to your contacts show up here.</Empty>
           ) : (
             <div className="table-wrap">
               <table className="table">
@@ -167,7 +155,9 @@ export default function Dashboard() {
                         </div>
                       </td>
                       <td style={{ textAlign: 'right' }}>
-                        <Badge tone={b.status === 'sent' ? 'green' : 'amber'}>{b.status === 'sent' ? 'Sent' : 'Draft'}</Badge>
+                        <Badge tone={b.status === 'sent' ? 'green' : 'amber'} dot>
+                          {b.status === 'sent' ? 'Sent' : 'Draft'}
+                        </Badge>
                       </td>
                     </tr>
                   ))}
@@ -175,12 +165,11 @@ export default function Dashboard() {
               </table>
             </div>
           )}
-        </div>
+        </Card>
 
-        <div className="card">
-          <div className="card-pad"><h2 className="card-title" style={{ margin: 0 }}>Recent responses</h2></div>
+        <Card flush title="Recent responses">
           {recent.length === 0 ? (
-            <Empty icon="💌" title="No responses yet">RSVPs land here the moment guests click.</Empty>
+            <Empty icon="heart" title="No responses yet">RSVPs land here the moment guests click.</Empty>
           ) : (
             <div className="table-wrap">
               <table className="table">
@@ -201,7 +190,7 @@ export default function Dashboard() {
               </table>
             </div>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );

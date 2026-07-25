@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useToast } from '../ui.jsx';
+import Icon from '../icons.jsx';
 
 // A small rich-text editor for the event description. Bold/italic/underline
 // use semantic tags; font and size wrap the selection in a span with an
@@ -126,22 +127,28 @@ export default function RichText({ value, onChange, placeholder }) {
 
   return (
     <div className="rt">
-      <div className="rt-toolbar">
-        <button type="button" className="rt-btn" title="Bold" onMouseDown={noSel} onClick={() => exec('bold')}><b>B</b></button>
-        <button type="button" className="rt-btn" title="Italic" onMouseDown={noSel} onClick={() => exec('italic')}><i>I</i></button>
-        <button type="button" className="rt-btn" title="Underline" onMouseDown={noSel} onClick={() => exec('underline')}><u>U</u></button>
+      <div className="rt-toolbar" role="toolbar" aria-label="Text formatting">
+        <button type="button" className="rt-btn" title="Bold" aria-label="Bold"
+          onMouseDown={noSel} onClick={() => exec('bold')}><Icon name="bold" size={15} /></button>
+        <button type="button" className="rt-btn" title="Italic" aria-label="Italic"
+          onMouseDown={noSel} onClick={() => exec('italic')}><Icon name="italic" size={15} /></button>
+        <button type="button" className="rt-btn" title="Underline" aria-label="Underline"
+          onMouseDown={noSel} onClick={() => exec('underline')}><Icon name="underline" size={15} /></button>
         <span className="rt-sep" />
-        <select className="rt-select" title="Font" value=""
+        <select className="rt-select" title="Font" aria-label="Font" value=""
           onChange={(e) => applyClass('ff', e.target.value)}>
           {FONTS.map((f, i) => <option key={i} value={f.cls}>{f.label}</option>)}
         </select>
-        <select className="rt-select" title="Text size" value=""
+        <select className="rt-select" title="Text size" aria-label="Text size" value=""
           onChange={(e) => applyClass('fs', e.target.value)}>
           {SIZES.map((s, i) => <option key={i} value={s.cls}>{s.label}</option>)}
         </select>
         <span className="rt-sep" />
-        <button type="button" className="rt-btn rt-btn-text" title="Paste clipboard contents without formatting"
-          onMouseDown={noSel} onClick={pastePlain}>Paste as plain text</button>
+        <button type="button" className="rt-btn rt-btn-text"
+          title="Paste clipboard contents without formatting" aria-label="Paste as plain text"
+          onMouseDown={noSel} onClick={pastePlain}>
+          <Icon name="pasteText" size={15} /> Plain paste
+        </button>
       </div>
       <div ref={ref} className="rt-editor rt-content" contentEditable suppressContentEditableWarning
         data-placeholder={placeholder || ''}

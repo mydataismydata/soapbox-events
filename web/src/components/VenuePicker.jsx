@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { Field, useToast } from '../ui.jsx';
+import { Field, useToast, Icon } from '../ui.jsx';
 
 // The venue block used inside the event wizard: pick a saved venue to fill the
 // fields, edit freely for a one-off, or save what you've typed to the venue
@@ -89,7 +89,8 @@ export default function VenuePicker({ value, onChange }) {
 
       {trimmedName && !alreadySaved ? (
         <button type="button" className="btn btn-sm" onClick={saveToLibrary} disabled={saving}>
-          {saving ? 'Saving…' : '＋ Save these details as a reusable venue'}
+          <Icon name="plus" size={14} />
+          {saving ? 'Saving…' : 'Save these details as a reusable venue'}
         </button>
       ) : null}
     </div>

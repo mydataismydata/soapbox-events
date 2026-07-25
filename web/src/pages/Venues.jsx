@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { Spinner, Modal, ConfirmModal, Empty, Field, useToast } from '../ui.jsx';
+import { Spinner, Modal, ConfirmModal, Empty, Field, useToast, Card, IconButton, Icon } from '../ui.jsx';
 
 function VenueModal({ venue, onClose, onSaved }) {
   const toast = useToast();
@@ -35,7 +35,7 @@ function VenueModal({ venue, onClose, onSaved }) {
           </button>
         </>
       }>
-      <Field label="Venue name *">
+      <Field label="Venue name" required>
         <input value={form.name} maxLength={200} autoFocus
           onChange={(e) => setForm({ ...form, name: e.target.value })} />
       </Field>
@@ -78,23 +78,28 @@ export default function Venues() {
           <p className="page-sub">Reusable locations you can drop into any event from the wizard.</p>
         </div>
         <div className="head-actions">
-          <a className="btn" href="/api/export/venues.csv">Export CSV</a>
-          <button className="btn btn-primary" onClick={() => setModal({ type: 'new' })}>+ New venue</button>
+          <a className="btn" href="/api/export/venues.csv">
+            <Icon name="download" size={15} /> Export CSV
+          </a>
+          <button className="btn btn-primary" onClick={() => setModal({ type: 'new' })}>
+            <Icon name="plus" size={15} /> New venue
+          </button>
         </div>
       </div>
 
       {venues.length === 0 ? (
-        <div className="card">
-          <Empty icon="📍" title="No venues yet"
+        <Card flush>
+          <Empty icon="pin" title="No venues yet"
             action={<button className="btn btn-primary" onClick={() => setModal({ type: 'new' })}>Add a venue</button>}>
             Save the places you host at — name, address, phone, and a map link — then pick them in the event wizard.
           </Empty>
-        </div>
+        </Card>
       ) : (
-        <div className="card">
+        <Card flush>
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Name</th><th>Address</th><th>Phone</th><th>Map</th><th></th></tr></thead>
+              <thead><tr><th>Name</th><th>Address</th><th>Phone</th><th>Map</th>
+                <th><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>
                 {venues.map((v) => (
                   <tr key={v.id}>
@@ -102,12 +107,14 @@ export default function Venues() {
                     <td className="t-sub">{v.address || '—'}</td>
                     <td className="t-sub">{v.phone || '—'}</td>
                     <td>{v.map_url
-                      ? <a href={v.map_url} target="_blank" rel="noreferrer">Map ↗</a>
+                      ? <a href={v.map_url} target="_blank" rel="noreferrer">Map <Icon name="external" size={12} /></a>
                       : <span className="t-sub">—</span>}</td>
                     <td>
                       <div className="t-actions">
-                        <button className="btn btn-sm" onClick={() => setModal({ type: 'edit', venue: v })}>Edit</button>
-                        <button className="btn btn-sm btn-ghost" onClick={() => setModal({ type: 'delete', venue: v })}>🗑</button>
+                        <IconButton icon="pencil" label={`Edit ${v.name}`}
+                          onClick={() => setModal({ type: 'edit', venue: v })} />
+                        <IconButton icon="trash" label={`Delete ${v.name}`} tone="ghost"
+                          onClick={() => setModal({ type: 'delete', venue: v })} />
                       </div>
                     </td>
                   </tr>
@@ -115,7 +122,7 @@ export default function Venues() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
       {modal?.type === 'new' || modal?.type === 'edit' ? (

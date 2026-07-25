@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
-import { Spinner, Modal, ConfirmModal, Empty, Field, useToast } from '../ui.jsx';
+import { Spinner, Modal, ConfirmModal, Empty, Field, useToast, Card, Icon } from '../ui.jsx';
 
 function GroupModal({ group, contacts, onClose, onSaved }) {
   const toast = useToast();
@@ -67,7 +67,7 @@ function GroupModal({ group, contacts, onClose, onSaved }) {
         </>
       }>
       <div className="field-row">
-        <Field label="Group name *">
+        <Field label="Group name" required>
           <input value={name} maxLength={120} autoFocus onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="Description">
@@ -75,8 +75,11 @@ function GroupModal({ group, contacts, onClose, onSaved }) {
         </Field>
       </div>
       <Field label={`Members (${memberIds.size})`}>
-        <input className="search-input" placeholder="Search contacts…" value={q}
-          onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 8 }} />
+        <div className="search-field" style={{ marginBottom: 8 }}>
+          <Icon name="search" size={15} />
+          <input className="search-input" placeholder="Search contacts…" aria-label="Search contacts"
+            value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
         {loaded && filtered.length > 0 ? (
           <div className="spread" style={{ marginBottom: 8 }}>
             <span className="small muted">
@@ -87,7 +90,10 @@ function GroupModal({ group, contacts, onClose, onSaved }) {
             </button>
           </div>
         ) : null}
-        <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 9 }}>
+        <div style={{
+          maxHeight: 300, overflowY: 'auto',
+          border: '1px solid var(--c-line)', borderRadius: 'var(--r-md)',
+        }}>
           {!loaded ? <Spinner /> : filtered.length === 0 ? (
             <p className="muted" style={{ padding: 14 }}>No contacts found.</p>
           ) : (
@@ -95,8 +101,9 @@ function GroupModal({ group, contacts, onClose, onSaved }) {
               <tbody>
                 {filtered.map((c) => (
                   <tr key={c.id}>
-                    <td style={{ width: 30 }}>
+                    <td style={{ width: 34 }}>
                       <input type="checkbox" checked={memberIds.has(c.id)}
+                        aria-label={`Include ${c.name}`}
                         onChange={() => {
                           const next = new Set(memberIds);
                           next.has(c.id) ? next.delete(c.id) : next.add(c.id);
@@ -140,30 +147,38 @@ export default function Groups() {
           <p className="page-sub">Reusable audiences — invite a whole group in one click.</p>
         </div>
         <div className="head-actions">
-          <a className="btn" href="/api/export/groups.csv">Export CSV</a>
-          <button className="btn btn-primary" onClick={() => setModal({ type: 'new' })}>+ New group</button>
+          <a className="btn" href="/api/export/groups.csv">
+            <Icon name="download" size={15} /> Export CSV
+          </a>
+          <button className="btn btn-primary" onClick={() => setModal({ type: 'new' })}>
+            <Icon name="plus" size={15} /> New group
+          </button>
         </div>
       </div>
 
       {groups.length === 0 ? (
-        <div className="card">
-          <Empty icon="👥" title="No groups yet"
+        <Card flush>
+          <Empty icon="users" title="No groups yet"
             action={<button className="btn btn-primary" onClick={() => setModal({ type: 'new' })}>Create a group</button>}>
             Groups like “Choir”, “Volunteers”, or “Board” make inviting the same people again painless.
           </Empty>
-        </div>
+        </Card>
       ) : (
         <div className="grid3">
           {groups.map((g) => (
             <div key={g.id} className="card card-pad">
               <div className="spread">
-                <h3 style={{ margin: 0, fontSize: 15 }}>{g.name}</h3>
+                <h3 style={{ margin: 0, fontSize: 14 }}>{g.name}</h3>
                 <span className="badge badge-gray">{g.member_count} member{g.member_count === 1 ? '' : 's'}</span>
               </div>
               {g.description ? <p className="small muted" style={{ margin: '6px 0 0' }}>{g.description}</p> : null}
               <div className="row mt">
-                <button className="btn btn-sm" onClick={() => setModal({ type: 'edit', group: g })}>Edit members</button>
-                <button className="btn btn-sm btn-ghost" onClick={() => setModal({ type: 'delete', group: g })}>Delete</button>
+                <button className="btn btn-sm" onClick={() => setModal({ type: 'edit', group: g })}>
+                  <Icon name="pencil" size={14} /> Edit members
+                </button>
+                <button className="btn btn-sm btn-ghost" onClick={() => setModal({ type: 'delete', group: g })}>
+                  <Icon name="trash" size={14} /> Delete
+                </button>
               </div>
             </div>
           ))}

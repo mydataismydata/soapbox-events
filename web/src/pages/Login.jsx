@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { Field } from '../ui.jsx';
+import { Field, ThemeToggle } from '../ui.jsx';
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -31,19 +31,23 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="login-wrap">
+      <ThemeToggle className="login-theme" />
       <form className="login-card" onSubmit={submit}>
-        <h1 className="login-brand">Soap<span className="tick">box</span></h1>
-        <p className="login-sub">Events, invitations & RSVPs</p>
-        <Field label="Email">
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-            autoComplete="username" autoFocus required />
+        <div className="login-mark" aria-hidden="true">S</div>
+        <h1 className="login-brand">Soapbox</h1>
+        <p className="login-sub">Events, invitations &amp; RSVPs</p>
+        <Field label="Email" htmlFor="login-email">
+          <input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+            autoComplete="username" autoFocus required
+            aria-invalid={error ? 'true' : undefined} />
         </Field>
-        <Field label="Password">
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password" required />
+        <Field label="Password" htmlFor="login-password">
+          <input id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password" required
+            aria-invalid={error ? 'true' : undefined} />
         </Field>
-        {error ? <div className="error-text">{error}</div> : null}
-        <button className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 12 }} disabled={busy}>
+        {error ? <div className="error-text" role="alert">{error}</div> : null}
+        <button className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 14 }} disabled={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
         {build?.build ? (

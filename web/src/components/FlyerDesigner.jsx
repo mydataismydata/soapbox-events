@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
-import { Field, useToast } from '../ui.jsx';
+import { Field, useToast, Icon } from '../ui.jsx';
 import { useFlyerSnapshot } from './useFlyerSnapshot.js';
 
 let cachedPresets = null;
@@ -163,11 +163,14 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
 
   const templates = (
     <Field label="Template" hint="Each template has its own fixed patriotic colors.">
-      <div className="style-grid">
+      <div className="style-grid" role="radiogroup" aria-label="Flyer template">
         {presets.styles.map((s) => (
           <button key={s.id} type="button"
+            role="radio"
+            aria-checked={flyer.style === s.id}
             className={`style-card ${flyer.style === s.id ? 'active' : ''}`}
             onClick={() => set({ style: s.id })}>
+            <span className="seg-mark" aria-hidden="true" />
             <div className="s-name">{s.label}{s.landscape ? <span className="s-tag">Wide</span> : null}</div>
             <div className="s-desc">{s.description}</div>
           </button>
@@ -200,18 +203,20 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
           <div className="img-slot" key={i}>
             {wide ? null : <div className="img-slot-label">Image {i + 1}</div>}
             <div className="row">
-              <button type="button" className="btn" disabled={uploadingSlot !== -1}
+              <button type="button" className="btn btn-sm" disabled={uploadingSlot !== -1}
                 onClick={() => pickImage(i)}>
+                <Icon name={tok ? 'refresh' : 'image'} size={14} />
                 {uploadingSlot === i ? 'Uploading…' : tok ? 'Replace' : 'Add image'}
               </button>
               {tok ? (
-                <button type="button" className="btn btn-ghost" onClick={() => setImageAt(i, '')}>
+                <button type="button" className="btn btn-sm btn-ghost" onClick={() => setImageAt(i, '')}>
                   Remove
                 </button>
               ) : null}
             </div>
             {tok ? (
-              <input className="img-cap" value={captions[i] || ''} maxLength={160}
+              <input className="img-cap input" value={captions[i] || ''} maxLength={160}
+                aria-label={`Caption for image ${i + 1}`}
                 placeholder="Caption / name (optional)"
                 onChange={(e) => setCaptionAt(i, e.target.value)} />
             ) : null}

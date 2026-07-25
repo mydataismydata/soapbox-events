@@ -1,0 +1,304 @@
+/* ---------------------------------------------------------------------------
+   Shell: sidebar rail, topbar, page container.
+--------------------------------------------------------------------------- */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--side-w) minmax(0, 1fr);
+  min-height: 100vh;
+  transition: grid-template-columns var(--transition);
+}
+.shell.is-collapsed { grid-template-columns: var(--side-w-collapsed) minmax(0, 1fr); }
+
+/* --- sidebar ------------------------------------------------------------ */
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--c-side);
+  color: var(--c-side-ink);
+  border-right: 1px solid var(--c-side-line);
+  overflow: hidden;
+}
+
+.side-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-4) var(--sp-3) var(--sp-3);
+  min-height: 62px;
+}
+.side-mark {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--r-md);
+  background: var(--c-accent);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: var(--fs-md);
+  letter-spacing: -0.02em;
+}
+:root[data-theme='dark'] .side-mark { color: var(--c-accent-ink); }
+.side-id { min-width: 0; }
+.side-name {
+  color: var(--c-side-ink-strong);
+  font-weight: 640;
+  font-size: var(--fs-md);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.side-org {
+  font-size: var(--fs-sm);
+  color: var(--c-side-faint);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--sp-2) var(--sp-2) 0;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.side-group {
+  padding: var(--sp-4) var(--sp-3) var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--c-side-faint);
+}
+.side-nav a {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 7px var(--sp-3);
+  border-radius: var(--r-md);
+  color: var(--c-side-ink);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background var(--transition), color var(--transition);
+}
+.side-nav a:hover {
+  background: var(--c-side-2);
+  color: var(--c-side-ink-strong);
+  text-decoration: none;
+}
+.side-nav a.active {
+  background: var(--c-side-2);
+  color: var(--c-side-ink-strong);
+  font-weight: 560;
+}
+.side-nav a:focus-visible {
+  outline-color: var(--c-side-ink-strong);
+  outline-offset: -2px;
+}
+/* Monochrome icons — the active item is simply brighter, never coloured. */
+.side-nav .nav-ico {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  opacity: 0.75;
+}
+.side-nav a.active .nav-ico,
+.side-nav a:hover .nav-ico { opacity: 1; }
+.nav-label { overflow: hidden; text-overflow: ellipsis; }
+
+.side-foot {
+  border-top: 1px solid var(--c-side-line);
+  padding: var(--sp-3);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.side-avatar {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--r-pill);
+  background: var(--c-side-2);
+  color: var(--c-side-ink-strong);
+  display: grid;
+  place-items: center;
+  font-size: var(--fs-sm);
+  font-weight: 640;
+  text-transform: uppercase;
+}
+.side-who { min-width: 0; flex: 1; }
+.side-who .who-name {
+  color: var(--c-side-ink-strong);
+  font-size: var(--fs-base);
+  font-weight: 560;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.side-who .who-meta {
+  font-size: var(--fs-sm);
+  color: var(--c-side-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.side-btn {
+  flex: none;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  border: 0;
+  background: none;
+  color: var(--c-side-faint);
+  cursor: pointer;
+  padding: 0;
+  border-radius: var(--r-sm);
+  display: grid;
+  place-items: center;
+  font: inherit;
+}
+.side-btn:hover { background: var(--c-side-2); color: var(--c-side-ink-strong); }
+.side-btn:focus-visible { outline-color: var(--c-side-ink-strong); }
+
+/* Collapsed rail: icons only, everything textual folds away. */
+.shell.is-collapsed .side-head { justify-content: center; padding-inline: 0; }
+.shell.is-collapsed .side-id,
+.shell.is-collapsed .nav-label,
+.shell.is-collapsed .side-who,
+.shell.is-collapsed .side-group { display: none; }
+.shell.is-collapsed .side-nav a { justify-content: center; padding-inline: 0; }
+.shell.is-collapsed .side-nav .nav-ico { width: 20px; height: 20px; }
+.shell.is-collapsed .side-foot { flex-direction: column; padding-inline: 0; }
+
+/* --- main column -------------------------------------------------------- */
+.main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: var(--topbar-h);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 0 var(--sp-5);
+  /* Opaque first so the bar never turns transparent where color-mix or
+     backdrop-filter is unsupported; the translucent version layers on top. */
+  background: var(--c-surface);
+  background: color-mix(in srgb, var(--c-surface) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(8px);
+  border-bottom: 1px solid var(--c-line);
+}
+@supports not (backdrop-filter: blur(4px)) {
+  .topbar { background: var(--c-surface); }
+}
+.topbar-title {
+  font-size: var(--fs-md);
+  font-weight: 580;
+  color: var(--c-ink);
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.build-chip {
+  font-size: var(--fs-xs);
+  color: var(--c-muted);
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-pill);
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+
+.page {
+  max-width: var(--page-max);
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--sp-6) var(--sp-6) var(--sp-8);
+  flex: 1;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-5);
+  flex-wrap: wrap;
+}
+.page-title {
+  font-size: var(--fs-xl);
+  font-weight: 640;
+  letter-spacing: -0.018em;
+  margin: 0;
+}
+.page-sub {
+  color: var(--c-muted);
+  margin: 3px 0 0;
+  font-size: var(--fs-base);
+  max-width: 74ch;
+}
+.head-actions {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* --- drawer scrim (small screens) --------------------------------------- */
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 12, 16, 0.5);
+  z-index: calc(var(--z-drawer) - 1);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .shell,
+  .shell.is-collapsed { grid-template-columns: minmax(0, 1fr); }
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: var(--side-w);
+    z-index: var(--z-drawer);
+    transform: translateX(-100%);
+    transition: transform var(--transition);
+    box-shadow: var(--sh-lg);
+  }
+  .shell.is-open .sidebar { transform: none; }
+  /* On small screens the rail always shows labels — it is a drawer, not a rail. */
+  .shell.is-collapsed .side-id,
+  .shell.is-collapsed .nav-label,
+  .shell.is-collapsed .side-who,
+  .shell.is-collapsed .side-group { display: revert; }
+  .shell.is-collapsed .side-head { justify-content: flex-start; padding-inline: var(--sp-3); }
+  .shell.is-collapsed .side-nav a { justify-content: flex-start; padding-inline: var(--sp-3); }
+  .shell.is-collapsed .side-foot { flex-direction: row; padding-inline: var(--sp-3); }
+  .page { padding: var(--sp-4) var(--sp-4) var(--sp-7); }
+  .topbar { padding-inline: var(--sp-3); }
+}

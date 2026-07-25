@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
-import { Field } from '../ui.jsx';
+import { Field, Banner, Icon } from '../ui.jsx';
 
 // Choose who gets invited: pick whole groups, tick individual contacts, and
 // add brand-new people inline. Reports the selection upward on every change.
@@ -66,10 +66,11 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = new 
               const active = sel.group_ids.includes(g.id);
               return (
                 <button key={g.id} type="button"
-                  className="chip"
-                  style={active ? { background: 'var(--accent-soft)', color: '#3730a3', fontWeight: 600 } : {}}
+                  className={`chip ${active ? 'active' : ''}`}
+                  aria-pressed={active}
                   onClick={() => toggleGroup(g.id)}>
-                  {active ? '✓ ' : ''}{g.name} ({g.member_count})
+                  {active ? <Icon name="check" size={12} strokeWidth={2.4} /> : null}
+                  {g.name} ({g.member_count})
                 </button>
               );
             })}
@@ -78,10 +79,16 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = new 
       ) : null}
 
       <Field label="Pick individual contacts">
-        <input className="search-input" placeholder="Search contacts…" value={q}
-          onChange={(e) => setQ(e.target.value)} />
+        <div className="search-field">
+          <Icon name="search" size={15} />
+          <input className="search-input" placeholder="Search contacts…" aria-label="Search contacts"
+            value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
       </Field>
-      <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 9 }}>
+      <div style={{
+        maxHeight: 260, overflowY: 'auto',
+        border: '1px solid var(--c-line)', borderRadius: 'var(--r-md)',
+      }}>
         {filtered.length === 0 ? (
           <p className="muted" style={{ padding: '14px 16px' }}>
             {contacts.length === 0 ? 'No contacts yet — add new people below, or import contacts first.' : 'No matches.'}
@@ -94,16 +101,19 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = new 
                 const invited = alreadyInvited.has((c.email || '').toLowerCase()) && c.email;
                 return (
                   <tr key={c.id}>
-                    <td style={{ width: 30 }}>
+                    <td style={{ width: 34 }}>
                       <input type="checkbox"
+                        aria-label={`Invite ${c.name}`}
                         checked={sel.contact_ids.includes(c.id) || viaGroup}
                         disabled={viaGroup}
                         onChange={() => toggleContact(c.id)} />
                     </td>
                     <td>
-                      <span className="t-main">{c.name}</span>
-                      {c.unsubscribed_at ? <span className="badge badge-amber" style={{ marginLeft: 8 }}>Unsubscribed</span> : null}
-                      {invited ? <span className="badge badge-gray" style={{ marginLeft: 8 }}>Already invited</span> : null}
+                      <div className="row" style={{ gap: 7 }}>
+                        <span className="t-main">{c.name}</span>
+                        {c.unsubscribed_at ? <span className="badge badge-amber">Unsubscribed</span> : null}
+                        {invited ? <span className="badge badge-gray">Already invited</span> : null}
+                      </div>
                       <div className="t-sub">{c.email || <em>no email — can't receive invitations</em>}</div>
                     </td>
                     <td className="t-sub" style={{ textAlign: 'right' }}>
@@ -119,21 +129,27 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = new 
 
       <Field label="Add new people" hint="They'll also be saved to your contact list.">
         {sel.new_contacts.map((n, i) => (
-          <div key={i} className="row" style={{ marginBottom: 8 }}>
-            <input style={{ flex: 1 }} placeholder="Name" value={n.name}
+          <div key={i} className="row" style={{ marginBottom: 8, flexWrap: 'nowrap' }}>
+            <input className="input" style={{ flex: 1 }} placeholder="Name" value={n.name}
+              aria-label={`Name of new person ${i + 1}`}
               onChange={(e) => setNew(i, { name: e.target.value })} />
-            <input style={{ flex: 1.2 }} placeholder="email@example.com" type="email" value={n.email}
+            <input className="input" style={{ flex: 1.2 }} placeholder="email@example.com" type="email"
+              aria-label={`Email of new person ${i + 1}`} value={n.email}
               onChange={(e) => setNew(i, { email: e.target.value })} />
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeNewRow(i)}>✕</button>
+            <button type="button" className="btn btn-ghost btn-sm btn-icon"
+              aria-label="Remove this row" title="Remove this row"
+              onClick={() => removeNewRow(i)}><Icon name="x" size={15} /></button>
           </div>
         ))}
-        <button type="button" className="btn btn-sm" onClick={addNewRow}>+ Add a person</button>
+        <button type="button" className="btn btn-sm" onClick={addNewRow}>
+          <Icon name="plus" size={14} /> Add a person
+        </button>
       </Field>
 
-      <div className="banner banner-info" style={{ marginBottom: 0 }}>
+      <Banner tone="info" style={{ marginBottom: 0 }}>
         {effectiveCount === 0 ? 'No guests selected yet — you can also skip this and share the event link instead.'
           : `${effectiveCount} guest${effectiveCount === 1 ? '' : 's'} selected.`}
-      </div>
+      </Banner>
     </div>
   );
 }

@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, formatDate, formatTime } from '../api.js';
 import { useAuth } from '../App.jsx';
-import { Field, Modal, Spinner, useToast, insertAtCursor } from '../ui.jsx';
+import {
+  Field, Modal, Spinner, useToast, insertAtCursor, Banner, Card, OptionCard, Icon,
+} from '../ui.jsx';
 import FlyerDesigner from '../components/FlyerDesigner.jsx';
 import FlyerSnapshotKeeper from '../components/useFlyerSnapshot.js';
 import RecipientPicker from '../components/RecipientPicker.jsx';
@@ -212,7 +214,7 @@ export default function EventWizard() {
     return ids.size + recipients.group_ids.length + recipients.new_contacts.filter((n) => n.name.trim()).length;
   }, [recipients]);
 
-  if (!ev) return <div className="page">{error ? <div className="banner banner-bad">{error}</div> : <Spinner />}</div>;
+  if (!ev) return <div className="page">{error ? <Banner tone="bad">{error}</Banner> : <Spinner />}</div>;
 
   const basics = {
     title: ev.title, host_name: ev.host_name, venue_name: ev.venue_name,
@@ -266,19 +268,21 @@ export default function EventWizard() {
             <button key={label}
               className={`wiz-step ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}
               disabled={i > maxStep}
+              aria-current={i === step ? 'step' : undefined}
               onClick={() => goTo(i)}>
-              <span className="n">{i < step ? '✓' : i + 1}</span> {label}
+              <span className="n">
+                {i < step ? <Icon name="check" size={11} strokeWidth={2.6} /> : i + 1}
+              </span> {label}
             </button>
           ))}
         </div>
 
         <div>
-          {error ? <div className="banner banner-bad">{error}</div> : null}
+          {error ? <Banner tone="bad">{error}</Banner> : null}
 
           {step === 0 ? (
-            <div className="card card-pad">
-              <h2 className="card-title">What's the occasion?</h2>
-              <Field label="Event title *">
+            <Card title="What's the occasion?">
+              <Field label="Event title" required>
                 <input value={ev.title} maxLength={200} placeholder="Summer Gala 2026"
                   onChange={(e) => patch({ title: e.target.value })} autoFocus />
               </Field>
@@ -307,23 +311,20 @@ export default function EventWizard() {
                 <RichText value={ev.description} placeholder="Tell guests what to expect…"
                   onChange={(html) => patch({ description: html })} />
               </Field>
-            </div>
+            </Card>
           ) : null}
 
           {step === 1 ? (
-            <div className="card card-pad">
-              <h2 className="card-title">How should guests respond?</h2>
+            <Card title="How should guests respond?">
               <div className="seg" style={{ marginBottom: 16 }}>
-                <div className={`seg-opt ${ev.rsvp_mode === 'rsvp' ? 'active' : ''}`}
-                  onClick={() => patch({ rsvp_mode: 'rsvp' })}>
-                  <div className="seg-title">Collect RSVPs</div>
-                  <div className="seg-sub">Guests accept or decline; you see exactly who's coming.</div>
-                </div>
-                <div className={`seg-opt ${ev.rsvp_mode === 'open' ? 'active' : ''}`}
-                  onClick={() => patch({ rsvp_mode: 'open' })}>
-                  <div className="seg-title">Open event</div>
-                  <div className="seg-sub">No RSVP — invitations are informational, everyone's welcome.</div>
-                </div>
+                <OptionCard name="rsvp_mode" checked={ev.rsvp_mode === 'rsvp'}
+                  onSelect={() => patch({ rsvp_mode: 'rsvp' })}
+                  title="Collect RSVPs"
+                  sub="Guests accept or decline; you see exactly who's coming." />
+                <OptionCard name="rsvp_mode" checked={ev.rsvp_mode === 'open'}
+                  onSelect={() => patch({ rsvp_mode: 'open' })}
+                  title="Open event"
+                  sub="No RSVP — invitations are informational, everyone's welcome." />
               </div>
 
               {ev.rsvp_mode === 'rsvp' ? (
@@ -368,18 +369,16 @@ export default function EventWizard() {
                 <span><span className="cb-label">Shareable link</span>
                   <div className="cb-sub">Anyone with the event link can view it{ev.rsvp_mode === 'rsvp' ? ' and RSVP — perfect for forwarding' : ''}. Turn off to limit responses to personal invitations.</div></span>
               </label>
-            </div>
+            </Card>
           ) : null}
 
           {step === 2 ? (
             <>
-              <div className="card card-pad">
-                <h2 className="card-title">Design the flyer</h2>
+              <Card title="Design the flyer">
                 <FlyerDesigner eventBasics={basics} flyer={ev.flyer}
                   onChange={(flyer) => patch({ flyer })} />
-              </div>
-              <div className="card card-pad">
-                <h2 className="card-title">Write the invitation email</h2>
+              </Card>
+              <Card title="Write the invitation email">
                 {templates.length > 0 ? (
                   <Field label="Start from a template">
                     <select defaultValue="" onChange={(e) => {
@@ -404,28 +403,28 @@ export default function EventWizard() {
                   <TagButtons onInsert={(snippet) =>
                     insertAtCursor(bodyRef, ev.email_body, snippet, (val) => patch({ email_body: val }))} />
                 </Field>
-                <button className="btn" onClick={previewEmail} disabled={saving}>Preview email</button>
-              </div>
+                <button className="btn" onClick={previewEmail} disabled={saving}>
+                  <Icon name="eye" size={14} /> Preview email
+                </button>
+              </Card>
             </>
           ) : null}
 
           {step === 3 ? (
-            <div className="card card-pad">
-              <h2 className="card-title">Who's invited?</h2>
+            <Card title="Who's invited?">
               {guests.length > 0 ? (
-                <div className="banner banner-info">
+                <Banner tone="info">
                   {guests.length} guest{guests.length === 1 ? '' : 's'} already on the list
                   {editing ? ' (manage them from the event page)' : ''}. Anyone you pick here is added on top.
-                </div>
+                </Banner>
               ) : null}
               <RecipientPicker value={recipients} onChange={setRecipients}
                 alreadyInvited={new Set(guests.map((g) => g.email).filter(Boolean))} />
-            </div>
+            </Card>
           ) : null}
 
           {step === 4 ? (
-            <div className="card card-pad">
-              <h2 className="card-title">Review & send</h2>
+            <Card title="Review & send">
               <div className="kv"><span className="k">Event</span><span><strong>{resolvePlaceholders(ev.title)}</strong></span></div>
               <div className="kv"><span className="k">When</span>
                 <span>{ev.date ? `${ev.date}${ev.start_time ? ` at ${ev.start_time}` : ''}` : <em>No date yet — required before sending</em>}</span></div>
@@ -439,13 +438,17 @@ export default function EventWizard() {
                 <span><strong>{sendable}</strong> will be emailed{guests.length ? ` · ${guests.length} on the guest list` : ''}{pendingSelection ? ` · ${pendingSelection} selection${pendingSelection === 1 ? '' : 's'} to add first` : ''}</span></div>
               <div className="kv"><span className="k">Subject</span><span>{resolvePlaceholders(ev.email_subject)}</span></div>
 
-              {!ev.date ? <div className="banner banner-warn mt">Add a date (step 1) before sending invitations.</div> : null}
+              {!ev.date ? (
+                <div className="mt">
+                  <Banner tone="warn">Add a date (step 1) before sending invitations.</Banner>
+                </div>
+              ) : null}
 
               <div className="row mt">
                 <button className="btn btn-primary btn-lg"
                   disabled={saving || !ev.date || (sendable === 0 && pendingSelection === 0)}
                   onClick={() => setConfirmSend(true)}>
-                  Send invitations
+                  <Icon name="send" size={15} /> Send invitations
                 </button>
                 <button className="btn btn-lg" onClick={saveDraftAndExit} disabled={saving}>
                   {ev.date ? 'Save without sending' : 'Save draft'}
@@ -457,21 +460,25 @@ export default function EventWizard() {
                 </p>
               ) : null}
 
-              <div className="divider" style={{ margin: '18px 0', borderTop: '1px solid var(--line)' }} />
+              <div className="divider" style={{ margin: '18px 0' }} />
               <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>Send yourself a test first</h3>
               <div className="row">
-                <input style={{ maxWidth: 280 }} type="email" placeholder="you@example.org (defaults to your login)"
+                <input className="input" style={{ maxWidth: 280 }} type="email"
+                  aria-label="Send the test email to"
+                  placeholder="you@example.org (defaults to your login)"
                   value={testTo} onChange={(e) => setTestTo(e.target.value)} />
                 <button className="btn" onClick={sendTest} disabled={saving}>Send test email</button>
               </div>
-            </div>
+            </Card>
           ) : null}
 
           <div className="wiz-foot">
-            <button className="btn" onClick={() => goTo(step - 1)} disabled={step === 0 || saving}>← Back</button>
+            <button className="btn" onClick={() => goTo(step - 1)} disabled={step === 0 || saving}>
+              <Icon name="arrowLeft" size={15} /> Back
+            </button>
             {step < STEPS.length - 1 ? (
               <button className="btn btn-primary" onClick={() => goTo(step + 1)} disabled={saving}>
-                {saving ? 'Saving…' : 'Continue →'}
+                {saving ? 'Saving…' : <>Continue <Icon name="arrowRight" size={15} /></>}
               </button>
             ) : <span />}
           </div>

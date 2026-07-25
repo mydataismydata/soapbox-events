@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api.js';
-import { Field, Modal, Spinner, useToast, insertAtCursor } from '../ui.jsx';
+import { Field, Modal, Spinner, useToast, insertAtCursor, Banner, Card, Icon } from '../ui.jsx';
 import FlyerDesigner from '../components/FlyerDesigner.jsx';
 import RecipientPicker from '../components/RecipientPicker.jsx';
 import TagButtons from '../components/TagButtons.jsx';
@@ -185,7 +185,7 @@ export default function BroadcastWizard() {
     return () => { cancelled = true; };
   }, [recipients]);
 
-  if (!b) return <div className="page">{error ? <div className="banner banner-bad">{error}</div> : <Spinner />}</div>;
+  if (!b) return <div className="page">{error ? <Banner tone="bad">{error}</Banner> : <Spinner />}</div>;
 
   return (
     <div className="page">
@@ -205,19 +205,21 @@ export default function BroadcastWizard() {
             <button key={label}
               className={`wiz-step ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}
               disabled={i > maxStep}
+              aria-current={i === step ? 'step' : undefined}
               onClick={() => goTo(i)}>
-              <span className="n">{i < step ? '✓' : i + 1}</span> {label}
+              <span className="n">
+                {i < step ? <Icon name="check" size={11} strokeWidth={2.6} /> : i + 1}
+              </span> {label}
             </button>
           ))}
         </div>
 
         <div>
-          {error ? <div className="banner banner-bad">{error}</div> : null}
+          {error ? <Banner tone="bad">{error}</Banner> : null}
 
           {step === 0 ? (
-            <div className="card card-pad">
-              <h2 className="card-title">What are you sending?</h2>
-              <Field label="Title *" hint="Shown at the top of the email and web version, and as the internal name.">
+            <Card title="What are you sending?">
+              <Field label="Title" required hint="Shown at the top of the email and web version, and as the internal name.">
                 <input value={b.title} maxLength={200} placeholder="May 2026 Primary — Our Endorsements"
                   onChange={(e) => patch({ title: e.target.value })} autoFocus />
               </Field>
@@ -232,18 +234,16 @@ export default function BroadcastWizard() {
                   <div className="cb-sub">Adds a “View this email online” link at an unguessable URL — handy when
                     email clients clip long messages. Turn off to keep this broadcast email-only.</div></span>
               </label>
-            </div>
+            </Card>
           ) : null}
 
           {step === 1 ? (
             <>
-              <div className="card card-pad">
-                <h2 className="card-title">Design the masthead</h2>
+              <Card title="Design the masthead">
                 <FlyerDesigner mode="broadcast" eventBasics={{ title: b.title, host_name: '' }}
                   flyer={b.flyer} onChange={(flyer) => patch({ flyer })} />
-              </div>
-              <div className="card card-pad">
-                <h2 className="card-title">Write the message</h2>
+              </Card>
+              <Card title="Write the message">
                 {templates.length > 0 ? (
                   <Field label="Start from a template" hint="Event-only placeholders (dates, venue) are left blank in a broadcast.">
                     <select defaultValue="" onChange={(e) => {
@@ -263,21 +263,21 @@ export default function BroadcastWizard() {
                   <TagButtons tags={BROADCAST_TAGS} onInsert={(snippet) =>
                     insertAtCursor(bodyRef, b.body, snippet, (val) => patch({ body: val }))} />
                 </Field>
-                <button className="btn" onClick={previewEmail} disabled={saving}>Preview email</button>
-              </div>
+                <button className="btn" onClick={previewEmail} disabled={saving}>
+                  <Icon name="eye" size={14} /> Preview email
+                </button>
+              </Card>
             </>
           ) : null}
 
           {step === 2 ? (
-            <div className="card card-pad">
-              <h2 className="card-title">Who receives this?</h2>
+            <Card title="Who receives this?">
               <RecipientPicker value={recipients} onChange={setRecipients} />
-            </div>
+            </Card>
           ) : null}
 
           {step === 3 ? (
-            <div className="card card-pad">
-              <h2 className="card-title">Review &amp; send</h2>
+            <Card title="Review & send">
               <div className="kv"><span className="k">Broadcast</span><span><strong>{b.title || '—'}</strong></span></div>
               <div className="kv"><span className="k">Subject</span><span>{b.subject || b.title || '—'}</span></div>
               <div className="kv"><span className="k">Web version</span>
@@ -288,36 +288,42 @@ export default function BroadcastWizard() {
                     : <><strong>{recipientCount}</strong> recipient{recipientCount === 1 ? '' : 's'} will be emailed</>}</span></div>
 
               {recipientCount === 0 ? (
-                <div className="banner banner-warn mt">
-                  {pendingSelection === 0
-                    ? 'Pick recipients (step 3) before sending.'
-                    : 'None of the selected people have an email address (or they’ve unsubscribed).'}
+                <div className="mt">
+                  <Banner tone="warn">
+                    {pendingSelection === 0
+                      ? 'Pick recipients (step 3) before sending.'
+                      : 'None of the selected people have an email address (or they’ve unsubscribed).'}
+                  </Banner>
                 </div>
               ) : null}
 
               <div className="row mt">
                 <button className="btn btn-primary btn-lg" disabled={saving || !recipientCount}
                   onClick={() => setConfirmSend(true)}>
-                  Send broadcast
+                  <Icon name="send" size={15} /> Send broadcast
                 </button>
                 <button className="btn btn-lg" onClick={saveDraftAndExit} disabled={saving}>Save draft</button>
               </div>
 
-              <div className="divider" style={{ margin: '18px 0', borderTop: '1px solid var(--line)' }} />
+              <div className="divider" style={{ margin: '18px 0' }} />
               <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>Send yourself a test first</h3>
               <div className="row">
-                <input style={{ maxWidth: 280 }} type="email" placeholder="you@example.org (defaults to your login)"
+                <input className="input" style={{ maxWidth: 280 }} type="email"
+                  aria-label="Send the test email to"
+                  placeholder="you@example.org (defaults to your login)"
                   value={testTo} onChange={(e) => setTestTo(e.target.value)} />
                 <button className="btn" onClick={sendTest} disabled={saving}>Send test email</button>
               </div>
-            </div>
+            </Card>
           ) : null}
 
           <div className="wiz-foot">
-            <button className="btn" onClick={() => goTo(step - 1)} disabled={step === 0 || saving}>← Back</button>
+            <button className="btn" onClick={() => goTo(step - 1)} disabled={step === 0 || saving}>
+              <Icon name="arrowLeft" size={15} /> Back
+            </button>
             {step < STEPS.length - 1 ? (
               <button className="btn btn-primary" onClick={() => goTo(step + 1)} disabled={saving}>
-                {saving ? 'Saving…' : 'Continue →'}
+                {saving ? 'Saving…' : <>Continue <Icon name="arrowRight" size={15} /></>}
               </button>
             ) : <span />}
           </div>

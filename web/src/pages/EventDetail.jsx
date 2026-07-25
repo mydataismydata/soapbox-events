@@ -4,6 +4,7 @@ import { api, formatWhen, timeAgo } from '../api.js';
 import {
   Spinner, Modal, ConfirmModal, Empty, Field, CopyBox, useToast,
   ResponseBadge, StatusBadge, EmailStatusBadge, insertAtCursor,
+  Banner, Card, StatGrid, Stat, IconButton, Icon,
 } from '../ui.jsx';
 import RecipientPicker from '../components/RecipientPicker.jsx';
 import TagButtons from '../components/TagButtons.jsx';
@@ -97,7 +98,7 @@ export default function EventDetail() {
     }
   }, [guests, filter]);
 
-  if (error) return <div className="page"><div className="banner banner-bad">{error}</div></div>;
+  if (error) return <div className="page"><Banner tone="bad">{error}</Banner></div>;
   if (!data) return <div className="page"><Spinner /></div>;
 
   const ev = data.event;
@@ -164,97 +165,111 @@ export default function EventDetail() {
           </p>
         </div>
         <div className="head-actions">
-          <a className="btn" href={ev.share_url} target="_blank" rel="noopener noreferrer">View page ↗</a>
+          <a className="btn" href={ev.share_url} target="_blank" rel="noopener noreferrer">
+            View page <Icon name="external" size={14} />
+          </a>
           {/* While it's still a draft the prominent "Continue creating" button
               below is the way back into the wizard; Edit appears once sent. */}
           {ev.status !== 'draft'
-            ? <Link className="btn" to={`/events/${ev.id}/edit`}>Edit</Link> : null}
+            ? <Link className="btn" to={`/events/${ev.id}/edit`}><Icon name="pencil" size={14} /> Edit</Link> : null}
           <button className="btn" onClick={() => act(async () => {
             const d = await api.post(`/api/events/${ev.id}/duplicate`);
             navigate(`/events/${d.event.id}/edit`);
-          })}>Duplicate</button>
+          })}><Icon name="copy" size={14} /> Duplicate</button>
           {ev.status === 'published'
             ? <button className="btn btn-danger" onClick={() => setConfirm({ type: 'cancel' })}>Cancel event</button>
-            : <button className="btn btn-danger" onClick={() => setConfirm({ type: 'delete' })}>Delete</button>}
+            : <button className="btn btn-danger" onClick={() => setConfirm({ type: 'delete' })}>
+                <Icon name="trash" size={14} /> Delete
+              </button>}
         </div>
       </div>
 
       {ev.status === 'draft' ? (
         <div className="card card-pad draft-cta">
           <div>
-            <strong style={{ fontSize: 15 }}>This event isn’t finished yet</strong>
+            <strong style={{ fontSize: 14 }}>This event isn’t finished yet</strong>
             <p className="small muted" style={{ margin: '2px 0 0' }}>
               It’s saved as a draft. Pick up where you left off to finish the details, design, and guest list, then send.
             </p>
           </div>
-          <Link className="btn btn-primary btn-lg" to={`/events/${ev.id}/edit`}>Continue creating →</Link>
+          <Link className="btn btn-primary" to={`/events/${ev.id}/edit`}>
+            Continue creating <Icon name="arrowRight" size={15} />
+          </Link>
         </div>
       ) : null}
 
       {ev.status === 'cancelled' ? (
-        <div className="banner banner-bad">This event is cancelled. Guests see a cancellation notice on the event page.</div>
+        <Banner tone="bad">This event is cancelled. Guests see a cancellation notice on the event page.</Banner>
       ) : null}
 
-      <div className="stat-grid">
-        <div className="stat"><div className="label">Invited</div><div className="value">{stats.invited}</div>
-          <div className="sub">{stats.emails_sent} emailed · {stats.emails_queued} queued</div></div>
-        <div className="stat tone-ok"><div className="label">Attending</div><div className="value">{stats.guests_attending}</div>
-          <div className="sub">{stats.accepted} accepted RSVP{stats.accepted === 1 ? '' : 's'}</div></div>
-        <div className="stat tone-bad"><div className="label">Declined</div><div className="value">{stats.declined}</div>
-          <div className="sub">&nbsp;</div></div>
-        <div className="stat tone-warn"><div className="label">Awaiting reply</div><div className="value">{stats.awaiting}</div>
-          <div className="sub">{stats.not_reached} not yet emailed</div></div>
-      </div>
+      <StatGrid>
+        <Stat icon="user" label="Invited" value={stats.invited}
+          sub={`${stats.emails_sent} emailed · ${stats.emails_queued} queued`} />
+        <Stat icon="checkCircle" tone="ok" label="Attending" value={stats.guests_attending}
+          sub={`${stats.accepted} accepted RSVP${stats.accepted === 1 ? '' : 's'}`} />
+        <Stat icon="xCircle" tone="bad" label="Declined" value={stats.declined} sub="&nbsp;" />
+        <Stat icon="clipboard" tone="warn" label="Awaiting reply" value={stats.awaiting}
+          sub={`${stats.not_reached} not yet emailed`} />
+      </StatGrid>
 
       {ev.capacity ? (
-        <div className="card card-pad" style={{ marginBottom: 16 }}>
-          <div className="spread" style={{ marginBottom: 6 }}>
-            <strong style={{ fontSize: 13.5 }}>Capacity</strong>
+        <Card style={{ marginBottom: 16 }}>
+          <div className="spread" style={{ marginBottom: 8 }}>
+            <strong style={{ fontSize: 13 }}>Capacity</strong>
             <span className="small muted">{stats.guests_attending} of {ev.capacity} places taken</span>
           </div>
-          <div className="progressbar">
+          <div className="progressbar" role="progressbar" aria-label="Capacity used"
+            aria-valuenow={stats.guests_attending} aria-valuemin={0} aria-valuemax={ev.capacity}>
             <div style={{ width: `${Math.min(100, (stats.guests_attending / ev.capacity) * 100)}%` }} />
           </div>
-        </div>
+        </Card>
       ) : null}
 
       {ev.share_enabled && ev.status === 'published' ? (
-        <div className="card card-pad" style={{ marginBottom: 16 }}>
-          <strong style={{ fontSize: 13.5 }}>Shareable link</strong>
+        <Card style={{ marginBottom: 16 }}>
+          <strong style={{ fontSize: 13 }}>Shareable link</strong>
           <p className="small muted" style={{ margin: '2px 0 8px' }}>
             Anyone with this link can view the event{ev.rsvp_mode === 'rsvp' ? ' and RSVP — forward it anywhere' : ''}.
             New RSVPs from the link appear in the guest list automatically.
           </p>
           <CopyBox value={ev.share_url} />
-        </div>
+        </Card>
       ) : null}
 
-      <div className="tabs">
-        <button className={`tab ${tab === 'guests' ? 'active' : ''}`} onClick={() => setTab('guests')}>
+      <div className="tabs" role="tablist">
+        <button role="tab" aria-selected={tab === 'guests'}
+          className={`tab ${tab === 'guests' ? 'active' : ''}`} onClick={() => setTab('guests')}>
           Guests ({guests.length})
         </button>
-        <button className={`tab ${tab === 'messages' ? 'active' : ''}`} onClick={() => setTab('messages')}>
+        <button role="tab" aria-selected={tab === 'messages'}
+          className={`tab ${tab === 'messages' ? 'active' : ''}`} onClick={() => setTab('messages')}>
           Follow-ups & nudges
         </button>
-        <button className={`tab ${tab === 'emails' ? 'active' : ''}`} onClick={() => setTab('emails')}>
+        <button role="tab" aria-selected={tab === 'emails'}
+          className={`tab ${tab === 'emails' ? 'active' : ''}`} onClick={() => setTab('emails')}>
           Email log ({emails.length})
         </button>
       </div>
 
       {tab === 'guests' ? (
-        <div className="card">
-          <div className="card-pad spread">
+        <Card flush>
+          <div className="table-toolbar">
             <div className="row">
-              <button className="btn btn-primary btn-sm" onClick={() => setAddOpen(true)}>+ Add guests</button>
+              <button className="btn btn-primary btn-sm" onClick={() => setAddOpen(true)}>
+                <Icon name="plus" size={14} /> Add guests
+              </button>
               {sendable > 0 && ev.status !== 'cancelled' ? (
                 <button className="btn btn-green btn-sm" disabled={busy}
                   onClick={() => setConfirm({ type: 'send' })}>
-                  Send invitations ({sendable})
+                  <Icon name="send" size={14} /> Send invitations ({sendable})
                 </button>
               ) : null}
-              <a className="btn btn-sm" href={`/api/export/events/${ev.id}/guests.csv`}>Export CSV</a>
+              <a className="btn btn-sm" href={`/api/export/events/${ev.id}/guests.csv`}>
+                <Icon name="download" size={14} /> Export CSV
+              </a>
             </div>
             <select className="search-input" style={{ maxWidth: 190 }} value={filter}
+              aria-label="Filter guests"
               onChange={(e) => setFilter(e.target.value)}>
               <option value="all">All guests</option>
               <option value="yes">Accepted</option>
@@ -264,7 +279,7 @@ export default function EventDetail() {
             </select>
           </div>
           {filteredGuests.length === 0 ? (
-            <Empty icon="🫂" title={guests.length === 0 ? 'No guests yet' : 'Nothing matches this filter'}>
+            <Empty icon="users" title={guests.length === 0 ? 'No guests yet' : 'Nothing matches this filter'}>
               {guests.length === 0 ? 'Add guests from your contacts, or share the event link.' : ''}
             </Empty>
           ) : (
@@ -272,16 +287,19 @@ export default function EventDetail() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Guest</th><th>Invitation</th><th>Response</th><th>Party</th><th>Note</th><th></th>
+                    <th>Guest</th><th>Invitation</th><th>Response</th><th>Party</th><th>Note</th>
+                    <th><span className="sr-only">Actions</span></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredGuests.map((g) => (
                     <tr key={g.id}>
                       <td>
-                        <span className="t-main">{g.name || '—'}</span>
-                        {g.source === 'link' ? <span className="badge badge-indigo" style={{ marginLeft: 7 }}>via link</span> : null}
-                        {g.unsubscribed ? <span className="badge badge-amber" style={{ marginLeft: 7 }}>Unsubscribed</span> : null}
+                        <div className="row" style={{ gap: 7 }}>
+                          <span className="t-main">{g.name || '—'}</span>
+                          {g.source === 'link' ? <span className="badge badge-indigo">via link</span> : null}
+                          {g.unsubscribed ? <span className="badge badge-amber">Unsubscribed</span> : null}
+                        </div>
                         <div className="t-sub">{g.email || g.phone || 'no contact info'}</div>
                       </td>
                       <td><EmailStatusBadge status={g.email_status} /></td>
@@ -289,30 +307,30 @@ export default function EventDetail() {
                         <ResponseBadge response={g.response} />
                         {g.responded_at ? <div className="t-sub">{timeAgo(g.responded_at)}</div> : null}
                       </td>
-                      <td>{g.party_size}</td>
+                      <td className="tabular">{g.party_size}</td>
                       <td className="t-sub" style={{ maxWidth: 180 }} title={g.note}>{g.note}</td>
                       <td>
                         <div className="t-actions">
                           {ev.rsvp_mode === 'rsvp' ? (
                             <>
-                              <button className="btn btn-sm" title="Mark as accepted" disabled={busy}
-                                onClick={() => act(() => api.put(`/api/events/${ev.id}/guests/${g.id}`, { response: 'yes' }))}>✓</button>
-                              <button className="btn btn-sm" title="Mark as declined" disabled={busy}
-                                onClick={() => act(() => api.put(`/api/events/${ev.id}/guests/${g.id}`, { response: 'no' }))}>✗</button>
+                              <IconButton icon="check" label="Mark as accepted" disabled={busy}
+                                onClick={() => act(() => api.put(`/api/events/${ev.id}/guests/${g.id}`, { response: 'yes' }))} />
+                              <IconButton icon="x" label="Mark as declined" disabled={busy}
+                                onClick={() => act(() => api.put(`/api/events/${ev.id}/guests/${g.id}`, { response: 'no' }))} />
                             </>
                           ) : null}
                           {g.email && ev.status !== 'cancelled' ? (
-                            <button className="btn btn-sm" title="Send / resend invitation" disabled={busy}
+                            <IconButton icon="mail" label="Send / resend invitation" disabled={busy}
                               onClick={() => act(() => api.post(`/api/events/${ev.id}/send`, { invite_ids: [g.id] }),
-                                'Invitation queued')}>✉</button>
+                                'Invitation queued')} />
                           ) : null}
                           {!g.contact_id && g.email ? (
-                            <button className="btn btn-sm" title="Save to contacts" disabled={busy}
+                            <IconButton icon="plus" label="Save to contacts" disabled={busy}
                               onClick={() => act(() => api.post(`/api/events/${ev.id}/guests/${g.id}/add-contact`),
-                                'Saved to contacts')}>＋</button>
+                                'Saved to contacts')} />
                           ) : null}
-                          <button className="btn btn-sm btn-ghost" title="Remove from event" disabled={busy}
-                            onClick={() => setConfirm({ type: 'removeGuest', guest: g })}>🗑</button>
+                          <IconButton icon="trash" label="Remove from event" tone="ghost" disabled={busy}
+                            onClick={() => setConfirm({ type: 'removeGuest', guest: g })} />
                         </div>
                       </td>
                     </tr>
@@ -321,14 +339,14 @@ export default function EventDetail() {
               </table>
             </div>
           )}
-        </div>
+        </Card>
       ) : null}
 
       {tab === 'messages' ? (
         <div className="grid3">
           {Object.entries(COMPOSE_PRESETS).map(([key, p]) => (
             <div key={key} className="card card-pad">
-              <h3 style={{ margin: '0 0 6px', fontSize: 14.5 }}>{p.label}</h3>
+              <h3 style={{ margin: '0 0 6px', fontSize: 14 }}>{p.label}</h3>
               <p className="small muted" style={{ marginTop: 0 }}>
                 {key === 'nudge'
                   ? `${guests.filter((g) => !g.response && g.email_status === 'sent').length} guest(s) haven't replied yet.`
@@ -338,26 +356,29 @@ export default function EventDetail() {
               </p>
               <button className="btn btn-sm"
                 disabled={ev.status === 'cancelled'}
-                onClick={() => openCompose(key)}>Compose</button>
+                onClick={() => openCompose(key)}>
+                <Icon name="pencil" size={14} /> Compose
+              </button>
             </div>
           ))}
         </div>
       ) : null}
 
       {tab === 'emails' ? (
-        <div className="card">
+        <Card flush>
           {emails.length === 0 ? (
-            <Empty icon="📬" title="No emails yet">Everything sent for this event shows up here, including exact content.</Empty>
+            <Empty icon="inbox" title="No emails yet">Everything sent for this event shows up here, including exact content.</Empty>
           ) : (
             <div className="table-wrap">
               <table className="table">
                 <thead>
-                  <tr><th>When</th><th>Type</th><th>To</th><th>Subject</th><th>Status</th><th></th></tr>
+                  <tr><th>When</th><th>Type</th><th>To</th><th>Subject</th><th>Status</th>
+                    <th><span className="sr-only">Actions</span></th></tr>
                 </thead>
                 <tbody>
                   {emails.map((e) => (
                     <tr key={e.id}>
-                      <td className="t-sub" style={{ whiteSpace: 'nowrap' }}>{timeAgo(e.sent_at || e.created_at)}</td>
+                      <td className="t-sub nowrap">{timeAgo(e.sent_at || e.created_at)}</td>
                       <td><span className="badge badge-gray">{e.kind.replace('_', ' ')}</span></td>
                       <td className="t-sub">{e.to_email}</td>
                       <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.subject}</td>
@@ -372,8 +393,8 @@ export default function EventDetail() {
                             catch (err) { toast(err.message, 'bad'); }
                           }}>View</button>
                           {e.status === 'failed' ? (
-                            <button className="btn btn-sm" disabled={busy}
-                              onClick={() => act(() => api.post(`/api/emails/${e.id}/retry`), 'Retrying')}>Retry</button>
+                            <IconButton icon="refresh" label="Retry sending" disabled={busy}
+                              onClick={() => act(() => api.post(`/api/emails/${e.id}/retry`), 'Retrying')} />
                           ) : null}
                         </div>
                       </td>
@@ -383,7 +404,7 @@ export default function EventDetail() {
               </table>
             </div>
           )}
-        </div>
+        </Card>
       ) : null}
 
       {addOpen ? (
@@ -422,14 +443,14 @@ export default function EventDetail() {
                   });
                   setComposePreview(d);
                 } catch (err) { toast(err.message, 'bad'); }
-              }}>Preview</button>
+              }}><Icon name="eye" size={14} /> Preview</button>
               <button className="btn btn-primary" onClick={sendCompose} disabled={busy || audienceCount === 0}>
                 {busy ? 'Queuing…' : `Send to ${audienceCount} guest${audienceCount === 1 ? '' : 's'}`}
               </button>
             </>
           }>
           {compose.kind === 'nudge'
-            ? <div className="banner banner-info">Nudges include the Accept / Decline buttons again.</div>
+            ? <Banner tone="info">Nudges include the Accept / Decline buttons again.</Banner>
             : null}
           <Field label="Audience">
             <select value={compose.audience}

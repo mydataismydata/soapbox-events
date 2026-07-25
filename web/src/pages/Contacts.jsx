@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
-import { Spinner, Modal, ConfirmModal, Empty, Field, useToast, Badge } from '../ui.jsx';
+import {
+  Spinner, Modal, ConfirmModal, Empty, Field, useToast, Badge, Banner, Card,
+  IconButton, Icon,
+} from '../ui.jsx';
 
 function ContactModal({ contact, onClose, onSaved }) {
   const toast = useToast();
@@ -47,7 +50,7 @@ function ContactModal({ contact, onClose, onSaved }) {
           </button>
         </>
       }>
-      <Field label="Name *">
+      <Field label="Name" required>
         <input value={form.name} maxLength={200} autoFocus
           onChange={(e) => setForm({ ...form, name: e.target.value })} />
       </Field>
@@ -115,22 +118,25 @@ function ImportModal({ onClose, onDone }) {
       <div className="row" style={{ marginBottom: 10 }}>
         <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
           onChange={(e) => readFile(e.target.files?.[0])} />
-        <button className="btn btn-sm" onClick={() => fileRef.current?.click()}>Choose CSV file…</button>
+        <button className="btn btn-sm" onClick={() => fileRef.current?.click()}>
+          <Icon name="upload" size={14} /> Choose CSV file…
+        </button>
         <span className="small muted">or paste below</span>
       </div>
       <Field>
         <textarea rows={9} value={csv} placeholder={'name,email,phone\nAva Thompson,ava@example.com,555-0101'}
-          onChange={(e) => setCsv(e.target.value)} style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12.5 }} />
+          onChange={(e) => setCsv(e.target.value)}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }} />
       </Field>
       {result ? (
-        <div className="banner banner-ok">
+        <Banner tone="ok">
           Imported {result.added}, skipped {result.skipped} duplicate{result.skipped === 1 ? '' : 's'}.
           {result.errors?.length ? (
             <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
               {result.errors.slice(0, 6).map((e, i) => <li key={i}>{e}</li>)}
             </ul>
           ) : null}
-        </div>
+        </Banner>
       ) : null}
     </Modal>
   );
@@ -202,54 +208,75 @@ export default function Contacts() {
           </p>
         </div>
         <div className="head-actions">
-          <a className="btn" href="/api/export/contacts.csv">Export CSV</a>
-          <button className="btn" onClick={() => setModal({ type: 'import' })}>Import CSV</button>
-          <button className="btn btn-primary" onClick={() => setModal({ type: 'new' })}>+ Add contact</button>
+          <a className="btn" href="/api/export/contacts.csv">
+            <Icon name="download" size={15} /> Export CSV
+          </a>
+          <button className="btn" onClick={() => setModal({ type: 'import' })}>
+            <Icon name="upload" size={15} /> Import CSV
+          </button>
+          <button className="btn btn-primary" onClick={() => setModal({ type: 'new' })}>
+            <Icon name="plus" size={15} /> Add contact
+          </button>
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-pad spread">
-          <input className="search-input" style={{ maxWidth: 320 }} placeholder="Search name, email, phone…"
-            value={q} onChange={(e) => setQ(e.target.value)} />
+      <Card flush>
+        <div className="table-toolbar">
+          <div className="search-field" style={{ maxWidth: 320, flex: 1 }}>
+            <Icon name="search" size={15} />
+            <input className="search-input" placeholder="Search name, email, phone…"
+              aria-label="Search contacts"
+              value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
           {selected.size > 0 ? (
             <div className="row">
               <span className="small muted">{selected.size} selected</span>
-              <select className="search-input" style={{ width: 200 }} defaultValue="" disabled={busy}
+              <select className="search-input" style={{ width: 190 }} defaultValue="" disabled={busy}
+                aria-label="Add selected contacts to a group"
                 onChange={(e) => { addSelectedToGroup(Number(e.target.value)); e.target.value = ''; }}>
                 <option value="" disabled>Add to group…</option>
                 {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
             </div>
-          ) : null}
+          ) : (
+            <span className="small muted">{filtered.length} shown</span>
+          )}
         </div>
         {filtered.length === 0 ? (
-          <Empty icon="👤" title={contacts.length === 0 ? 'No contacts yet' : 'No matches'}
+          <Empty icon="user" title={contacts.length === 0 ? 'No contacts yet' : 'No matches'}
             action={contacts.length === 0
               ? <button className="btn btn-primary" onClick={() => setModal({ type: 'import' })}>Import a CSV</button>
               : null}>
-            {contacts.length === 0 ? 'Add people one at a time or import a whole spreadsheet.' : ''}
+            {contacts.length === 0
+              ? 'Add people one at a time or import a whole spreadsheet.'
+              : 'Try a different name, email or phone number.'}
           </Empty>
         ) : (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{ width: 30 }}>
-                    <input type="checkbox"
+                  <th style={{ width: 34 }}>
+                    <input type="checkbox" aria-label="Select all shown contacts"
                       checked={selected.size === filtered.length && filtered.length > 0}
                       onChange={(e) => setSelected(e.target.checked ? new Set(filtered.map((c) => c.id)) : new Set())} />
                   </th>
-                  <th>Name</th><th>Email</th><th>Phone</th><th>Groups</th><th></th>
+                  <th>Name</th><th>Email</th><th>Phone</th><th>Groups</th>
+                  <th><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((c) => (
                   <tr key={c.id}>
-                    <td><input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} /></td>
                     <td>
-                      <span className="t-main">{c.name}</span>
-                      {c.unsubscribed_at ? <Badge tone="amber">Unsubscribed</Badge> : null}
+                      <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)}
+                        aria-label={`Select ${c.name}`} />
+                    </td>
+                    <td>
+                      <div className="row" style={{ gap: 7 }}>
+                        <span className="t-main">{c.name}</span>
+                        {c.unsubscribed_at ? <Badge tone="amber" dot>Unsubscribed</Badge> : null}
+                      </div>
                       {c.notes ? <div className="t-sub" title={c.notes}>{c.notes.slice(0, 60)}</div> : null}
                     </td>
                     <td className="t-sub">{c.email || '—'}</td>
@@ -262,8 +289,10 @@ export default function Contacts() {
                     </td>
                     <td>
                       <div className="t-actions">
-                        <button className="btn btn-sm" onClick={() => setModal({ type: 'edit', contact: c })}>Edit</button>
-                        <button className="btn btn-sm btn-ghost" onClick={() => setModal({ type: 'delete', contact: c })}>🗑</button>
+                        <IconButton icon="pencil" label={`Edit ${c.name}`}
+                          onClick={() => setModal({ type: 'edit', contact: c })} />
+                        <IconButton icon="trash" label={`Delete ${c.name}`} tone="ghost"
+                          onClick={() => setModal({ type: 'delete', contact: c })} />
                       </div>
                     </td>
                   </tr>
@@ -272,7 +301,7 @@ export default function Contacts() {
             </table>
           </div>
         )}
-      </div>
+      </Card>
 
       {modal?.type === 'new' || modal?.type === 'edit' ? (
         <ContactModal contact={modal.contact}

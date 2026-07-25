@@ -3,6 +3,19 @@
    any future re-skin come for free.
 --------------------------------------------------------------------------- */
 
+/* === brand =============================================================== */
+/* The logo reads two custom properties rather than fixed fills, so each
+   context can hand it colours that work against its own background. Context
+   rules must out-specify this one — components.css is the last file in, so a
+   bare `.side-logo` in layout.css would lose to it. */
+.logo {
+  --logo-ink: var(--c-ink);
+  --logo-accent: var(--c-accent);
+  display: block;
+  width: auto;
+  height: 24px;
+}
+
 /* === surfaces ============================================================ */
 
 .card {
@@ -1077,24 +1090,9 @@ button.chip.active,
   width: 100%;
   max-width: 380px;
 }
-.login-mark {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--r-lg);
-  background: var(--c-accent);
-  color: var(--c-accent-ink);
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: var(--fs-lg);
-  margin-bottom: var(--sp-4);
-}
-.login-brand {
-  font-size: var(--fs-xl);
-  font-weight: 660;
-  letter-spacing: -0.02em;
-  margin: 0;
-}
+/* The heading is kept for structure; the logo inside supplies its text. */
+.login-brand { margin: 0; }
+.login-card .login-logo { height: 30px; }
 .login-sub {
   color: var(--c-muted);
   font-size: var(--fs-base);

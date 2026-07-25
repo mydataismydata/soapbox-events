@@ -62,6 +62,9 @@
   --c-side-ink-strong: #ffffff;
   --c-side-line: rgba(255, 255, 255, 0.08);
   --c-side-faint: #868d9b;
+  /* The sidebar is dark in both themes, so it needs an accent that reads on
+     black — the light theme's --c-accent is far too dark there. */
+  --c-side-accent: #2dd4bf;
 
   /* --- focus ----------------------------------------------------------- */
   --c-focus: #0f766e;

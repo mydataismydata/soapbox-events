@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { Field, ThemeToggle } from '../ui.jsx';
+import Logo from '../components/Logo.jsx';
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -33,8 +34,7 @@ export default function Login({ onLogin }) {
     <div className="login-wrap">
       <ThemeToggle className="login-theme" />
       <form className="login-card" onSubmit={submit}>
-        <div className="login-mark" aria-hidden="true">S</div>
-        <h1 className="login-brand">Soapbox</h1>
+        <h1 className="login-brand"><Logo className="login-logo" /></h1>
         <p className="login-sub">Events, invitations &amp; RSVPs</p>
         <Field label="Email" htmlFor="login-email">
           <input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}

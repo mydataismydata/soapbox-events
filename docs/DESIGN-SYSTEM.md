@@ -15,6 +15,7 @@ beyond Vite.
 | `web/src/styles/components.css` | Cards, buttons, forms, tables, badges, banners, modals, wizard, flyer designer, editor |
 | `web/src/styles.css` | Import order only — tokens, base, layout, components |
 | `web/src/icons.jsx` | The monochrome line-icon set |
+| `web/src/components/Logo.jsx` | The brand lockup — mark and wordmark, inlined so CSS can theme it |
 | `web/src/ui.jsx` | React primitives (below) |
 
 ## Rules
@@ -66,6 +67,38 @@ From `web/src/ui.jsx`:
 | `<Modal>` / `<ConfirmModal>` | Dialog with `role="dialog"`, focus moved into the panel, Escape to close. |
 | `<ThemeProvider>` / `<ThemeToggle>` / `useTheme()` | Light / dark / system. Stored per browser under `soapbox.theme`; `system` follows the OS live. |
 | `<Icon name size>` | Any glyph from `icons.jsx`. |
+| `<Logo variant>` | The brand lockup — `full` is mark + wordmark, `mark` is the graphic alone (used by the collapsed rail). |
+
+## The logo
+
+`Logo.jsx` inlines the artwork rather than loading an `.svg`, so one file
+serves every background. It takes no fixed fills — two custom properties do
+the work:
+
+| Property | Paints |
+| --- | --- |
+| `--logo-ink` | The mark and the "soap" half of the wordmark |
+| `--logo-accent` | The "box" half |
+
+They default to `--c-ink` / `--c-accent` and are overridden on the sidebar,
+which is dark in both themes and therefore needs `--c-side-accent` (a light
+teal) rather than the light theme's much darker `--c-accent`.
+
+Two things to know before editing it:
+
+- **Context rules must out-specify `.logo`.** `components.css` is the last
+  file in the import chain, so a bare `.side-logo` selector in `layout.css`
+  loses to `.logo`. Scope context rules to their container
+  (`.sidebar .side-logo`, `.login-card .login-logo`).
+- **Counters are punched, not painted.** Each letter carries its bowl in the
+  same path with `fill-rule="evenodd"`, so the holes are truly transparent
+  and the logo needs no backing colour. The source artwork drew them as
+  opaque off-white shapes, which only works on one background.
+
+The source lockup stacks the mark above the wordmark; `MARK_TRANSFORM` and
+`WORD_TRANSFORM` re-lay it out horizontally. To change the balance between
+the two, edit those transforms — the comment above them records the source
+bounding boxes the numbers derive from.
 
 ## Adding a glyph
 

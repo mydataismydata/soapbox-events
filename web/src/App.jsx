@@ -3,6 +3,7 @@ import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom'
 import { api, onUnauthorized } from './api.js';
 import { ToastProvider, ThemeProvider, ThemeToggle, Spinner } from './ui.jsx';
 import Icon from './icons.jsx';
+import Logo from './components/Logo.jsx';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import EventsList from './pages/EventsList.jsx';
@@ -92,11 +93,11 @@ function Layout({ children }) {
     <div className={`shell ${collapsed ? 'is-collapsed' : ''} ${drawerOpen ? 'is-open' : ''}`}>
       <aside className="sidebar">
         <div className="side-head">
-          <div className="side-mark" aria-hidden="true">S</div>
-          <div className="side-id">
-            <div className="side-name">Soapbox</div>
-            <div className="side-org" title={org.name}>{org.name}</div>
-          </div>
+          {/* Both variants render; the stylesheet picks one, so the drawer
+              breakpoint keeps control of what a narrow screen shows. */}
+          <Logo className="side-logo side-logo-full" variant="full" />
+          <Logo className="side-logo side-logo-mark" variant="mark" />
+          <div className="side-org" title={org.name}>{org.name}</div>
         </div>
 
         <nav className="side-nav" aria-label="Main">

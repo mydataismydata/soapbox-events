@@ -89,7 +89,12 @@ Two things to know before editing it:
 - **Context rules must out-specify `.logo`.** `components.css` is the last
   file in the import chain, so a bare `.side-logo` selector in `layout.css`
   loses to `.logo`. Scope context rules to their container
-  (`.sidebar .side-logo`, `.login-card .login-logo`).
+  (`.sidebar .side-logo`, `.login-card .login-logo`). This has bitten twice —
+  once silently, where a bare `.side-logo-mark { display: none }` lost to
+  `.logo { display: block }` and the sidebar drew the logo twice.
+- **Which variant renders is a JS decision, not a CSS one.** `App.jsx` picks
+  `mark` or `full`, so exactly one `<svg>` is ever in the DOM. Don't render
+  both and hide one — that is what caused the double-draw above.
 - **Counters are punched, not painted.** Each letter carries its bowl in the
   same path with `fill-rule="evenodd"`, so the holes are truly transparent
   and the logo needs no backing colour. The source artwork drew them as

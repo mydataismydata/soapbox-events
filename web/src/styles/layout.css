@@ -31,17 +31,14 @@
   padding: var(--sp-4) var(--sp-3) var(--sp-3);
   min-height: 62px;
 }
-/* Two variants ship in the markup; CSS decides which one the current rail
-   width calls for, so the drawer's media query keeps working unchanged.
-   Scoped to .sidebar so it out-specifies the base .logo rule. */
+/* Which variant renders is decided in App.jsx, not here — one <svg> in the
+   DOM, never two. Scoped to .sidebar so it out-specifies the base .logo
+   rule, which lives in the later-loading components.css. */
 .sidebar .side-logo {
   --logo-ink: var(--c-side-ink-strong);
   --logo-accent: var(--c-side-accent);
   height: 24px;
 }
-.side-logo-mark { display: none; }
-.shell.is-collapsed .side-logo-full { display: none; }
-.shell.is-collapsed .side-logo-mark { display: block; }
 .side-org {
   font-size: var(--fs-sm);
   color: var(--c-side-faint);
@@ -286,8 +283,6 @@
   .shell.is-collapsed .nav-label,
   .shell.is-collapsed .side-who,
   .shell.is-collapsed .side-group { display: revert; }
-  .shell.is-collapsed .side-logo-full { display: block; }
-  .shell.is-collapsed .side-logo-mark { display: none; }
   .shell.is-collapsed .side-head { align-items: flex-start; padding-inline: var(--sp-3); }
   .shell.is-collapsed .side-nav a { justify-content: flex-start; padding-inline: var(--sp-3); }
   .shell.is-collapsed .side-foot { flex-direction: row; padding-inline: var(--sp-3); }

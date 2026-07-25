@@ -39,6 +39,8 @@ const NAV = [
 ];
 
 const COLLAPSE_KEY = 'soapbox.sidebar.collapsed';
+// Below this the rail stops being a rail and becomes an off-canvas drawer.
+const NARROW = '(max-width: 900px)';
 
 // The topbar label follows the route: deepest matching nav entry wins, so
 // /events/12/edit still reads "Events".
@@ -66,9 +68,28 @@ function Layout({ children }) {
     try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; }
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(() => window.matchMedia(NARROW).matches);
 
   // Picking a destination closes the mobile drawer.
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
+
+  // Three signals for one fact, because none of them is universally
+  // delivered: some engines (and headless viewport overrides) change width
+  // without dispatching the media-query event, or without a resize event.
+  // A ResizeObserver on the root element catches what the others miss.
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW);
+    const sync = () => setIsNarrow(mq.matches);
+    mq.addEventListener('change', sync);
+    window.addEventListener('resize', sync);
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(sync) : null;
+    ro?.observe(document.documentElement);
+    return () => {
+      mq.removeEventListener('change', sync);
+      window.removeEventListener('resize', sync);
+      ro?.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') setDrawerOpen(false); };
@@ -77,8 +98,13 @@ function Layout({ children }) {
   }, []);
 
   function toggleRail() {
+    // Read the width here rather than trusting isNarrow: this decides which
+    // control the button *is*, so it must not depend on a resize event having
+    // been delivered. The state is resynced on the way past.
+    const narrow = window.matchMedia(NARROW).matches;
+    setIsNarrow(narrow);
     // Under 900px the rail is an off-canvas drawer; above it, a width toggle.
-    if (window.matchMedia('(max-width: 900px)').matches) {
+    if (narrow) {
       setDrawerOpen((v) => !v);
       return;
     }
@@ -93,10 +119,9 @@ function Layout({ children }) {
     <div className={`shell ${collapsed ? 'is-collapsed' : ''} ${drawerOpen ? 'is-open' : ''}`}>
       <aside className="sidebar">
         <div className="side-head">
-          {/* Both variants render; the stylesheet picks one, so the drawer
-              breakpoint keeps control of what a narrow screen shows. */}
-          <Logo className="side-logo side-logo-full" variant="full" />
-          <Logo className="side-logo side-logo-mark" variant="mark" />
+          {/* Collapsed only narrows the rail on wide screens — below 900px it
+              is a drawer, which always has room for the full lockup. */}
+          <Logo className="side-logo" variant={collapsed && !isNarrow ? 'mark' : 'full'} />
           <div className="side-org" title={org.name}>{org.name}</div>
         </div>
 

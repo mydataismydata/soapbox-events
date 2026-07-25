@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, timeAgo } from '../api.js';
+import { api } from '../api.js';
 import {
-  Spinner, Modal, ConfirmModal, Empty, CopyBox, useToast, EmailStatusBadge, Badge,
-  Banner, Card, StatGrid, Stat, IconButton, Icon,
+  Spinner, ConfirmModal, CopyBox, useToast, Badge,
+  Banner, Card, StatGrid, Stat, Icon,
 } from '../ui.jsx';
+import EmailLog from '../components/EmailLog.jsx';
 
 function BroadcastBadge({ status }) {
   if (status === 'sent') return <Badge tone="green" dot>Sent</Badge>;
@@ -18,20 +19,14 @@ export default function BroadcastDetail() {
   const toast = useToast();
 
   const [b, setB] = useState(null);
-  const [emails, setEmails] = useState([]);
+  const [summary, setSummary] = useState({ total: 0, pending: 0 });
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState(null);
-  const [viewEmail, setViewEmail] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async (quiet = false) => {
     try {
-      const [d, e] = await Promise.all([
-        api.get(`/api/broadcasts/${id}`),
-        api.get(`/api/emails?broadcast_id=${id}`),
-      ]);
-      setB(d.broadcast);
-      setEmails(e.emails);
+      setB((await api.get(`/api/broadcasts/${id}`)).broadcast);
     } catch (err) {
       if (!quiet) setError(err.message);
     }
@@ -39,13 +34,13 @@ export default function BroadcastDetail() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Quiet refresh while emails are moving through the queue.
-  const hasActivity = emails.some((e) => ['queued', 'sending'].includes(e.status));
+  // The log refreshes itself while emails are in flight; follow it so the
+  // stats above it keep up too.
   useEffect(() => {
-    if (!hasActivity) return;
+    if (!summary.pending) return undefined;
     const t = setInterval(() => load(true), 3000);
     return () => clearInterval(t);
-  }, [hasActivity, load]);
+  }, [summary.pending, load]);
 
   if (error) return <div className="page"><Banner tone="bad">{error}</Banner></div>;
   if (!b) return <div className="page"><Spinner /></div>;
@@ -122,58 +117,12 @@ export default function BroadcastDetail() {
         </Card>
       ) : null}
 
-      <Card flush title={`Email log (${emails.length})`}>
-        {emails.length === 0 ? (
-          <Empty icon="inbox" title="No emails yet">
-            Once you send (or run a test), every email shows up here with its exact content and status.
-          </Empty>
-        ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr><th>When</th><th>Type</th><th>To</th><th>Subject</th><th>Status</th>
-                  <th><span className="sr-only">Actions</span></th></tr>
-              </thead>
-              <tbody>
-                {emails.map((e) => (
-                  <tr key={e.id}>
-                    <td className="t-sub nowrap">{timeAgo(e.sent_at || e.created_at)}</td>
-                    <td><span className="badge badge-gray">{e.kind === 'test' ? 'test' : 'broadcast'}</span></td>
-                    <td className="t-sub">{e.to_email}</td>
-                    <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.subject}</td>
-                    <td>
-                      <EmailStatusBadge status={e.status} />
-                      {e.error ? <div className="t-sub" title={e.error}>{e.error.slice(0, 60)}</div> : null}
-                    </td>
-                    <td>
-                      <div className="t-actions">
-                        <button className="btn btn-sm" onClick={async () => {
-                          try { setViewEmail((await api.get(`/api/emails/${e.id}`)).email); }
-                          catch (err) { toast(err.message, 'bad'); }
-                        }}>View</button>
-                        {e.status === 'failed' ? (
-                          <IconButton icon="refresh" label="Retry sending" disabled={busy}
-                            onClick={() => act(() => api.post(`/api/emails/${e.id}/retry`), 'Retrying')} />
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      {/* Every row here is this broadcast, so type and subject would only
+          repeat the page heading — the type filter covers test vs real. */}
+      <Card flush title="Email log">
+        <EmailLog scope={{ broadcast_id: id }} kinds={['broadcast', 'test']} onSummary={setSummary}
+          emptyHint="Once you send (or run a test), every email shows up here with its exact content and status." />
       </Card>
-
-      {viewEmail ? (
-        <Modal title={viewEmail.subject} size="lg" onClose={() => setViewEmail(null)}>
-          <p className="small muted" style={{ margin: '0 0 8px' }}>
-            To {viewEmail.to_email} · {viewEmail.kind === 'test' ? 'test' : 'broadcast'} · {viewEmail.status}
-            {viewEmail.sent_at ? ` · ${viewEmail.sent_at} UTC` : ''}
-          </p>
-          <iframe className="email-frame" title="Sent email" srcDoc={viewEmail.html} />
-        </Modal>
-      ) : null}
 
       {confirm?.type === 'delete' ? (
         <ConfirmModal title="Delete broadcast?" danger busy={busy}

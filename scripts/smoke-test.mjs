@@ -274,6 +274,43 @@ let guests = [];
   check('email html contains accept + decline + unsubscribe links',
     html.includes('/accept') && html.includes('/decline') && html.includes('/u/'));
 
+  // --- email log: filtering, sorting, paging -------------------------------
+  const all = await A.api('GET', `/api/emails?event_id=${eventId}&per_page=100`);
+  const logged = all.data.emails.length;
+  check('email log reports its own total', all.data.total === logged && all.data.pages === 1);
+  check('email log counts what is still in flight', typeof all.data.pending === 'number');
+
+  const one = all.data.emails[0];
+  const hit = await A.api('GET', `/api/emails?event_id=${eventId}&q=${encodeURIComponent(one.to_email)}`);
+  check('email log filters by recipient',
+    hit.data.total >= 1 && hit.data.emails.every((e) => e.to_email === one.to_email));
+  const partial = await A.api('GET', `/api/emails?event_id=${eventId}&q=${encodeURIComponent(one.to_email.slice(2, 7))}`);
+  check('recipient filter matches on a fragment', partial.data.total >= 1);
+  const miss = await A.api('GET', `/api/emails?event_id=${eventId}&q=nobody-by-that-name`);
+  check('recipient filter can match nothing', miss.data.total === 0 && miss.data.emails.length === 0);
+
+  const byKind = await A.api('GET', `/api/emails?event_id=${eventId}&kind=invitation`);
+  check('email log filters by type', byKind.data.emails.every((e) => e.kind === 'invitation'));
+
+  const asc = await A.api('GET', `/api/emails?event_id=${eventId}&sort=recipient&dir=asc&per_page=100`);
+  const desc = await A.api('GET', `/api/emails?event_id=${eventId}&sort=recipient&dir=desc&per_page=100`);
+  const ascTo = asc.data.emails.map((e) => e.to_email);
+  check('email log sorts by recipient', String(ascTo) === String([...ascTo].sort()));
+  check('sort direction flips the order', String(desc.data.emails.map((e) => e.to_email)) === String([...ascTo].reverse()));
+  const unsortable = await A.api('GET', `/api/emails?event_id=${eventId}&sort=;DROP TABLE email_log`);
+  check('unknown sort column falls back safely', unsortable.status === 200 && unsortable.data.emails.length > 0);
+
+  const p1 = await A.api('GET', `/api/emails?event_id=${eventId}&per_page=2&page=1&sort=recipient&dir=asc`);
+  const p2 = await A.api('GET', `/api/emails?event_id=${eventId}&per_page=2&page=2&sort=recipient&dir=asc`);
+  check('email log paginates', p1.data.emails.length === 2 && p1.data.pages === Math.ceil(logged / 2));
+  check('pages do not overlap', !p1.data.emails.some((a) => p2.data.emails.some((b) => b.id === a.id)));
+
+  // The org-wide log spans every event and broadcast, so it needs the source.
+  const orgWide = await A.api('GET', '/api/emails?per_page=200');
+  check('org-wide log includes more than one event\'s worth', orgWide.data.total >= logged);
+  check('org-wide log names each email\'s source',
+    orgWide.data.emails.filter((e) => e.event_id).every((e) => Boolean(e.event_title)));
+
   const withEmail = guests.filter((x) => x.email && x.email_status === 'sent');
   const acceptRes = await fetch(`${BASE}/o/alpha/i/${withEmail[0].token}/accept`, { redirect: 'manual' });
   check('accept link redirects', acceptRes.status === 303);
@@ -308,6 +345,10 @@ let guests = [];
   check('stats: accepted 2, declined 1, awaiting 2, attending 3',
     stats?.accepted === 2 && stats?.declined === 1 && stats?.awaiting === 2 && stats?.guests_attending === 3,
     JSON.stringify(stats));
+  // Labels the email log tab without the tab having to be opened first.
+  const logCount = (await A.api('GET', `/api/emails?event_id=${eventId}&per_page=200`)).data.total;
+  check('stats count the event\'s logged emails', stats?.emails_logged === logCount,
+    `${stats?.emails_logged} vs ${logCount}`);
 }
 
 // --- nudge + follow-up -----------------------------------------------------

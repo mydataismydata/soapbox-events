@@ -506,6 +506,41 @@ a.t-main:hover { color: var(--c-accent-text); }
 }
 .search-field input { padding-left: 31px; }
 
+/* Sortable column headers: the whole label is the button, so it sits exactly
+   where a plain <th> label would. The arrow is faint until the column sorts. */
+.table th:has(.th-sort) { padding: 0; }
+.th-sort {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 9px var(--sp-4);
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.th-sort:hover { color: var(--c-ink); }
+.th-sort.is-active { color: var(--c-accent-text); }
+.th-sort .th-arrow { opacity: 0; transition: opacity var(--transition); }
+.th-sort:hover .th-arrow,
+.th-sort.is-active .th-arrow { opacity: 1; }
+
+/* The count sits at the end of a log's filter strip. */
+.log-count { white-space: nowrap; }
+
+/* Pager under a long table. */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--c-line);
+}
+
 /* Table filter / bulk-action strip. */
 .table-toolbar {
   display: flex;

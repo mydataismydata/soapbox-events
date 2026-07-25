@@ -152,7 +152,8 @@ a per-broadcast toggle.
 and anyone who has unsubscribed (from a broadcast *or* an event) is skipped and
 counted in the send summary. The broadcast page shows delivery counts
 (recipients, sent, queued, failed) and a full email log with one-click retry,
-exactly like an event's email log. Broadcasts also export to CSV
+filtering by recipient and status, and sortable columns — exactly like an
+event's email log. Broadcasts also export to CSV
 (Settings → Export, or the button on the Broadcasts page).
 
 ## The guest experience
@@ -177,10 +178,11 @@ exactly like an event's email log. Broadcasts also export to CSV
 The event page in the app has three tabs:
 
 - **Guests** — everyone invited, their invitation status
-  (sent/queued/failed), response, party size, and note. Filter by status;
-  add guests; **✓ / ✗** to record phone RSVPs yourself; **✉** to send or
-  resend one invitation; **＋** to save a via-link guest into contacts;
-  export the list as CSV.
+  (sent/queued/failed), response, party size, and note. Type in the box to
+  filter by name, email or phone, narrow by status, and click any column
+  heading to sort by it; add guests; **✓ / ✗** to record phone RSVPs
+  yourself; **✉** to send or resend one invitation; **＋** to save a
+  via-link guest into contacts; export the list as CSV.
 - **Follow-ups & nudges** — three composers: *remind guests who haven't
   replied* (includes the Accept/Decline buttons again), *message everyone
   who accepted* (e.g. parking details), or *message everyone*. Audience,
@@ -189,7 +191,10 @@ The event page in the app has three tabs:
   unsubscribed people were skipped.
 - **Email log** — every email for this event with its exact rendered
   content, status (queued → sent, or simulated in simulation mode), any
-  provider error, and one-click retry for failures.
+  provider error, and one-click retry for failures. Filter by recipient,
+  type or status, and sort on any column. Subject isn't shown here — it's
+  the same for the whole event — and the type is a filter rather than a
+  column of near-identical badges.
 
 Header actions: view the public page, edit (reopens the wizard), duplicate
 (new draft with the same design/settings, empty guest list), cancel (with
@@ -202,6 +207,12 @@ optional notification), and delete for drafts and cancelled events.
   SMTP2GO quota remaining.
 - **Event stats** — invited, emailed, accepted (plus total headcount
   including plus-ones), declined, awaiting reply, not yet reached.
+- **Email log** (the sidebar one) — every email the organization has ever
+  sent, from every event and broadcast, in one paginated list. This is where
+  the type and the event/broadcast it came from become useful columns, so
+  both are shown here along with the subject. Filter by recipient, type or
+  status, and sort on any column. Each row still opens the exact email that
+  was sent and offers a retry if it failed.
 - **Exports** (Settings → Export, plus buttons throughout): contacts,
   groups, events (with per-event stats and share URLs), per-event guest
   lists, and the full email log as CSV; plus a complete JSON backup of the

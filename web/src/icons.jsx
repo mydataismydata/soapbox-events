@@ -49,6 +49,9 @@ const PATHS = {
   panelLeft: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9.5 4v16" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   chevronDown: <path d="m6 9.5 6 6 6-6" />,
+  chevronUp: <path d="m6 14.5 6-6 6 6" />,
+  // Both arrows stacked: an unsorted, sortable column.
+  chevronUpDown: <><path d="m8 10.5 4-4 4 4" /><path d="m8 13.5 4 4 4-4" /></>,
   chevronRight: <path d="m9.5 6 6 6-6 6" />,
   chevronLeft: <path d="m14.5 6-6 6 6 6" />,
   arrowLeft: <><path d="M20 12H4" /><path d="m9.5 6.5-5.5 5.5 5.5 5.5" /></>,

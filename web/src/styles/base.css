@@ -101,6 +101,7 @@ hr {
 .small { font-size: var(--fs-base); }
 .tiny { font-size: var(--fs-sm); }
 .nowrap { white-space: nowrap; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spacer { flex: 1; }
 .mt { margin-top: var(--sp-4); }
 .mb { margin-bottom: var(--sp-4); }

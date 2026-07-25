@@ -16,6 +16,7 @@ import Contacts from './pages/Contacts.jsx';
 import Groups from './pages/Groups.jsx';
 import Venues from './pages/Venues.jsx';
 import Templates from './pages/Templates.jsx';
+import Emails from './pages/Emails.jsx';
 import Settings from './pages/Settings.jsx';
 
 const AuthContext = createContext(null);
@@ -35,6 +36,7 @@ const NAV = [
   { group: 'Library' },
   { to: '/venues', label: 'Venues', icon: 'pin' },
   { to: '/templates', label: 'Templates', icon: 'file' },
+  { to: '/emails', label: 'Email log', icon: 'inbox' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
@@ -243,6 +245,7 @@ export default function App() {
               <Route path="/groups" element={<Groups />} />
               <Route path="/venues" element={<Venues />} />
               <Route path="/templates" element={<Templates />} />
+              <Route path="/emails" element={<Emails />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

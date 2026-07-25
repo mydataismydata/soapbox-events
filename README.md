@@ -49,6 +49,9 @@ organizations from one installation**, with hard isolation between them.
   are skipped and shared with the event unsubscribe list
 - Delivery report (recipients, sent, queued, failed) and a full email log with
   one-click retry
+- Email logs everywhere — per event, per broadcast, and an organization-wide
+  one — filterable by recipient, type and status, sortable on every column,
+  and paginated
 
 **People**
 - Contact list with names, emails, phone numbers, and notes

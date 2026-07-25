@@ -276,6 +276,50 @@ export function Empty({ icon = 'inbox', title, children, action }) {
   );
 }
 
+// --- sortable tables -------------------------------------------------------
+
+// Sort state shared by every table with clickable headers. Clicking the column
+// already sorted flips the direction; a new column starts from `startDir`.
+export function useSort(key, dir = 'asc') {
+  const [sort, setSort] = useState({ key, dir });
+  const sortBy = useCallback((next, startDir = 'asc') => {
+    setSort((s) => (s.key === next
+      ? { key: next, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+      : { key: next, dir: startDir }));
+  }, []);
+  return [sort, sortBy];
+}
+
+// Sort rows by `sort`, using an accessor per column key. Empty values always
+// sink to the bottom, either way up, so a blank never outranks real data.
+export function sortRows(rows, sort, accessors) {
+  const get = accessors[sort.key];
+  if (!get) return rows;
+  const dir = sort.dir === 'asc' ? 1 : -1;
+  const blank = (x) => x === null || x === undefined || x === '';
+  return [...rows].sort((a, b) => {
+    const x = get(a);
+    const y = get(b);
+    if (blank(x) || blank(y)) return blank(x) && blank(y) ? 0 : (blank(x) ? 1 : -1);
+    if (typeof x === 'number' && typeof y === 'number') return (x - y) * dir;
+    return String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+  });
+}
+
+// A clickable table header. `k` is the key looked up in the accessor map.
+export function SortTh({ label, k, sort, onSort, startDir = 'asc', style }) {
+  const active = sort.key === k;
+  return (
+    <th style={style} aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button type="button" className={`th-sort ${active ? 'is-active' : ''}`} onClick={() => onSort(k, startDir)}>
+        {label}
+        <Icon className="th-arrow" size={13}
+          name={active ? (sort.dir === 'asc' ? 'chevronUp' : 'chevronDown') : 'chevronUpDown'} />
+      </button>
+    </th>
+  );
+}
+
 export function Field({ label, hint, required, htmlFor, children }) {
   return (
     <div className="field">

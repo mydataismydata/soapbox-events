@@ -16,6 +16,11 @@ export function eventStats(db, eventId) {
   `).get(eventId);
   const stats = {};
   for (const [k, val] of Object.entries(row)) stats[k] = Number(val || 0);
+  // Every email ever sent for the event — invitations, nudges, follow-ups,
+  // cancellations and tests — which is what the email log tab lists.
+  stats.emails_logged = Number(
+    db.prepare('SELECT COUNT(*) AS n FROM email_log WHERE event_id = ?').get(eventId).n || 0
+  );
   return stats;
 }
 

@@ -4,10 +4,22 @@ import { api, formatWhen, timeAgo } from '../api.js';
 import {
   Spinner, Modal, ConfirmModal, Empty, Field, CopyBox, useToast,
   ResponseBadge, StatusBadge, EmailStatusBadge, insertAtCursor,
-  Banner, Card, StatGrid, Stat, IconButton, Icon,
+  Banner, Card, StatGrid, Stat, IconButton, Icon, SortTh, useSort, sortRows,
 } from '../ui.jsx';
 import RecipientPicker from '../components/RecipientPicker.jsx';
 import TagButtons from '../components/TagButtons.jsx';
+import EmailLog from '../components/EmailLog.jsx';
+
+// Guest columns you can order by. Responses sort into a deliberate order
+// rather than alphabetically, so accepted / declined / no reply group up.
+const RESPONSE_RANK = { yes: 0, no: 1 };
+const EMAIL_RANK = { sent: 0, simulated: 0, sending: 1, queued: 2, failed: 3, not_sent: 4 };
+const GUEST_SORTS = {
+  name: (g) => g.name || g.email || '',
+  email_status: (g) => EMAIL_RANK[g.email_status] ?? 9,
+  response: (g) => (g.response ? RESPONSE_RANK[g.response] : 2),
+  party_size: (g) => Number(g.party_size) || 0,
+};
 
 const COMPOSE_PRESETS = {
   nudge: {
@@ -49,15 +61,16 @@ export default function EventDetail() {
 
   const [data, setData] = useState(null);
   const [guests, setGuests] = useState([]);
-  const [emails, setEmails] = useState([]);
+  const [emailSummary, setEmailSummary] = useState({ total: 0, pending: 0 });
   const [tab, setTab] = useState('guests');
   const [filter, setFilter] = useState('all');
+  const [guestQuery, setGuestQuery] = useState('');
+  const [guestSort, sortGuestsBy] = useSort('name');
   const [error, setError] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [recipients, setRecipients] = useState({ contact_ids: [], group_ids: [], new_contacts: [] });
   const [confirm, setConfirm] = useState(null); // {type, ...}
   const [cancelNotify, setCancelNotify] = useState(true);
-  const [viewEmail, setViewEmail] = useState(null);
   const [compose, setCompose] = useState(null); // {presetKey, kind, audience, subject, body}
   const [composePreview, setComposePreview] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -65,14 +78,12 @@ export default function EventDetail() {
 
   const load = useCallback(async (quiet = false) => {
     try {
-      const [d, g, e] = await Promise.all([
+      const [d, g] = await Promise.all([
         api.get(`/api/events/${id}`),
         api.get(`/api/events/${id}/guests`),
-        api.get(`/api/emails?event_id=${id}`),
       ]);
       setData(d);
       setGuests(g.guests);
-      setEmails(e.emails);
     } catch (err) {
       if (!quiet) setError(err.message);
     }
@@ -80,23 +91,32 @@ export default function EventDetail() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Quiet refresh while emails are moving through the queue.
-  const hasActivity = emails.some((e) => ['queued', 'sending'].includes(e.status));
+  // The email log refreshes itself while emails are in flight; follow it so
+  // the guest list and stats keep up too.
   useEffect(() => {
-    if (!hasActivity) return;
+    if (!emailSummary.pending) return undefined;
     const t = setInterval(() => load(true), 3000);
     return () => clearInterval(t);
-  }, [hasActivity, load]);
+  }, [emailSummary.pending, load]);
 
   const filteredGuests = useMemo(() => {
-    switch (filter) {
-      case 'yes': return guests.filter((g) => g.response === 'yes');
-      case 'no': return guests.filter((g) => g.response === 'no');
-      case 'pending': return guests.filter((g) => !g.response && g.email_status === 'sent');
-      case 'not_sent': return guests.filter((g) => ['not_sent', 'failed'].includes(g.email_status));
-      default: return guests;
-    }
-  }, [guests, filter]);
+    const byStatus = (() => {
+      switch (filter) {
+        case 'yes': return guests.filter((g) => g.response === 'yes');
+        case 'no': return guests.filter((g) => g.response === 'no');
+        case 'pending': return guests.filter((g) => !g.response && g.email_status === 'sent');
+        case 'not_sent': return guests.filter((g) => ['not_sent', 'failed'].includes(g.email_status));
+        default: return guests;
+      }
+    })();
+    const needle = guestQuery.trim().toLowerCase();
+    const matched = needle
+      ? byStatus.filter((g) => (g.name || '').toLowerCase().includes(needle)
+        || (g.email || '').toLowerCase().includes(needle)
+        || (g.phone || '').includes(needle))
+      : byStatus;
+    return sortRows(matched, guestSort, GUEST_SORTS);
+  }, [guests, filter, guestQuery, guestSort]);
 
   if (error) return <div className="page"><Banner tone="bad">{error}</Banner></div>;
   if (!data) return <div className="page"><Spinner /></div>;
@@ -247,7 +267,7 @@ export default function EventDetail() {
         </button>
         <button role="tab" aria-selected={tab === 'emails'}
           className={`tab ${tab === 'emails' ? 'active' : ''}`} onClick={() => setTab('emails')}>
-          Email log ({emails.length})
+          Email log ({stats.emails_logged ?? 0})
         </button>
       </div>
 
@@ -268,15 +288,23 @@ export default function EventDetail() {
                 <Icon name="download" size={14} /> Export CSV
               </a>
             </div>
-            <select className="search-input" style={{ maxWidth: 190 }} value={filter}
-              aria-label="Filter guests"
-              onChange={(e) => setFilter(e.target.value)}>
-              <option value="all">All guests</option>
-              <option value="yes">Accepted</option>
-              <option value="no">Declined</option>
-              <option value="pending">Awaiting reply</option>
-              <option value="not_sent">Not emailed / failed</option>
-            </select>
+            <div className="row" style={{ gap: 8 }}>
+              <div className="search-field" style={{ width: 230 }}>
+                <Icon name="search" size={15} />
+                <input className="search-input" value={guestQuery} placeholder="Filter by guest…"
+                  aria-label="Filter guests by name, email or phone"
+                  onChange={(e) => setGuestQuery(e.target.value)} />
+              </div>
+              <select className="search-input" style={{ width: 185 }} value={filter}
+                aria-label="Filter guests"
+                onChange={(e) => setFilter(e.target.value)}>
+                <option value="all">All guests</option>
+                <option value="yes">Accepted</option>
+                <option value="no">Declined</option>
+                <option value="pending">Awaiting reply</option>
+                <option value="not_sent">Not emailed / failed</option>
+              </select>
+            </div>
           </div>
           {filteredGuests.length === 0 ? (
             <Empty icon="users" title={guests.length === 0 ? 'No guests yet' : 'Nothing matches this filter'}>
@@ -287,7 +315,11 @@ export default function EventDetail() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Guest</th><th>Invitation</th><th>Response</th><th>Party</th><th>Note</th>
+                    <SortTh label="Guest" k="name" sort={guestSort} onSort={sortGuestsBy} />
+                    <SortTh label="Invitation" k="email_status" sort={guestSort} onSort={sortGuestsBy} />
+                    <SortTh label="Response" k="response" sort={guestSort} onSort={sortGuestsBy} />
+                    <SortTh label="Party" k="party_size" sort={guestSort} onSort={sortGuestsBy} />
+                    <th>Note</th>
                     <th><span className="sr-only">Actions</span></th>
                   </tr>
                 </thead>
@@ -364,46 +396,14 @@ export default function EventDetail() {
         </div>
       ) : null}
 
+      {/* Subject is the same on every row of one event's log, so it stays out;
+          type varies (invitation, nudge, cancellation) and is a filter rather
+          than a column of near-identical badges. */}
       {tab === 'emails' ? (
         <Card flush>
-          {emails.length === 0 ? (
-            <Empty icon="inbox" title="No emails yet">Everything sent for this event shows up here, including exact content.</Empty>
-          ) : (
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr><th>When</th><th>Type</th><th>To</th><th>Subject</th><th>Status</th>
-                    <th><span className="sr-only">Actions</span></th></tr>
-                </thead>
-                <tbody>
-                  {emails.map((e) => (
-                    <tr key={e.id}>
-                      <td className="t-sub nowrap">{timeAgo(e.sent_at || e.created_at)}</td>
-                      <td><span className="badge badge-gray">{e.kind.replace('_', ' ')}</span></td>
-                      <td className="t-sub">{e.to_email}</td>
-                      <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.subject}</td>
-                      <td>
-                        <EmailStatusBadge status={e.status} />
-                        {e.error ? <div className="t-sub" title={e.error}>{e.error.slice(0, 60)}</div> : null}
-                      </td>
-                      <td>
-                        <div className="t-actions">
-                          <button className="btn btn-sm" onClick={async () => {
-                            try { setViewEmail((await api.get(`/api/emails/${e.id}`)).email); }
-                            catch (err) { toast(err.message, 'bad'); }
-                          }}>View</button>
-                          {e.status === 'failed' ? (
-                            <IconButton icon="refresh" label="Retry sending" disabled={busy}
-                              onClick={() => act(() => api.post(`/api/emails/${e.id}/retry`), 'Retrying')} />
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <EmailLog scope={{ event_id: id }} onSummary={setEmailSummary}
+            kinds={['invitation', 'nudge', 'follow_up', 'cancellation', 'test']}
+            emptyHint="Everything sent for this event shows up here, including exact content." />
         </Card>
       ) : null}
 
@@ -478,16 +478,6 @@ export default function EventDetail() {
       {composePreview ? (
         <Modal title={`Preview — ${composePreview.subject}`} size="lg" onClose={() => setComposePreview(null)}>
           <iframe className="email-frame" title="Email preview" srcDoc={composePreview.html} />
-        </Modal>
-      ) : null}
-
-      {viewEmail ? (
-        <Modal title={viewEmail.subject} size="lg" onClose={() => setViewEmail(null)}>
-          <p className="small muted" style={{ margin: '0 0 8px' }}>
-            To {viewEmail.to_email} · {viewEmail.kind.replace('_', ' ')} · {viewEmail.status}
-            {viewEmail.sent_at ? ` · ${viewEmail.sent_at} UTC` : ''}
-          </p>
-          <iframe className="email-frame" title="Sent email" srcDoc={viewEmail.html} />
         </Modal>
       ) : null}
 

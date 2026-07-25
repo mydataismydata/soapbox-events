@@ -13,5 +13,6 @@ server/public/app/
 
 # local tooling
 .claude/
+.design/
 .DS_Store
 *.log

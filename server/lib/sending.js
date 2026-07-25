@@ -43,13 +43,9 @@ export function eventAccent(event) {
 }
 
 // Public URLs for a flyer's featured images, aligned to flyer.imageTokens
-// (empty string for an empty slot). Passed straight into renderFlyer/email.
+// (empty string for an empty slot). Passed straight into renderFlyer.
 export function flyerImageUrls(orgSlug, flyer) {
   return normalizeFlyer(flyer).imageTokens.map((t) => (t ? publicUrl(orgSlug, `/files/${t}`) : ''));
-}
-
-export function eventImageUrls(orgSlug, event) {
-  return flyerImageUrls(orgSlug, parseFlyer(event));
 }
 
 // URL of the picture-of-the-flyer that goes at the foot of the invitation
@@ -119,7 +115,6 @@ export function renderEmailFor({ org, event, invite, kind, subjectTemplate, body
   const rendered = kind === 'invitation'
     ? renderInvitationEmail({
       ...common,
-      imageUrls: eventImageUrls(org.slug, event),
       flyerImageUrl: flyerSnapshotUrl(org.slug, parseFlyer(event)),
     })
     : renderMessageEmail({ ...common, kind });
@@ -246,12 +241,11 @@ export function renderBroadcastEmailFor({ org, broadcast, recipient, subjectTemp
   const ctx = buildBroadcastTagContext({ org, recipientName: name, links: { view: viewUrl || '' } });
   const subject = renderTags(subjectTemplate, ctx).trim() || broadcast.title || org.name;
   const bodyText = renderTags(bodyTemplate, ctx);
-  const flyer = parseFlyer(broadcast);
-  const accent = flyerColors(flyer).accent;
-  const imageUrls = flyerImageUrls(org.slug, flyer);
+  // The flyer no longer rides along in the email — it still fronts the
+  // broadcast's web version, which publicRoutes renders from the same design.
   const rendered = renderBroadcastEmail({
-    org, accent, bannerLabel: flyer.eyebrow || '', title: broadcast.title,
-    toEmail: email, bodyText, imageUrls, viewUrl: viewUrl || '', unsubUrl: unsubUrl || '',
+    org, title: broadcast.title,
+    toEmail: email, bodyText, viewUrl: viewUrl || '', unsubUrl: unsubUrl || '',
   });
   return { subject, html: rendered.html, text: rendered.text, toName: name, toEmail: email };
 }

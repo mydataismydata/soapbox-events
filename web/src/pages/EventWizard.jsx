@@ -7,6 +7,7 @@ import {
 } from '../ui.jsx';
 import FlyerDesigner from '../components/FlyerDesigner.jsx';
 import FlyerSnapshotKeeper from '../components/useFlyerSnapshot.js';
+import FlyerEmailOption from '../components/FlyerEmailOption.jsx';
 import RecipientPicker from '../components/RecipientPicker.jsx';
 import RichText from '../components/RichText.jsx';
 import TagButtons from '../components/TagButtons.jsx';
@@ -247,7 +248,8 @@ export default function EventWizard() {
   return (
     <div className="page">
       {/* The flyer picture for the email tracks the event's own details, so it
-          has to keep re-rendering while the designer is off-screen. */}
+          has to keep re-rendering on the steps where the option itself (which
+          owns the hook on step 3) is off-screen. */}
       {step !== 2 ? (
         <FlyerSnapshotKeeper eventBasics={basics} flyer={ev.flyer}
           onChange={(flyer) => patch({ flyer })} />
@@ -403,7 +405,9 @@ export default function EventWizard() {
                   <TagButtons onInsert={(snippet) =>
                     insertAtCursor(bodyRef, ev.email_body, snippet, (val) => patch({ email_body: val }))} />
                 </Field>
-                <button className="btn" onClick={previewEmail} disabled={saving}>
+                <FlyerEmailOption eventBasics={basics} flyer={ev.flyer}
+                  onChange={(flyer) => patch({ flyer })} />
+                <button className="btn mt" onClick={previewEmail} disabled={saving}>
                   <Icon name="eye" size={14} /> Preview email
                 </button>
               </Card>

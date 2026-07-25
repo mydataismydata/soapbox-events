@@ -239,7 +239,10 @@ export default function BroadcastWizard() {
 
           {step === 1 ? (
             <>
-              <Card title="Design the masthead">
+              <Card title="Design the masthead"
+                sub={b.web_version
+                  ? 'Fronts the broadcast’s web version. The email itself is just your message.'
+                  : 'Only used by the web version, which is switched off — turn it on in step 1 for this to appear anywhere.'}>
                 <FlyerDesigner mode="broadcast" eventBasics={{ title: b.title, host_name: '' }}
                   flyer={b.flyer} onChange={(flyer) => patch({ flyer })} />
               </Card>

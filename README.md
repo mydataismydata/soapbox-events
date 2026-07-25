@@ -43,7 +43,8 @@ organizations from one installation**, with hard isolation between them.
 - A slimmed wizard (details → design & message → recipients → review & send);
   send to groups and individual contacts, add new people inline
 - Optional unguessable **web version** ("view this email online") per broadcast,
-  rendered from the flyer masthead; per-send toggle
+  rendered from the flyer masthead; per-send toggle. The email itself carries
+  your message and nothing above it.
 - Every broadcast email carries a one-click unsubscribe; unsubscribed contacts
   are skipped and shared with the event unsubscribe list
 - Delivery report (recipients, sent, queued, failed) and a full email log with

@@ -52,7 +52,10 @@ function detailsBox({ event, links }) {
     </td></tr></table>`;
 }
 
-function shell({ accent, preheader, headerHtml, contentHtml, footerHtml }) {
+// The message opens with the host's own words — no coloured masthead, no
+// title block, no featured-image strip. Anyone who wants a banner turns on
+// "Include flyer in email", which puts the real flyer in the body instead.
+function shell({ preheader, contentHtml, footerHtml }) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -64,9 +67,7 @@ function shell({ accent, preheader, headerHtml, contentHtml, footerHtml }) {
 <tr><td align="center" style="padding:26px 12px;">
   <table role="presentation" width="600" cellpadding="0" cellspacing="0"
     style="max-width:600px; width:100%; background:#ffffff; border-radius:14px; overflow:hidden;">
-    <tr><td bgcolor="${accent}" style="padding:0; line-height:0; font-size:0;">&nbsp;</td></tr>
-    ${headerHtml}
-    <tr><td style="padding:8px 36px 30px;">${contentHtml}</td></tr>
+    <tr><td style="padding:30px 36px;">${contentHtml}</td></tr>
   </table>
   <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%;">
     <tr><td align="center" style="padding:18px 24px; font-size:12px; line-height:1.6; color:#9ca3af;">
@@ -77,36 +78,21 @@ function shell({ accent, preheader, headerHtml, contentHtml, footerHtml }) {
 </body></html>`;
 }
 
-// The email banner: 1–3 featured images in a row (email-safe table layout).
-function headerImages(imageUrls) {
-  const urls = (Array.isArray(imageUrls) ? imageUrls : []).filter(Boolean);
-  if (!urls.length) return '';
-  if (urls.length === 1) {
-    return `<tr><td style="padding:0; line-height:0;">
-      <img src="${esc(urls[0])}" alt="" width="600" style="width:100%; max-height:300px; object-fit:cover; display:block;">
-    </td></tr>`;
-  }
-  const w = Math.floor(600 / urls.length);
-  const h = urls.length === 2 ? 200 : 150;
-  const cells = urls.map((u) => `<td width="${w}" style="padding:0; line-height:0; vertical-align:top;">
-    <img src="${esc(u)}" alt="" width="${w}" style="width:100%; height:${h}px; object-fit:cover; display:block;">
-  </td>`).join('');
-  return `<tr><td style="padding:0; line-height:0;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>${cells}</tr></table>
-  </td></tr>`;
+function bodyBlock(bodyText) {
+  const html = textToHtml(bodyText);
+  if (!html) return '';
+  return `<div style="font-size:15.5px; line-height:1.65; color:#374151;">${html}</div>`;
 }
 
-function header({ accent, orgName, bannerLabel, title, whenLine, imageUrl, imageUrls }) {
-  const onAccent = contrastOn(accent);
-  const urls = imageUrls || (imageUrl ? [imageUrl] : []);
-  return `
-  <tr><td bgcolor="${accent}" style="padding:26px 36px 22px;">
-    <div style="font-size:12.5px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase;
-      color:${onAccent}; opacity:0.85;">${esc(bannerLabel || orgName)}</div>
-    <div style="font-size:27px; font-weight:800; color:${onAccent}; padding-top:6px; line-height:1.2;">${esc(title)}</div>
-    ${whenLine ? `<div style="font-size:14.5px; color:${onAccent}; opacity:0.9; padding-top:6px;">${esc(whenLine)}</div>` : ''}
-  </td></tr>
-  ${headerImages(urls)}`;
+// Plain-text alternative: drop the blocks that came out empty, then separate
+// what's left with one blank line. Building it block-by-block keeps the
+// spacing right however many pieces a given email actually has.
+function textBlocks(...blocks) {
+  return blocks
+    .map((b) => (Array.isArray(b) ? b.filter(Boolean).join('\n') : b))
+    .map((b) => (b || '').trim())
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 function footer({ orgName, toEmail, unsubUrl, note, viewUrl }) {
@@ -147,12 +133,11 @@ function flyerPicture(url, links) {
 
 // --- public API ------------------------------------------------------------
 
-export function renderInvitationEmail({ org, event, accent, toName, toEmail, bodyText, links, imageUrl, imageUrls, flyerImageUrl, unsubUrl }) {
+export function renderInvitationEmail({ org, event, accent, toName, toEmail, bodyText, links, flyerImageUrl, unsubUrl }) {
   const whenLine = formatWhen(event);
   const isRsvp = event.rsvp_mode === 'rsvp';
   const content = `
-    ${textToHtml(bodyText) ? `<div style="font-size:15.5px; line-height:1.65; color:#374151; padding-top:16px;">
-      ${textToHtml(bodyText)}</div>` : ''}
+    ${bodyBlock(bodyText)}
     ${detailsBox({ event, links })}
     ${isRsvp ? rsvpButtons(links) : `
       <div style="text-align:center; padding:16px 0 4px;">
@@ -162,91 +147,70 @@ export function renderInvitationEmail({ org, event, accent, toName, toEmail, bod
     ${flyerPicture(flyerImageUrl, links)}
   `;
   const html = shell({
-    accent,
     preheader: `${event.title} — ${whenLine}`,
-    headerHtml: header({ accent, orgName: org.name, bannerLabel: "You're invited", title: event.title, whenLine, imageUrl, imageUrls }),
     contentHtml: content,
     footerHtml: footer({ orgName: org.name, toEmail, unsubUrl }),
   });
-  const text = [
-    `${event.title}`,
-    whenLine,
-    [event.venue_name, event.venue_address].filter(Boolean).join(' — '),
-    '',
+  // The plain-text alternative follows the same order as the HTML: the
+  // message first, then the details it refers to.
+  const text = textBlocks(
     bodyText,
-    '',
-    isRsvp ? `Accept: ${links.accept}\nDecline: ${links.decline}\nYour RSVP page: ${links.rsvp}` : `Event page: ${links.event}`,
-    '',
-    `Sent to ${toEmail} by ${org.name}.`,
-    unsubUrl ? `Unsubscribe: ${unsubUrl}` : '',
-  ].filter((l) => l !== null).join('\n');
+    [event.title, whenLine, [event.venue_name, event.venue_address].filter(Boolean).join(' — ')],
+    isRsvp
+      ? [`Accept: ${links.accept}`, `Decline: ${links.decline}`, `Your RSVP page: ${links.rsvp}`]
+      : `Event page: ${links.event}`,
+    [`Sent to ${toEmail} by ${org.name}.`, unsubUrl ? `Unsubscribe: ${unsubUrl}` : ''],
+  );
   return { html, text };
 }
 
-const KIND_BANNERS = {
-  follow_up: { label: 'Event update', accentOverride: null },
-  nudge: { label: 'Reminder — please RSVP', accentOverride: '#b45309' },
-  cancellation: { label: 'Event cancelled', accentOverride: '#b91c1c' },
+// Only the preheader — the inbox preview line — still says what kind of
+// message this is. Nothing is stamped across the top of the body.
+const KIND_PREHEADERS = {
+  follow_up: 'Event update',
+  nudge: 'Reminder — please RSVP',
+  cancellation: 'Event cancelled',
 };
 
-export function renderMessageEmail({ kind, org, event, accent, toEmail, bodyText, links, unsubUrl }) {
-  const banner = KIND_BANNERS[kind] || { label: org.name };
-  const usedAccent = banner.accentOverride || accent;
+export function renderMessageEmail({ kind, org, event, toEmail, bodyText, links, unsubUrl }) {
+  const label = KIND_PREHEADERS[kind] || org.name;
   const whenLine = formatWhen(event);
   const showButtons = kind === 'nudge' && event.rsvp_mode === 'rsvp' && event.status !== 'cancelled';
   const content = `
-    ${textToHtml(bodyText) ? `<div style="font-size:15.5px; line-height:1.65; color:#374151; padding-top:16px;">
-      ${textToHtml(bodyText)}</div>` : ''}
+    ${bodyBlock(bodyText)}
     ${kind === 'cancellation' ? '' : detailsBox({ event, links })}
     ${showButtons ? rsvpButtons(links) : ''}
   `;
   const html = shell({
-    accent: usedAccent,
-    preheader: `${banner.label}: ${event.title}`,
-    headerHtml: header({ accent: usedAccent, orgName: org.name, bannerLabel: banner.label, title: event.title, whenLine: kind === 'cancellation' ? '' : whenLine }),
+    preheader: `${label}: ${event.title}`,
     contentHtml: content,
     footerHtml: footer({ orgName: org.name, toEmail, unsubUrl }),
   });
-  const text = [
-    `${banner.label}: ${event.title}`,
-    kind === 'cancellation' ? '' : whenLine,
-    '',
+  const text = textBlocks(
     bodyText,
-    '',
-    showButtons ? `Accept: ${links.accept}\nDecline: ${links.decline}` : (links?.event && kind !== 'cancellation' ? `Event page: ${links.event}` : ''),
-    '',
-    `Sent to ${toEmail} by ${org.name}.`,
-    unsubUrl ? `Unsubscribe: ${unsubUrl}` : '',
-  ].filter((l) => l !== null).join('\n');
+    kind === 'cancellation' ? '' : [event.title, whenLine],
+    showButtons
+      ? [`Accept: ${links.accept}`, `Decline: ${links.decline}`]
+      : (links?.event && kind !== 'cancellation' ? `Event page: ${links.event}` : ''),
+    [`Sent to ${toEmail} by ${org.name}.`, unsubUrl ? `Unsubscribe: ${unsubUrl}` : ''],
+  );
   return { html, text };
 }
 
-// Standalone broadcast (email blast not tied to an event): the flyer accent
-// and optional featured image in the header, the message body, then footer
-// with the "view online" and unsubscribe links. No event details, no RSVP.
-export function renderBroadcastEmail({ org, accent, bannerLabel, title, toEmail, bodyText, imageUrl, imageUrls, viewUrl, unsubUrl }) {
-  const content = textToHtml(bodyText)
-    ? `<div style="font-size:15.5px; line-height:1.65; color:#374151; padding-top:16px;">${textToHtml(bodyText)}</div>`
-    : '';
+// Standalone broadcast (email blast not tied to an event): just the message
+// body, then the footer with the "view online" and unsubscribe links. The
+// flyer still fronts the web version — it is no longer stamped on the email.
+export function renderBroadcastEmail({ org, title, toEmail, bodyText, viewUrl, unsubUrl }) {
   const html = shell({
-    accent,
-    preheader: title || bannerLabel || org.name,
-    headerHtml: header({
-      accent, orgName: org.name, bannerLabel: bannerLabel || org.name,
-      title: title || org.name, whenLine: '', imageUrl, imageUrls,
-    }),
-    contentHtml: content,
+    preheader: title || org.name,
+    contentHtml: bodyBlock(bodyText),
     footerHtml: footer({ orgName: org.name, toEmail, unsubUrl, viewUrl }),
   });
-  const text = [
-    title || bannerLabel || org.name,
-    '',
+  const text = textBlocks(
     bodyText,
-    '',
     viewUrl ? `View online: ${viewUrl}` : '',
-    `Sent to ${toEmail} by ${org.name}.`,
-    unsubUrl ? `Unsubscribe: ${unsubUrl}` : '',
-  ].filter(Boolean).join('\n');
+    [`Sent to ${toEmail} by ${org.name}.`, unsubUrl ? `Unsubscribe: ${unsubUrl}` : ''],
+  );
   return { html, text };
 }
 

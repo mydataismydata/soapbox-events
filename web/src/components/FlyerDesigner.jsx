@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { Field, useToast, Icon } from '../ui.jsx';
-import { useFlyerSnapshot } from './useFlyerSnapshot.js';
 
 let cachedPresets = null;
 
@@ -80,11 +79,6 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
   const wide = Boolean(presets?.styles.find((s) => s.id === flyer.style)?.landscape);
   const slotCount = wide ? 1 : 3;
 
-  // "Include flyer in email" needs an actual picture of the flyer, which only
-  // the browser can produce. The wizard keeps this running on its other steps
-  // too, so a change of date or venue re-renders it as well.
-  const snapshot = useFlyerSnapshot({ eventBasics, flyer, mode, onChange });
-
   // Featured images live in parallel arrays (imageTokens / imageCaptions), one
   // entry per slot. imageToken / imageCaption mirror the first slot so older
   // readers still work. These helpers always write both the arrays and mirror.
@@ -155,11 +149,6 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
   if (!presets) return null;
   const tokens = imageSlots();
   const captions = captionSlots();
-  const snapshotNote = snapshot === 'working'
-    ? <em>Preparing the picture…</em>
-    : snapshot === 'error'
-      ? <em>The picture could not be prepared, so the email will go out without it.</em>
-      : flyer.flyerImageToken ? <em>Ready — it matches the preview above.</em> : null;
 
   const templates = (
     <Field label="Template" hint="Each template has its own fixed patriotic colors.">
@@ -185,7 +174,7 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
         style={{ height: previewHeight }} srcDoc={srcdoc} />
       <p className="small muted" style={{ textAlign: 'center', marginTop: 6 }}>
         {mode === 'broadcast'
-          ? 'Live preview — the masthead at the top of the email and web version.'
+          ? 'Live preview — the masthead on the broadcast’s web version.'
           : 'Live preview — exactly what guests see on the event page.'}
       </p>
     </div>
@@ -274,15 +263,6 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
               onChange={(e) => set({ showAddress: e.target.checked })} />
             <span><span className="cb-label">Show venue address</span>
               <div className="cb-sub">The venue name and time always show; turn this on to add the street address.</div></span>
-          </label>
-          <label className="checkbox">
-            <input type="checkbox" checked={!!flyer.includeFlyerImage}
-              onChange={(e) => set({ includeFlyerImage: e.target.checked })} />
-            <span><span className="cb-label">Include flyer in email</span>
-              <div className="cb-sub">
-                Adds a picture of this flyer to the invitation email, below the Accept / Decline buttons.
-                {flyer.includeFlyerImage ? <> {snapshotNote}</> : null}
-              </div></span>
           </label>
         </>
       ) : null}

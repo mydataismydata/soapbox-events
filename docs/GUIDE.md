@@ -105,13 +105,13 @@ leave and resume any time (it stays a draft until you send or publish).
    wide one — each with an optional caption. On the Panel template,
    separating the footnote with `·` turns it into up to three bullet rows.
    Long text shrinks and wraps automatically so it always stays
-   inside the flyer. Tick **Include flyer in email** to send a picture of
-   the finished flyer with the invitation — it appears under the Accept /
-   Decline buttons, and is re-made automatically whenever you change the
-   design or the event's date, time or venue.
-   The preview is live and pixel-identical to the public page. Below it, write
-   the email: start from a template, insert placeholders, and *Preview
-   email* to see the real rendering.
+   inside the flyer. The preview is live and pixel-identical to the public
+   page. Below it, write the email: start from a template, insert
+   placeholders, and *Preview email* to see the real rendering. The email
+   leads with your message and nothing above it — tick **Include flyer in
+   email** if you want the artwork in there too. That sends a picture of the
+   finished flyer under the Accept / Decline buttons, re-made automatically
+   whenever you change the design or the event's date, time or venue.
 4. **Guests** — tick groups, tick individual contacts, and add brand-new
    people inline (they're saved to your contacts too). People without an
    email address can be invited but only reached by phone/link.
@@ -129,13 +129,15 @@ list, no date/venue.
 
 **Broadcasts → New broadcast** opens a slimmed four-step wizard:
 
-1. **Details** — a title (shown at the top of the email and web version), the
-   email subject (defaults to the title), and whether to publish a **web
+1. **Details** — a title (the internal name, also shown on the web version),
+   the email subject (defaults to the title), and whether to publish a **web
    version** (see below).
 2. **Design & message** — the flyer designer, here producing a *masthead* (the
-   styled title block at the top of the email — no date/venue lines). Then the
-   message body, with a template picker and the `{{first_name}}`,
-   `{{recipient_name}}`, and `{{org_name}}` placeholders.
+   styled title block that fronts the web version — no date/venue lines). Then
+   the message body, with a template picker and the `{{first_name}}`,
+   `{{recipient_name}}`, and `{{org_name}}` placeholders. The email itself goes
+   out as your message and nothing else, so the masthead only appears if the
+   web version is on.
 3. **Recipients** — pick groups and individual contacts, or add new people
    inline (they're saved to your contacts, just like the event wizard).
 4. **Review & send** — send yourself a test first, then send. One email is

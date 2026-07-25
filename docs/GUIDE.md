@@ -105,7 +105,11 @@ leave and resume any time (it stays a draft until you send or publish).
    wide one — each with an optional caption. On the Panel template,
    separating the footnote with `·` turns it into up to three bullet rows.
    Long text shrinks and wraps automatically so it always stays
-   inside the flyer. The preview is live and pixel-identical to the public page. Below it, write
+   inside the flyer. Tick **Include flyer in email** to send a picture of
+   the finished flyer with the invitation — it appears under the Accept /
+   Decline buttons, and is re-made automatically whenever you change the
+   design or the event's date, time or venue.
+   The preview is live and pixel-identical to the public page. Below it, write
    the email: start from a template, insert placeholders, and *Preview
    email* to see the real rendering.
 4. **Guests** — tick groups, tick individual contacts, and add brand-new

@@ -38,15 +38,29 @@ uploadRouter.post('/uploads', wrap(async (req, res) => {
   const mime = sniffImage(buf);
   if (!mime) throw new ApiError(400, 'Only JPEG, PNG, GIF, and WebP images are supported.');
 
-  const token = randomToken(28);
+  // `replace` overwrites an existing upload in place, keeping its token and
+  // URL. The flyer designer re-renders its picture-of-the-flyer every time the
+  // design changes, and this stops each re-render leaving a stale file behind.
+  const replace = String(req.body.replace || '');
+  const existing = /^[A-Za-z0-9]{6,64}$/.test(replace)
+    ? req.db.prepare('SELECT * FROM uploads WHERE token = ?').get(replace)
+    : null;
+
+  const token = existing ? existing.token : randomToken(28);
   const dir = uploadsDir(req.org.slug);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, token), buf);
-  const info = req.db.prepare(
-    'INSERT INTO uploads (token, original_name, mime, bytes) VALUES (?, ?, ?, ?)'
-  ).run(token, name || null, mime, buf.length);
+  let id = existing ? existing.id : 0;
+  if (existing) {
+    req.db.prepare('UPDATE uploads SET original_name = ?, mime = ?, bytes = ? WHERE id = ?')
+      .run(name || null, mime, buf.length, existing.id);
+  } else {
+    id = insertId(req.db.prepare(
+      'INSERT INTO uploads (token, original_name, mime, bytes) VALUES (?, ?, ?, ?)'
+    ).run(token, name || null, mime, buf.length));
+  }
   res.status(201).json({
-    id: insertId(info),
+    id,
     token,
     url: publicUrl(req.org.slug, `/files/${token}`),
     bytes: buf.length,

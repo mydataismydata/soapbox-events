@@ -52,6 +52,15 @@ export function eventImageUrls(orgSlug, event) {
   return flyerImageUrls(orgSlug, parseFlyer(event));
 }
 
+// URL of the picture-of-the-flyer that goes at the foot of the invitation
+// email — empty unless the host turned the option on and the designer has
+// rendered one.
+export function flyerSnapshotUrl(orgSlug, flyer) {
+  const f = normalizeFlyer(flyer);
+  if (!f.includeFlyerImage || !f.flyerImageToken) return '';
+  return publicUrl(orgSlug, `/files/${f.flyerImageToken}`);
+}
+
 export function inviteName(invite) {
   return invite.contact_name || invite.guest_name || '';
 }
@@ -108,7 +117,11 @@ export function renderEmailFor({ org, event, invite, kind, subjectTemplate, body
     bodyText, links, unsubUrl: links.unsub,
   };
   const rendered = kind === 'invitation'
-    ? renderInvitationEmail({ ...common, imageUrls: eventImageUrls(org.slug, event) })
+    ? renderInvitationEmail({
+      ...common,
+      imageUrls: eventImageUrls(org.slug, event),
+      flyerImageUrl: flyerSnapshotUrl(org.slug, parseFlyer(event)),
+    })
     : renderMessageEmail({ ...common, kind });
   return { subject, html: rendered.html, text: rendered.text, toName: name, toEmail: email };
 }

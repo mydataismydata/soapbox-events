@@ -4,6 +4,7 @@ import { api, formatDate, formatTime } from '../api.js';
 import { useAuth } from '../App.jsx';
 import { Field, Modal, Spinner, useToast, insertAtCursor } from '../ui.jsx';
 import FlyerDesigner from '../components/FlyerDesigner.jsx';
+import FlyerSnapshotKeeper from '../components/useFlyerSnapshot.js';
 import RecipientPicker from '../components/RecipientPicker.jsx';
 import RichText from '../components/RichText.jsx';
 import TagButtons from '../components/TagButtons.jsx';
@@ -23,6 +24,7 @@ const BLANK = {
     style: 'blue', font: 'sans', scale: 'm',
     eyebrow: "You're invited", tagline: '', note: '', contact: '', showHost: true, showAddress: false,
     imageColumns: 1, imageTokens: [], imageCaptions: [], imageToken: '', imageCaption: '',
+    includeFlyerImage: false, flyerImageToken: '',
   },
 };
 
@@ -242,6 +244,12 @@ export default function EventWizard() {
 
   return (
     <div className="page">
+      {/* The flyer picture for the email tracks the event's own details, so it
+          has to keep re-rendering while the designer is off-screen. */}
+      {step !== 2 ? (
+        <FlyerSnapshotKeeper eventBasics={basics} flyer={ev.flyer}
+          onChange={(flyer) => patch({ flyer })} />
+      ) : null}
       <div className="page-head">
         <div>
           <h1 className="page-title">{editing ? `Edit: ${ev.title || 'event'}` : 'New event'}</h1>

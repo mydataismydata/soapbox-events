@@ -66,6 +66,8 @@ export const DEFAULT_FLYER = {
   imageCaptions: [], // parallel to imageTokens (e.g. speaker names)
   imageToken: '', // legacy mirror of imageTokens[0]
   imageCaption: '', // legacy mirror of imageCaptions[0]
+  includeFlyerImage: false, // show a picture of the flyer in the invitation email
+  flyerImageToken: '', // upload token of that picture, rendered by the designer
 };
 
 export function normalizeFlyer(raw) {
@@ -100,6 +102,8 @@ export function normalizeFlyer(raw) {
   f.imageColumns = Math.min(maxImages, Math.max(cols, f.imageTokens.filter(Boolean).length || 1));
   f.imageToken = f.imageTokens[0] || '';
   f.imageCaption = f.imageCaptions[0] || '';
+  f.includeFlyerImage = Boolean(f.includeFlyerImage);
+  f.flyerImageToken = validToken(f.flyerImageToken);
   return f;
 }
 
@@ -678,7 +682,10 @@ const RENDERERS = {
 // hideEventMeta drops the date/time/venue/host block so the same styles power
 // a broadcast "masthead" (title + eyebrow + tagline + image), which has no
 // event fields to show.
-export function renderFlyer({ event, flyer: rawFlyer, imageUrl = '', imageUrls = null, hideEventMeta = false }) {
+// `snapshot` renders the card for the designer's picture-of-the-flyer capture:
+// a plain rectangle at a fixed width, with no page breakout, rounded corners or
+// shadow — those only make sense against a page, not inside a JPEG.
+export function renderFlyer({ event, flyer: rawFlyer, imageUrl = '', imageUrls = null, hideEventMeta = false, snapshot = false }) {
   const flyer = normalizeFlyer(rawFlyer);
   const colors = flyerColors(flyer);
   const font = fontOf(flyer);
@@ -694,23 +701,41 @@ export function renderFlyer({ event, flyer: rawFlyer, imageUrl = '', imageUrls =
   // than the public page's text column: they break out of it and centre on the
   // viewport instead. On a phone the card simply fills the screen and its two
   // columns stack.
-  const box = isLandscape(flyer.style)
-    ? `width:min(920px, calc(100vw - 32px)); margin-left:50%; transform:translateX(-50%);`
-    : 'max-width:640px; margin:0 auto;';
+  const wide = isLandscape(flyer.style);
+  let box;
+  if (snapshot) box = `width:100%; max-width:${wide ? SNAPSHOT_WIDE : SNAPSHOT_WIDTH}px; margin:0 auto;`;
+  else if (wide) box = 'width:min(920px, calc(100vw - 32px)); margin-left:50%; transform:translateX(-50%);';
+  else box = 'max-width:640px; margin:0 auto;';
+  const chrome = snapshot
+    ? ''
+    : 'border-radius:12px; box-shadow:0 2px 8px rgba(10,10,15,0.12), 0 12px 40px rgba(10,10,15,0.12);';
   // overflow-wrap is inherited, so one declaration here keeps a single very
   // long word (a URL, say) inside every template.
-  return `<div style="${box} overflow:hidden; border-radius:12px; overflow-wrap:break-word;
-    box-shadow:0 2px 8px rgba(10,10,15,0.12), 0 12px 40px rgba(10,10,15,0.12);">${inner}</div>`;
+  return `<div style="${box} overflow:hidden; overflow-wrap:break-word; ${chrome}">${inner}</div>`;
 }
 
-// Standalone document for the designer's live preview iframe.
-export function renderFlyerDocument({ event, flyer, imageUrl, imageUrls, hideEventMeta = false }) {
+// How wide the picture-of-the-flyer capture is laid out before rasterizing.
+// Portrait matches the card; wide matches its broken-out width.
+export const SNAPSHOT_WIDTH = 640;
+export const SNAPSHOT_WIDE = 920;
+
+export function snapshotWidth(flyer) {
+  return isLandscape(normalizeFlyer(flyer).style) ? SNAPSHOT_WIDE : SNAPSHOT_WIDTH;
+}
+
+// Standalone document for the designer's live preview iframe. In `snapshot`
+// mode the page furniture goes away so the document is exactly the flyer,
+// ready to be drawn onto a canvas.
+export function renderFlyerDocument({ event, flyer, imageUrl, imageUrls, hideEventMeta = false, snapshot = false }) {
   const colors = flyerColors(normalizeFlyer(flyer));
-  const html = renderFlyer({ event, flyer, imageUrl, imageUrls, hideEventMeta });
+  const html = renderFlyer({ event, flyer, imageUrl, imageUrls, hideEventMeta, snapshot });
+  const body = snapshot
+    ? 'margin:0; padding:0; background:#ffffff; color-scheme: light;'
+    : `margin:0; padding:22px 10px; background:${mixWithWhite(colors.ink, 0.07)}; color-scheme: light;`;
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <style>*, *::before, *::after { box-sizing: border-box; }
-body { margin:0; padding:22px 10px; background:${mixWithWhite(colors.ink, 0.07)}; color-scheme: light; }</style>
+body { ${body} }</style>
 </head><body>${html}</body></html>`;
 }
 

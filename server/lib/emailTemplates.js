@@ -133,9 +133,21 @@ function rsvpButtons(links) {
   </div>`;
 }
 
+// A picture of the flyer at the foot of the invitation, under the RSVP
+// buttons. It links to the event page so a click still goes somewhere useful,
+// and carries alt text for clients that block images.
+function flyerPicture(url, links) {
+  if (!url) return '';
+  const img = `<img src="${esc(url)}" alt="Event flyer" width="600"
+    style="width:100%; max-width:600px; display:block; border:0; border-radius:10px;">`;
+  const wrapped = links?.event
+    ? `<a href="${esc(links.event)}" target="_blank" style="text-decoration:none;">${img}</a>` : img;
+  return `<div style="padding:26px 0 2px; line-height:0;">${wrapped}</div>`;
+}
+
 // --- public API ------------------------------------------------------------
 
-export function renderInvitationEmail({ org, event, accent, toName, toEmail, bodyText, links, imageUrl, imageUrls, unsubUrl }) {
+export function renderInvitationEmail({ org, event, accent, toName, toEmail, bodyText, links, imageUrl, imageUrls, flyerImageUrl, unsubUrl }) {
   const whenLine = formatWhen(event);
   const isRsvp = event.rsvp_mode === 'rsvp';
   const content = `
@@ -147,6 +159,7 @@ export function renderInvitationEmail({ org, event, accent, toName, toEmail, bod
         ${button(links.event, 'View event details', accent, contrastOn(accent))}
         <div style="padding-top:12px; font-size:13px; color:#6b7280;">No RSVP needed — this is an open event.</div>
       </div>`}
+    ${flyerPicture(flyerImageUrl, links)}
   `;
   const html = shell({
     accent,

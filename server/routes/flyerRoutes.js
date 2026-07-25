@@ -27,5 +27,8 @@ flyerRouter.post('/flyer/preview', wrap(async (req, res) => {
   const flyer = req.body.flyer || {};
   const imageUrls = flyerImageUrls(req.org.slug, flyer);
   const hideEventMeta = req.body.mode === 'broadcast';
-  res.type('html').send(renderFlyerDocument({ event, flyer, imageUrls, hideEventMeta }));
+  // The designer asks for `snapshot` when it is about to rasterize the flyer
+  // into the JPEG that goes in the invitation email.
+  const snapshot = req.body.snapshot === true;
+  res.type('html').send(renderFlyerDocument({ event, flyer, imageUrls, hideEventMeta, snapshot }));
 }));

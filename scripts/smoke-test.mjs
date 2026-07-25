@@ -331,8 +331,24 @@ let guests = [];
 {
   const prev = await A.api('POST', `/api/events/${eventId}/email-preview`, { kind: 'invitation' });
   check('email preview renders', prev.status === 200 && String(prev.data?.html || '').includes('Test Gala'));
+  check('invitation has no flyer picture by default', !/alt="Event flyer"/.test(prev.data?.html || ''));
   const test = await A.api('POST', `/api/events/${eventId}/test-email`, {});
   check('test email simulated', test.data?.status === 'simulated', JSON.stringify(test.data));
+
+  // "Include flyer in email": the picture the designer rendered goes in under
+  // the Accept / Decline buttons.
+  const ev = (await A.api('GET', `/api/events/${eventId}`)).data.event;
+  await A.api('PUT', `/api/events/${eventId}`, {
+    flyer: { ...ev.flyer, includeFlyerImage: true, flyerImageToken: 'flyerSNAPshot1' },
+  });
+  const withFlyer = await A.api('POST', `/api/events/${eventId}/email-preview`, { kind: 'invitation' });
+  const fh = String(withFlyer.data?.html || '');
+  check('invitation embeds the flyer picture', fh.includes('/files/flyerSNAPshot1') && fh.includes('alt="Event flyer"'));
+  check('flyer picture sits after the RSVP buttons',
+    fh.indexOf('/files/flyerSNAPshot1') > fh.indexOf('Decline</a>'));
+  const followUp = await A.api('POST', `/api/events/${eventId}/email-preview`, { kind: 'follow_up' });
+  check('flyer picture is invitation-only', !/alt="Event flyer"/.test(String(followUp.data?.html || '')));
+  await A.api('PUT', `/api/events/${eventId}`, { flyer: ev.flyer });
 }
 
 // --- uploads + flyer preview -----------------------------------------------
@@ -344,6 +360,13 @@ let guests = [];
   check('uploaded file served with mime', img.status === 200 && img.headers.get('content-type') === 'image/png');
   const bad = await A.api('POST', '/api/uploads', { name: 'x.txt', data: 'data:text/plain;base64,aGVsbG8=' });
   check('non-image upload rejected', bad.status === 400);
+
+  // The designer re-renders its picture-of-the-flyer on every edit and reuses
+  // one upload for it, rather than leaving a trail of dead files.
+  const gif = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  const again = await A.api('POST', '/api/uploads', { name: 'flyer.jpg', data: gif, replace: up.data.token });
+  check('upload replace keeps the same token', again.status === 201 && again.data?.token === up.data.token);
+  check('upload replace rewrites the file', again.data?.mime === 'image/gif');
 
   const fp = await A.raw('POST', '/api/flyer/preview', {
     body: { event: { title: 'Preview Party', date: future },
@@ -389,6 +412,16 @@ let guests = [];
     check(`${style}: renders a wide side-by-side card`,
       whtml.includes('flex-wrap:wrap') && whtml.includes('min(920px'));
   }
+
+  // Snapshot mode is what the designer rasterizes into the email's JPEG: a
+  // plain rectangle, no page breakout, no shadow, no page background.
+  const snap = await A.raw('POST', '/api/flyer/preview', {
+    body: { event: { title: 'Preview Party', date: future }, flyer: { style: 'spotlight' }, snapshot: true },
+  });
+  const snapHtml = await snap.text();
+  check('snapshot flyer drops the page furniture',
+    snapHtml.includes('Preview Party') && !snapHtml.includes('box-shadow') && !snapHtml.includes('translateX(-50%)'));
+  check('snapshot flyer is laid out at a fixed width', snapHtml.includes('max-width:920px'));
 }
 
 // --- public pages ----------------------------------------------------------

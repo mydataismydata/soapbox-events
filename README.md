@@ -14,6 +14,9 @@ organizations from one installation**, with hard isolation between them.
   color scheme, 5 font pairings, adjustable title sizes, and featured
   images: up to three side by side on the portrait templates (e.g. featured
   speakers), or one full-height photo down the side on the wide ones
+- Optional "include flyer in email": the designer renders the flyer to a JPEG
+  in the browser (no headless browser on the server) and the invitation carries
+  it under the Accept / Decline buttons
 - Live preview — the exact renderer that guests see powers the design preview
 - Invitation emails with prominent, fixed-color **Accept / Decline buttons**,
   automatic event-details card, plain-text alternative, and per-guest

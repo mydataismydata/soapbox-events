@@ -103,14 +103,25 @@ export function useToast() {
 
 export function Modal({ title, onClose, children, footer, size }) {
   const panelRef = useRef(null);
+  // Callers pass an inline arrow for onClose, so its identity changes on every
+  // render. Read it through a ref and the Escape listener can be bound once.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    const onKey = (e) => { if (e.key === 'Escape') closeRef.current?.(); };
     document.addEventListener('keydown', onKey);
-    // Move focus into the dialog so the keyboard lands somewhere sensible.
-    panelRef.current?.focus();
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
+
+  // Move focus into the dialog so the keyboard lands somewhere sensible —
+  // on mount only. Re-running this would steal focus back from whatever field
+  // the user is typing in, one character in. Leave it alone if a child (say an
+  // autoFocus input) already claimed it.
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (panel && !panel.contains(document.activeElement)) panel.focus();
+  }, []);
 
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>

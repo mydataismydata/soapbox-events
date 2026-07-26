@@ -1,5 +1,5 @@
 #!/bin/sh
-# Update SJC-Vite to the latest committed version and restart it.
+# Update Soapbox to the latest committed version and restart it.
 #
 #     ./update.sh
 #
@@ -8,7 +8,7 @@
 # any time — if nothing changed it simply rebuilds and restarts.
 #
 # Overrides (rarely needed):
-#     SJC_SERVICE=my-service ./update.sh     # systemd unit name (default sjc-vite)
+#     SOAPBOX_SERVICE=my-service ./update.sh   # systemd unit name
 set -eu
 
 # The whole body is wrapped in a brace group so the shell parses it fully
@@ -17,7 +17,12 @@ set -eu
 {
   cd "$(dirname "$0")"
 
-  SERVICE="${SJC_SERVICE:-sjc-vite}"
+  # New installs name the unit soapbox.service; installs that predate the
+  # rename still run sjc-vite.service, so prefer whichever actually exists.
+  SERVICE="${SOAPBOX_SERVICE:-${SJC_SERVICE:-}}"
+  if [ -z "$SERVICE" ]; then
+    if systemctl cat soapbox.service >/dev/null 2>&1; then SERVICE=soapbox; else SERVICE=sjc-vite; fi
+  fi
   # Health check port: read PORT from .env if set, otherwise 3000.
   PORT="$(sed -n 's/^[[:space:]]*PORT[[:space:]]*=[[:space:]]*//p' .env 2>/dev/null | tail -n1 || true)"
   PORT="${PORT:-3000}"
@@ -47,7 +52,7 @@ set -eu
   while [ "$n" -lt 30 ]; do
     if curl -fsS "http://localhost:$PORT/api/health" >/dev/null 2>&1; then
       echo ""
-      echo "Done — SJC-Vite is up to date and healthy (now at $AFTER)."
+      echo "Done — Soapbox is up to date and healthy (now at $AFTER)."
       exit 0
     fi
     n=$((n + 1))

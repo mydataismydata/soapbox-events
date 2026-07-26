@@ -62,8 +62,8 @@ node --version   # should print v24.x
 
 ```bash
 su - app
-git clone https://github.com/mydataismydata/sjc-vite.git
-cd sjc-vite
+git clone https://github.com/mydataismydata/soapbox-events.git soapbox
+cd soapbox
 npm install
 npm run build
 cp .env.example .env
@@ -88,7 +88,7 @@ node scripts/create-org.mjs --slug sjc --name "St. James Community" \
 
 ### 4. Run it as a service
 
-As root, create `/etc/systemd/system/sjc-vite.service`:
+As root, create `/etc/systemd/system/soapbox.service`:
 
 ```ini
 [Unit]
@@ -97,7 +97,7 @@ After=network.target
 
 [Service]
 User=app
-WorkingDirectory=/home/app/sjc-vite
+WorkingDirectory=/home/app/soapbox
 ExecStart=/usr/bin/node server/index.js
 Restart=always
 RestartSec=3
@@ -109,8 +109,8 @@ WantedBy=multi-user.target
 
 ```bash
 systemctl daemon-reload
-systemctl enable --now sjc-vite
-systemctl status sjc-vite     # should be active (running)
+systemctl enable --now soapbox
+systemctl status soapbox     # should be active (running)
 ```
 
 ### 5. HTTPS reverse proxy (Caddy — automatic certificates)
@@ -149,7 +149,7 @@ secrets. Copying it while the app runs is safe for practical purposes
 ```bash
 crontab -e -u app
 # nightly at 03:10
-10 3 * * * /home/app/sjc-vite/scripts/backup.sh >> /home/app/backup.log 2>&1
+10 3 * * * /home/app/soapbox/scripts/backup.sh >> /home/app/backup.log 2>&1
 ```
 
 Copy `backups/` somewhere off the server (rclone to any cloud storage, or
@@ -162,7 +162,7 @@ Whenever there are new changes on GitHub, redeploy in one step with the
 bundled script:
 
 ```bash
-cd ~/sjc-vite
+cd ~/soapbox
 ./update.sh
 ```
 
@@ -172,6 +172,11 @@ migrations run automatically at startup, so there's nothing else to do.
 
 (First time only — to fetch the script itself — run `git pull` once, then
 `./update.sh` from then on.)
+
+Installed before the project was renamed, with the unit called
+`sjc-vite.service`? Nothing to do — `update.sh` restarts whichever unit is
+actually installed. Set `SOAPBOX_SERVICE=<name>` if yours is called something
+else again.
 
 ---
 

@@ -212,7 +212,7 @@ reportRouter.get('/export/backup.json', wrap(async (req, res) => {
     settings[row.key] = row.key === 'smtp2go_api_key' && row.value ? '[configured]' : row.value;
   }
   const backup = {
-    format: 'sjc-vite-backup',
+    format: 'soapbox-backup',
     version: 1,
     exported_at: new Date().toISOString(),
     organization: { slug: req.org.slug, name: req.org.name },

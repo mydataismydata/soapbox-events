@@ -9,7 +9,7 @@ export const authRouter = Router();
 
 // A throwaway hash so a wrong email costs the same wall-clock time as a wrong
 // password — otherwise "email exists somewhere" would be detectable by timing.
-const DUMMY_HASH = hashPassword('sjc-vite-placeholder-not-a-real-password');
+const DUMMY_HASH = hashPassword('soapbox-placeholder-not-a-real-password');
 
 authRouter.post('/auth/login', wrap(async (req, res) => {
   const email = v.email(req.body.email, { label: 'Email' });

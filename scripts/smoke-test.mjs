@@ -12,7 +12,7 @@ import path from 'node:path';
 
 const PORT = 3870 + Math.floor(Math.random() * 100);
 const BASE = `http://localhost:${PORT}`;
-const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'sjc-vite-smoke-'));
+const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'soapbox-smoke-'));
 const ENV = { ...process.env, PORT: String(PORT), BASE_URL: BASE, DATA_DIR, NODE_ENV: 'test', SMTP2GO_API_KEY: '' };
 
 let passed = 0;

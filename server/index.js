@@ -1,4 +1,4 @@
-// SJC-Vite server entry point: assembles the Express app, serves the admin
+// Soapbox server entry point: assembles the Express app, serves the admin
 // SPA, the JSON API, and the public guest pages, and runs the email queue.
 import express from 'express';
 import path from 'node:path';
@@ -124,7 +124,7 @@ app.use((err, req, res, _next) => {
 });
 
 app.listen(config.port, () => {
-  console.log(`sjc-vite listening on ${config.baseUrl} (port ${config.port})`);
+  console.log(`${config.appName} listening on ${config.baseUrl} (port ${config.port})`);
   console.log(`data directory: ${config.dataDir}`);
   console.log(config.smtp2goApiKey
     ? 'email: SMTP2GO configured via environment'

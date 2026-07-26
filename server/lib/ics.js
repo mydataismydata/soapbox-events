@@ -2,6 +2,7 @@
 // to their calendars from the landing page and confirmation screens.
 // Times are emitted as "floating" local times, matching how events are
 // entered (wall-clock at the venue).
+import { config } from './env.js';
 import { formatWhen } from './format.js';
 
 function icsEscape(s) {
@@ -44,7 +45,11 @@ function eventTimes(event) {
   return { allDay: false, start: compact(event.date, event.start_time), end: compact(endDate, endTime) };
 }
 
-export function buildIcs({ event, orgName, url, uid }) {
+// `uidKey` is the local part of the calendar UID — the stable identity of the
+// event in a guest's calendar. It is namespaced with the installation's own
+// hostname, per RFC 5545, so re-adding an event updates the existing entry
+// rather than creating a second one.
+export function buildIcs({ event, orgName, url, uidKey }) {
   const times = eventTimes(event);
   if (!times) return null;
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
@@ -54,11 +59,11 @@ export function buildIcs({ event, orgName, url, uid }) {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//sjc-vite//events//EN',
+    `PRODID:-//${icsEscape(config.appName)}//events//EN`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
-    `UID:${uid}`,
+    `UID:${uidKey}@${config.host}`,
     `DTSTAMP:${stamp}`,
     times.allDay ? `DTSTART;VALUE=DATE:${times.start}` : `DTSTART:${times.start}`,
     times.allDay ? '' : `DTEND:${times.end}`,

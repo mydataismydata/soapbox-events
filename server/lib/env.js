@@ -49,6 +49,14 @@ function loadOrCreateSecret() {
   return secret;
 }
 
+const baseUrl = (process.env.BASE_URL || `http://localhost:${port}`).replace(/\/+$/, '');
+
+// The bare hostname, used as the namespace for calendar UIDs so two
+// installations can't mint colliding identifiers.
+function hostOf(url) {
+  try { return new URL(url).hostname || 'localhost'; } catch { return 'localhost'; }
+}
+
 export const config = {
   root: ROOT,
   port,
@@ -56,7 +64,8 @@ export const config = {
   isProd: nodeEnv === 'production',
   version: pkg.version || '0.0.0',
   build: Number(pkg.build || 0),
-  baseUrl: (process.env.BASE_URL || `http://localhost:${port}`).replace(/\/+$/, ''),
+  baseUrl,
+  host: hostOf(baseUrl),
   dataDir,
   orgsDir: path.join(dataDir, 'orgs'),
   sessionSecret: loadOrCreateSecret(),

@@ -324,7 +324,7 @@ publicRouter.get('/e/:slug/ics', (req, res) => {
   const ics = buildIcs({
     event, orgName: req.pub.org.name,
     url: publicUrl(req.pub.org.slug, `/e/${event.slug}`),
-    uid: `${event.slug}@sjc-vite`,
+    uidKey: event.slug,
   });
   if (!ics) return notFoundPage(res, 'This event has no date yet.');
   res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
@@ -459,7 +459,7 @@ publicRouter.get('/i/:token/ics', (req, res) => {
   const ics = buildIcs({
     event, orgName: req.pub.org.name,
     url: publicUrl(req.pub.org.slug, `/e/${event.slug}`),
-    uid: `${invite.token}@sjc-vite`,
+    uidKey: invite.token,
   });
   if (!ics) return notFoundPage(res, 'This event has no date yet.');
   res.setHeader('Content-Type', 'text/calendar; charset=utf-8');

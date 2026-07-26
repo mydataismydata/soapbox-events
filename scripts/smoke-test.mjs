@@ -477,6 +477,8 @@ let guests = [];
   const ics = await fetch(`${BASE}/o/alpha/e/${eventSlug}/ics`);
   const icsText = await ics.text();
   check('ICS download works', ics.status === 200 && icsText.includes('BEGIN:VCALENDAR') && icsText.includes('SUMMARY:Test Gala'));
+  check('ICS UID is namespaced with the BASE_URL host',
+    icsText.includes(`UID:${eventSlug}@${new URL(BASE).hostname}`), icsText.match(/UID:.*/)?.[0]);
 }
 
 // --- unsubscribe -----------------------------------------------------------

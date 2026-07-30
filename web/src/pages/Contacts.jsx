@@ -177,6 +177,14 @@ export default function Contacts() {
     setSelected(next);
   }
 
+  // One menu for everything that acts on the selection. Values are namespaced
+  // ("group:12") so new actions can be added without colliding.
+  function runBulkAction(action) {
+    if (!action) return;
+    if (action === 'delete') { setModal({ type: 'delete-selected' }); return; }
+    if (action.startsWith('group:')) addSelectedToGroup(Number(action.slice(6)));
+  }
+
   async function deleteSelected() {
     setBusy(true);
     try {
@@ -248,15 +256,16 @@ export default function Contacts() {
             <div className="row">
               <span className="small muted">{selected.size} selected</span>
               <select className="search-input" style={{ width: 190 }} defaultValue="" disabled={busy}
-                aria-label="Add selected contacts to a group"
-                onChange={(e) => { addSelectedToGroup(Number(e.target.value)); e.target.value = ''; }}>
-                <option value="" disabled>Add to group…</option>
-                {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                aria-label="Bulk actions for the selected contacts"
+                onChange={(e) => { runBulkAction(e.target.value); e.target.value = ''; }}>
+                <option value="" disabled>Bulk actions…</option>
+                {groups.length ? (
+                  <optgroup label="Add to group">
+                    {groups.map((g) => <option key={g.id} value={`group:${g.id}`}>{g.name}</option>)}
+                  </optgroup>
+                ) : null}
+                <option value="delete">Delete selected…</option>
               </select>
-              <button className="btn btn-sm btn-danger" disabled={busy}
-                onClick={() => setModal({ type: 'delete-selected' })}>
-                <Icon name="trash" size={14} /> Delete
-              </button>
             </div>
           ) : (
             <span className="small muted">{filtered.length} shown</span>

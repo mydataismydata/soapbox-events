@@ -674,6 +674,31 @@ let guests = [];
   check('dashboard exposes broadcasts list', Array.isArray(dashB.data?.broadcasts));
 }
 
+// --- bulk delete contacts --------------------------------------------------
+{
+  const mk = async (name, email) =>
+    (await A.api('POST', '/api/contacts', { name, email })).data.contact.id;
+  const b1 = await mk('Bulk One', 'bulk1@guest.test');
+  const b2 = await mk('Bulk Two', 'bulk2@guest.test');
+  const b3 = await mk('Bulk Three', 'bulk3@guest.test');
+  const gid = (await A.api('POST', '/api/groups', { name: 'Bulk Group', contact_ids: [b1, b2] })).data.group.id;
+
+  const none = await A.api('POST', '/api/contacts/bulk-delete', { contact_ids: [] });
+  check('bulk delete rejects an empty selection', none.status === 400);
+
+  // b3 is deleted twice over: once on its own, then again inside the batch.
+  await A.api('DELETE', `/api/contacts/${b3}`);
+  const res = await A.api('POST', '/api/contacts/bulk-delete', { contact_ids: [b1, b2, b3] });
+  check('bulk delete reports what it actually removed', res.status === 200 && res.data?.deleted === 2,
+    JSON.stringify(res.data));
+
+  const left = (await A.api('GET', '/api/contacts')).data.contacts.map((c) => c.id);
+  check('bulk-deleted contacts are gone', ![b1, b2, b3].some((id) => left.includes(id)));
+  const g = await A.api('GET', `/api/groups/${gid}`);
+  check('bulk delete clears group membership too', g.data.group.member_ids.length === 0,
+    JSON.stringify(g.data.group.member_ids));
+}
+
 // --- sender identity: broadcasts can use a second address ------------------
 {
   const put = await A.api('PUT', '/api/settings', {

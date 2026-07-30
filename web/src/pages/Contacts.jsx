@@ -177,6 +177,22 @@ export default function Contacts() {
     setSelected(next);
   }
 
+  async function deleteSelected() {
+    setBusy(true);
+    try {
+      const { deleted } = await api.post('/api/contacts/bulk-delete', {
+        contact_ids: Array.from(selected),
+      });
+      toast(`${deleted} contact${deleted === 1 ? '' : 's'} deleted`);
+      setModal(null);
+      await load();
+    } catch (err) {
+      toast(err.message, 'bad');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function addSelectedToGroup(groupId) {
     if (!groupId) return;
     setBusy(true);
@@ -237,6 +253,10 @@ export default function Contacts() {
                 <option value="" disabled>Add to group…</option>
                 {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
+              <button className="btn btn-sm btn-danger" disabled={busy}
+                onClick={() => setModal({ type: 'delete-selected' })}>
+                <Icon name="trash" size={14} /> Delete
+              </button>
             </div>
           ) : (
             <span className="small muted">{filtered.length} shown</span>
@@ -311,6 +331,13 @@ export default function Contacts() {
 
       {modal?.type === 'import' ? (
         <ImportModal onClose={() => setModal(null)} onDone={load} />
+      ) : null}
+
+      {modal?.type === 'delete-selected' ? (
+        <ConfirmModal title={`Delete ${selected.size} contact${selected.size === 1 ? '' : 's'}?`} danger busy={busy}
+          message={`This removes ${selected.size === 1 ? 'them' : 'them all'} from your contact list and from every group. Past event RSVPs keep the names they were sent to. It cannot be undone.`}
+          confirmLabel={`Delete ${selected.size}`} onClose={() => setModal(null)}
+          onConfirm={deleteSelected} />
       ) : null}
 
       {modal?.type === 'delete' ? (

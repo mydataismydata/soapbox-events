@@ -88,6 +88,22 @@ contactRouter.delete('/contacts/:id', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Bulk delete from the contact list's selection. One transaction, so a
+// selection either goes entirely or not at all. Ids that no longer exist are
+// counted as already gone rather than failing the whole batch — two people
+// deleting the same contact shouldn't produce an error.
+contactRouter.post('/contacts/bulk-delete', wrap(async (req, res) => {
+  const ids = v.intArray(req.body.contact_ids, { label: 'contact_ids' });
+  if (ids.length === 0) throw new ApiError(400, 'Select at least one contact to delete.');
+  const stmt = req.db.prepare('DELETE FROM contacts WHERE id = ?');
+  const deleted = withTx(req.db, () => {
+    let n = 0;
+    for (const id of ids) n += Number(stmt.run(id).changes);
+    return n;
+  });
+  res.json({ ok: true, deleted });
+}));
+
 // CSV import. Body: { csv: "<file text>" }. Rows with an email that already
 // exists are skipped, so re-importing the same file is safe.
 contactRouter.post('/contacts/import', wrap(async (req, res) => {

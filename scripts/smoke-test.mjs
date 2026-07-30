@@ -674,6 +674,46 @@ let guests = [];
   check('dashboard exposes broadcasts list', Array.isArray(dashB.data?.broadcasts));
 }
 
+// --- sender identity: broadcasts can use a second address ------------------
+{
+  const put = await A.api('PUT', '/api/settings', {
+    sender_name: 'Alpha Society', sender_email: 'meetings@alpha.test', reply_to: 'chair@alpha.test',
+    broadcast_sender_split: true, broadcast_sender_email: 'news@alpha.test',
+    broadcast_sender_name: '', broadcast_reply_to: '',
+  });
+  check('split sender settings save', put.status === 200, JSON.stringify(put.data));
+  const got = (await A.api('GET', '/api/settings')).data?.settings;
+  check('split sender settings round-trip',
+    got?.broadcast_sender_split === true && got?.broadcast_sender_email === 'news@alpha.test',
+    JSON.stringify(got));
+
+  // The routing itself, exercised directly — in simulation mode no From
+  // header reaches the wire, so this is the only place it can be observed.
+  process.env.DATA_DIR = DATA_DIR; // keep the module's data dir inside the sandbox
+  const { senderFor } = await import('../server/lib/email.js');
+  const stub = (settings) => ({ prepare: () => ({ get: (key) => ({ value: settings[key] ?? '' }) }) });
+  const live = stub({
+    sender_email: 'meetings@alpha.test', sender_name: 'Alpha Society', reply_to: 'chair@alpha.test',
+    broadcast_sender_split: '1', broadcast_sender_email: 'news@alpha.test', broadcast_reply_to: '',
+  });
+  const ev = senderFor(live, 'Alpha Society', 'event');
+  check('events keep the default sender',
+    ev.sender.email === 'meetings@alpha.test' && ev.replyTo === 'chair@alpha.test', JSON.stringify(ev));
+  const bc = senderFor(live, 'Alpha Society', 'broadcast');
+  check('broadcasts use the split sender', bc.sender.email === 'news@alpha.test', JSON.stringify(bc));
+  check('broadcast name falls back to the default sender name', bc.sender.name === 'Alpha Society');
+  check('broadcast reply-to does not inherit the event reply-to', bc.replyTo === '');
+
+  const halfDone = stub({ sender_email: 'meetings@alpha.test', broadcast_sender_split: '1' });
+  check('split with no address falls back to the default sender',
+    senderFor(halfDone, 'Alpha', 'broadcast').sender.email === 'meetings@alpha.test');
+  const off = stub({ sender_email: 'meetings@alpha.test', broadcast_sender_email: 'news@alpha.test' });
+  check('a saved broadcast address is ignored while the split is off',
+    senderFor(off, 'Alpha', 'broadcast').sender.email === 'meetings@alpha.test');
+
+  await A.api('PUT', '/api/settings', { broadcast_sender_split: false });
+}
+
 // ---------------------------------------------------------------------------
 console.log('');
 if (failures.length === 0) {

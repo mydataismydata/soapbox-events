@@ -13,6 +13,10 @@ settingsRouter.get('/settings', wrap(async (req, res) => {
       sender_name: getSetting(req.db, 'sender_name', ''),
       sender_email: getSetting(req.db, 'sender_email', ''),
       reply_to: getSetting(req.db, 'reply_to', ''),
+      broadcast_sender_split: getSetting(req.db, 'broadcast_sender_split', '') === '1',
+      broadcast_sender_name: getSetting(req.db, 'broadcast_sender_name', ''),
+      broadcast_sender_email: getSetting(req.db, 'broadcast_sender_email', ''),
+      broadcast_reply_to: getSetting(req.db, 'broadcast_reply_to', ''),
       smtp2go_key_set: Boolean(getSetting(req.db, 'smtp2go_api_key', '')),
       default_start_time: getSetting(req.db, 'default_start_time', ''),
       default_end_time: getSetting(req.db, 'default_end_time', ''),
@@ -39,6 +43,18 @@ settingsRouter.put('/settings', requireAdmin, wrap(async (req, res) => {
   }
   if (b.reply_to !== undefined) {
     setSetting(req.db, 'reply_to', v.optEmail(b.reply_to, { label: 'Reply-to email' }));
+  }
+  if (b.broadcast_sender_split !== undefined) {
+    setSetting(req.db, 'broadcast_sender_split', b.broadcast_sender_split ? '1' : '');
+  }
+  if (b.broadcast_sender_name !== undefined) {
+    setSetting(req.db, 'broadcast_sender_name', v.optStr(b.broadcast_sender_name, { label: 'Broadcast sender name', max: 200 }));
+  }
+  if (b.broadcast_sender_email !== undefined) {
+    setSetting(req.db, 'broadcast_sender_email', v.optEmail(b.broadcast_sender_email, { label: 'Broadcast sender email' }));
+  }
+  if (b.broadcast_reply_to !== undefined) {
+    setSetting(req.db, 'broadcast_reply_to', v.optEmail(b.broadcast_reply_to, { label: 'Broadcast reply-to email' }));
   }
   if (b.smtp2go_api_key !== undefined) {
     const key = v.optStr(b.smtp2go_api_key, { label: 'API key', max: 200 });

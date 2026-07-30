@@ -5,7 +5,7 @@ import { randomSlug, randomToken } from '../lib/tokens.js';
 import { normalizeFlyer } from '../lib/flyer.js';
 import { sanitizeRichText } from '../lib/sanitizeHtml.js';
 import { eventStats } from '../lib/stats.js';
-import { orgApiKey, orgSender, sendEmail } from '../lib/email.js';
+import { orgApiKey, senderFor, sendEmail } from '../lib/email.js';
 import { getSetting } from '../lib/db.js';
 import {
   parseFlyer, publicUrl, getInvitesForEvent, queueEmails, renderEmailFor,
@@ -404,10 +404,11 @@ eventRouter.post('/events/:id/test-email', wrap(async (req, res) => {
     bodyTemplate: event.email_body || DEFAULT_BODIES.invitation,
     linksOverride: previewLinks(req.org.slug, event),
   });
+  const { sender, replyTo } = senderFor(req.db, req.org.name, 'event');
   const result = await sendEmail({
     apiKey: orgApiKey(req.db),
-    sender: orgSender(req.db, req.org.name),
-    replyTo: getSetting(req.db, 'reply_to', ''),
+    sender,
+    replyTo,
     toName: req.user.name,
     toEmail: to,
     subject: msg.subject,

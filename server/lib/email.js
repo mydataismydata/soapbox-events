@@ -14,10 +14,36 @@ export function orgApiKey(db) {
   return getSetting(db, 'smtp2go_api_key', '') || config.smtp2goApiKey || '';
 }
 
-export function orgSender(db, orgName) {
-  const email = getSetting(db, 'sender_email', '');
-  const name = getSetting(db, 'sender_name', '') || orgName;
-  return { email, name };
+// The "from" identity for one message, plus its Reply-To.
+//
+// An organization has one default identity. Broadcasts can optionally use a
+// second one — a newsletter address, say, distinct from the address that
+// invites people to meetings. The split only applies when it is switched on
+// AND a broadcast address is actually filled in; otherwise everything falls
+// back to the default, so a half-finished setup still sends.
+//
+// When the split is live the broadcast identity is used whole: its own
+// Reply-To (or none), never the default one, so replies follow the address
+// the recipient can see.
+export function senderFor(db, orgName, kind = 'event') {
+  const broadcastEmail = getSetting(db, 'broadcast_sender_email', '');
+  const split = getSetting(db, 'broadcast_sender_split', '') === '1';
+  if (kind === 'broadcast' && split && broadcastEmail) {
+    return {
+      sender: {
+        email: broadcastEmail,
+        name: getSetting(db, 'broadcast_sender_name', '') || getSetting(db, 'sender_name', '') || orgName,
+      },
+      replyTo: getSetting(db, 'broadcast_reply_to', ''),
+    };
+  }
+  return {
+    sender: {
+      email: getSetting(db, 'sender_email', ''),
+      name: getSetting(db, 'sender_name', '') || orgName,
+    },
+    replyTo: getSetting(db, 'reply_to', ''),
+  };
 }
 
 export function senderHeader(sender) {

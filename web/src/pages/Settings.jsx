@@ -9,8 +9,13 @@ function SendingCard({ data, isAdmin, onSaved }) {
     sender_name: data.settings.sender_name,
     sender_email: data.settings.sender_email,
     reply_to: data.settings.reply_to,
+    broadcast_sender_split: data.settings.broadcast_sender_split,
+    broadcast_sender_name: data.settings.broadcast_sender_name,
+    broadcast_sender_email: data.settings.broadcast_sender_email,
+    broadcast_reply_to: data.settings.broadcast_reply_to,
     smtp2go_api_key: undefined,
   });
+  const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   const [quota, setQuota] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -19,9 +24,23 @@ function SendingCard({ data, isAdmin, onSaved }) {
   }, []);
 
   async function save() {
+    // A split with no address of its own would silently fall back to the
+    // default sender — better to say so than to look like it took effect.
+    if (form.broadcast_sender_split && !form.broadcast_sender_email.trim()) {
+      toast('Give broadcasts a sender email, or turn the split off.', 'bad');
+      return;
+    }
     setBusy(true);
     try {
-      const payload = { sender_name: form.sender_name, sender_email: form.sender_email, reply_to: form.reply_to };
+      const payload = {
+        sender_name: form.sender_name,
+        sender_email: form.sender_email,
+        reply_to: form.reply_to,
+        broadcast_sender_split: form.broadcast_sender_split,
+        broadcast_sender_name: form.broadcast_sender_name,
+        broadcast_sender_email: form.broadcast_sender_email,
+        broadcast_reply_to: form.broadcast_reply_to,
+      };
       if (form.smtp2go_api_key !== undefined) payload.smtp2go_api_key = form.smtp2go_api_key;
       await api.put('/api/settings', payload);
       toast('Sending settings saved');
@@ -59,17 +78,20 @@ function SendingCard({ data, isAdmin, onSaved }) {
       <div className="field-row">
         <Field label="Sender name" hint="The “from” name guests see.">
           <input value={form.sender_name} maxLength={200} disabled={!isAdmin}
-            onChange={(e) => setForm({ ...form, sender_name: e.target.value })} />
+            onChange={(e) => set({ sender_name: e.target.value })} />
         </Field>
-        <Field label="Sender email" hint="Must belong to a domain verified in SMTP2GO.">
+        <Field label="Sender email"
+          hint={form.broadcast_sender_split
+            ? 'Used for events. Must belong to a domain verified in SMTP2GO.'
+            : 'Must belong to a domain verified in SMTP2GO.'}>
           <input type="email" value={form.sender_email} maxLength={254} disabled={!isAdmin}
-            onChange={(e) => setForm({ ...form, sender_email: e.target.value })} />
+            onChange={(e) => set({ sender_email: e.target.value })} />
         </Field>
       </div>
       <div className="field-row">
         <Field label="Reply-to (optional)">
           <input type="email" value={form.reply_to} maxLength={254} disabled={!isAdmin}
-            onChange={(e) => setForm({ ...form, reply_to: e.target.value })} />
+            onChange={(e) => set({ reply_to: e.target.value })} />
         </Field>
         <Field label="SMTP2GO API key"
           hint={data.settings.smtp2go_key_set
@@ -79,9 +101,44 @@ function SendingCard({ data, isAdmin, onSaved }) {
               : 'Starts with “api-”. Created in the SMTP2GO dashboard under Settings → API Keys.'}>
           <input type="password" placeholder={data.settings.smtp2go_key_set ? '••••••••••••' : 'api-…'}
             disabled={!isAdmin}
-            onChange={(e) => setForm({ ...form, smtp2go_api_key: e.target.value })} />
+            onChange={(e) => set({ smtp2go_api_key: e.target.value })} />
         </Field>
       </div>
+
+      <label className="checkbox">
+        <input type="checkbox" checked={form.broadcast_sender_split} disabled={!isAdmin}
+          onChange={(e) => set({ broadcast_sender_split: e.target.checked })} />
+        <span><span className="cb-label">Send broadcasts from a different address</span>
+          <div className="cb-sub">
+            Off, everything goes out from the address above — event invitations and broadcasts alike.
+            On, broadcasts use their own identity, so a newsletter needn't come from the address
+            that invites people to meetings.
+          </div></span>
+      </label>
+
+      {form.broadcast_sender_split ? (
+        <>
+          <div className="field-row">
+            <Field label="Broadcast sender name" hint="Leave blank to reuse the sender name above.">
+              <input value={form.broadcast_sender_name} maxLength={200} disabled={!isAdmin}
+                onChange={(e) => set({ broadcast_sender_name: e.target.value })} />
+            </Field>
+            <Field label="Broadcast sender email" required
+              hint="Also has to be on a domain verified in SMTP2GO.">
+              <input type="email" value={form.broadcast_sender_email} maxLength={254} disabled={!isAdmin}
+                onChange={(e) => set({ broadcast_sender_email: e.target.value })} />
+            </Field>
+          </div>
+          <div className="field-row">
+            <Field label="Broadcast reply-to (optional)"
+              hint="Blank sends replies to the broadcast address itself. The reply-to above never applies to broadcasts.">
+              <input type="email" value={form.broadcast_reply_to} maxLength={254} disabled={!isAdmin}
+                onChange={(e) => set({ broadcast_reply_to: e.target.value })} />
+            </Field>
+          </div>
+        </>
+      ) : null}
+
       {isAdmin ? (
         <button className="btn btn-primary" onClick={save} disabled={busy}>
           {busy ? 'Saving…' : 'Save sending settings'}

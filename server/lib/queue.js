@@ -2,8 +2,8 @@
 // organizations, throttled to EMAILS_PER_MINUTE, and records the outcome.
 // With no SMTP2GO key configured, messages complete as "simulated".
 import { config } from './env.js';
-import { listOrgs, orgDb, getSetting } from './db.js';
-import { sendEmail, orgApiKey, orgSender } from './email.js';
+import { listOrgs, orgDb } from './db.js';
+import { sendEmail, orgApiKey, senderFor } from './email.js';
 import { buildLinks, publicUrl, signContactToken } from './sending.js';
 
 const TICK_MS = 2000;
@@ -34,10 +34,11 @@ async function processOne(db, org, row) {
     }
   }
 
+  const { sender, replyTo } = senderFor(db, org.name, row.broadcast_id ? 'broadcast' : 'event');
   const result = await sendEmail({
     apiKey: orgApiKey(db),
-    sender: orgSender(db, org.name),
-    replyTo: getSetting(db, 'reply_to', ''),
+    sender,
+    replyTo,
     toName: row.to_name,
     toEmail: row.to_email,
     subject: row.subject,

@@ -7,7 +7,7 @@ import { wrap, v, ApiError } from '../lib/validate.js';
 import { randomSlug } from '../lib/tokens.js';
 import { normalizeFlyer } from '../lib/flyer.js';
 import { broadcastStats } from '../lib/stats.js';
-import { orgApiKey, orgSender, sendEmail } from '../lib/email.js';
+import { orgApiKey, senderFor, sendEmail } from '../lib/email.js';
 import {
   parseFlyer, publicUrl, resolveRecipients, queueBroadcastEmails,
   renderBroadcastEmailFor, broadcastViewUrl,
@@ -147,10 +147,11 @@ broadcastRouter.post('/broadcasts/:id/test-email', wrap(async (req, res) => {
     org: req.org, broadcast: b, recipient: { name: req.user.name, email: to },
     subjectTemplate: `[Test] ${b.subject || b.title}`, bodyTemplate: b.body || '', viewUrl, unsubUrl: '',
   });
+  const { sender, replyTo } = senderFor(req.db, req.org.name, 'broadcast');
   const result = await sendEmail({
     apiKey: orgApiKey(req.db),
-    sender: orgSender(req.db, req.org.name),
-    replyTo: getSetting(req.db, 'reply_to', ''),
+    sender,
+    replyTo,
     toName: req.user.name, toEmail: to, subject: msg.subject, html: msg.html, text: msg.text,
   });
   const status = result.ok ? (result.simulated ? 'simulated' : 'sent') : 'failed';

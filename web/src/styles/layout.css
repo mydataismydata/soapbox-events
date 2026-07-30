@@ -39,13 +39,20 @@
   --logo-accent: var(--c-side-accent);
   height: 24px;
 }
+/* Organization names are as long as the organization decided; let them wrap
+   rather than truncating at the first line. Three lines is the ceiling, so a
+   runaway name can't push the navigation off screen — the full text stays in
+   the title attribute either way. */
 .side-org {
   font-size: var(--fs-sm);
   color: var(--c-side-faint);
   line-height: 1.3;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .side-nav {

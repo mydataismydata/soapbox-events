@@ -3,9 +3,17 @@ import { api, timeAgo } from '../api.js';
 import { useAuth } from '../App.jsx';
 import { Spinner, Modal, Field, useToast, Badge, Banner, Card, Icon } from '../ui.jsx';
 
+// The plain fields, compared against what's on the server to decide whether
+// there is anything to save. The API key is handled separately: it is never
+// sent back to the browser, so there is nothing to compare it to.
+const SENDING_FIELDS = [
+  'sender_name', 'sender_email', 'reply_to',
+  'broadcast_sender_split', 'broadcast_sender_name', 'broadcast_sender_email', 'broadcast_reply_to',
+];
+
 function SendingCard({ data, isAdmin, onSaved }) {
   const toast = useToast();
-  const [form, setForm] = useState({
+  const initial = () => ({
     sender_name: data.settings.sender_name,
     sender_email: data.settings.sender_email,
     reply_to: data.settings.reply_to,
@@ -15,6 +23,8 @@ function SendingCard({ data, isAdmin, onSaved }) {
     broadcast_reply_to: data.settings.broadcast_reply_to,
     smtp2go_api_key: undefined,
   });
+  const [form, setForm] = useState(initial);
+  const [saved, setSaved] = useState(initial); // what the server last told us
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   const [quota, setQuota] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -44,7 +54,12 @@ function SendingCard({ data, isAdmin, onSaved }) {
       if (form.smtp2go_api_key !== undefined) payload.smtp2go_api_key = form.smtp2go_api_key;
       await api.put('/api/settings', payload);
       toast('Sending settings saved');
-      onSaved();
+      // Clear the key box and re-baseline, so the button goes quiet again and
+      // the hint below the box becomes the record of what is stored.
+      const next = { ...form, smtp2go_api_key: undefined };
+      setForm(next);
+      setSaved(next);
+      await onSaved();
     } catch (err) {
       toast(err.message, 'bad');
     } finally {
@@ -53,6 +68,11 @@ function SendingCard({ data, isAdmin, onSaved }) {
   }
 
   const simulation = quota && quota.mode === 'simulation';
+  // Typing in the key box counts as a change — except typing and deleting
+  // again when no key was stored, which would save nothing.
+  const keyChanged = form.smtp2go_api_key !== undefined
+    && (form.smtp2go_api_key !== '' || data.settings.smtp2go_key_set);
+  const dirty = keyChanged || SENDING_FIELDS.some((k) => form[k] !== saved[k]);
 
   return (
     <Card title="Email sending">
@@ -100,7 +120,7 @@ function SendingCard({ data, isAdmin, onSaved }) {
               ? 'Using the server-wide key. A key entered here overrides it for this organization.'
               : 'Starts with “api-”. Created in the SMTP2GO dashboard under Settings → API Keys.'}>
           <input type="password" placeholder={data.settings.smtp2go_key_set ? '••••••••••••' : 'api-…'}
-            disabled={!isAdmin}
+            value={form.smtp2go_api_key ?? ''} disabled={!isAdmin}
             onChange={(e) => set({ smtp2go_api_key: e.target.value })} />
         </Field>
       </div>
@@ -140,9 +160,12 @@ function SendingCard({ data, isAdmin, onSaved }) {
       ) : null}
 
       {isAdmin ? (
-        <button className="btn btn-primary" onClick={save} disabled={busy}>
-          {busy ? 'Saving…' : 'Save sending settings'}
-        </button>
+        <div className="row" style={{ gap: 'var(--sp-3)' }}>
+          <button className="btn btn-primary" onClick={save} disabled={busy || !dirty}>
+            {busy ? 'Saving…' : 'Save sending settings'}
+          </button>
+          {!dirty && !busy ? <span className="small muted">No unsaved changes.</span> : null}
+        </div>
       ) : <p className="small muted">Only administrators can change sending settings.</p>}
     </Card>
   );
@@ -332,7 +355,8 @@ export default function Settings() {
             <input value={orgName} maxLength={200} disabled={!isAdmin}
               onChange={(e) => setOrgName(e.target.value)} />
           </Field>
-          <Field label="Server address" hint="Set BASE_URL in .env — links in emails are built from it.">
+          <Field label="Server address"
+            hint="This is where all the RSVP links resolve to in the sent emails. Can also be set in the .env file on the server in the BASE_URL field.">
             <input value={data.env.base_url} disabled />
           </Field>
         </div>

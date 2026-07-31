@@ -239,13 +239,6 @@ export default function BroadcastWizard() {
 
           {step === 1 ? (
             <>
-              <Card title="Design the masthead"
-                sub={b.web_version
-                  ? 'Fronts the broadcast’s web version. The email itself is just your message.'
-                  : 'Only used by the web version, which is switched off — turn it on in step 1 for this to appear anywhere.'}>
-                <FlyerDesigner mode="broadcast" eventBasics={{ title: b.title, host_name: '' }}
-                  flyer={b.flyer} onChange={(flyer) => patch({ flyer })} />
-              </Card>
               <Card title="Write the message">
                 {templates.length > 0 ? (
                   <Field label="Start from a template" hint="Event-only placeholders (dates, venue) are left blank in a broadcast.">
@@ -260,7 +253,7 @@ export default function BroadcastWizard() {
                     </select>
                   </Field>
                 ) : null}
-                <Field label="Message" hint="Placeholders fill in per recipient. The masthead above and an unsubscribe footer are added automatically.">
+                <Field label="Message" hint="Placeholders fill in per recipient. The masthead below and an unsubscribe footer are added automatically.">
                   <textarea ref={bodyRef} rows={9} value={b.body} maxLength={20000}
                     onChange={(e) => patch({ body: e.target.value })} />
                   <TagButtons tags={BROADCAST_TAGS} onInsert={(snippet) =>
@@ -269,6 +262,13 @@ export default function BroadcastWizard() {
                 <button className="btn" onClick={previewEmail} disabled={saving}>
                   <Icon name="eye" size={14} /> Preview email
                 </button>
+              </Card>
+              <Card title="Design the masthead"
+                sub={b.web_version
+                  ? 'Fronts the broadcast’s web version. The email itself is just your message.'
+                  : 'Only used by the web version, which is switched off — turn it on in step 1 for this to appear anywhere.'}>
+                <FlyerDesigner mode="broadcast" eventBasics={{ title: b.title, host_name: '' }}
+                  flyer={b.flyer} onChange={(flyer) => patch({ flyer })} />
               </Card>
             </>
           ) : null}

@@ -9,6 +9,7 @@ import {
 import RecipientPicker from '../components/RecipientPicker.jsx';
 import TagButtons from '../components/TagButtons.jsx';
 import EmailLog from '../components/EmailLog.jsx';
+import { exportEventForWordPress } from '../components/exportForWordPress.js';
 
 // Guest columns you can order by. Responses sort into a deliberate order
 // rather than alphabetically, so accepted / declined / no reply group up.
@@ -70,6 +71,7 @@ export default function EventDetail() {
   const [addOpen, setAddOpen] = useState(false);
   const [recipients, setRecipients] = useState({ contact_ids: [], group_ids: [], new_contacts: [] });
   const [confirm, setConfirm] = useState(null); // {type, ...}
+  const [exporting, setExporting] = useState(false);
   const [cancelNotify, setCancelNotify] = useState(true);
   const [compose, setCompose] = useState(null); // {presetKey, kind, audience, subject, body}
   const [composePreview, setComposePreview] = useState(null);
@@ -196,6 +198,15 @@ export default function EventDetail() {
             const d = await api.post(`/api/events/${ev.id}/duplicate`);
             navigate(`/events/${d.event.id}/edit`);
           })}><Icon name="copy" size={14} /> Duplicate</button>
+          <button className="btn" disabled={exporting} onClick={async () => {
+            setExporting(true);
+            try {
+              const doc = await exportEventForWordPress(ev);
+              toast(`Exported ${doc.counts.guests} guest${doc.counts.guests === 1 ? '' : 's'}`
+                + (doc.flyer_image ? ' with the flyer' : ' (no flyer picture)'));
+            } catch (err) { toast(err.message, 'bad'); }
+            finally { setExporting(false); }
+          }}><Icon name="download" size={14} /> {exporting ? 'Exporting…' : 'Export for WordPress'}</button>
           {ev.status === 'published'
             ? <button className="btn btn-danger" onClick={() => setConfirm({ type: 'cancel' })}>Cancel event</button>
             : <button className="btn btn-danger" onClick={() => setConfirm({ type: 'delete' })}>

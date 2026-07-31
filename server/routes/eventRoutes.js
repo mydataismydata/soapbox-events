@@ -5,6 +5,7 @@ import { randomSlug, randomToken } from '../lib/tokens.js';
 import { normalizeFlyer } from '../lib/flyer.js';
 import { sanitizeRichText } from '../lib/sanitizeHtml.js';
 import { eventStats } from '../lib/stats.js';
+import { buildEventExport } from '../lib/wpExport.js';
 import { orgApiKey, senderFor, sendEmail } from '../lib/email.js';
 import { getSetting } from '../lib/db.js';
 import {
@@ -127,6 +128,17 @@ eventRouter.delete('/events/:id', wrap(async (req, res) => {
   const event = getEvent(req.db, req.params.id);
   req.db.prepare('DELETE FROM events WHERE id = ?').run(event.id);
   res.json({ ok: true });
+}));
+
+// Hand this event to the WordPress plugin. POST rather than GET because the
+// browser renders the flyer to a JPEG first (there is no headless browser on
+// the server) and posts it along to be embedded in the document. Without one
+// the export still goes, using the stored "include flyer in email" picture if
+// there is one.
+eventRouter.post('/events/:id/export/wordpress', wrap(async (req, res) => {
+  const event = getEvent(req.db, req.params.id);
+  const flyerDataUrl = v.optStr(req.body.flyer_image, { label: 'Flyer image', max: 12_000_000 });
+  res.json(buildEventExport(req.db, req.org, event, { flyerDataUrl }));
 }));
 
 eventRouter.post('/events/:id/duplicate', wrap(async (req, res) => {

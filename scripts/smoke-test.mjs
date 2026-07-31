@@ -674,6 +674,51 @@ let guests = [];
   check('dashboard exposes broadcasts list', Array.isArray(dashB.data?.broadcasts));
 }
 
+// --- WordPress export ------------------------------------------------------
+{
+  const doc = (await A.api('POST', `/api/events/${eventId}/export/wordpress`, {})).data;
+  check('export declares its format and version',
+    doc?.format === 'soapbox-event-export' && doc?.version === 1, JSON.stringify(doc?.format));
+  check('export identifies the source organization',
+    doc?.source?.org_slug === 'alpha' && typeof doc?.source?.base_url === 'string');
+  check('export carries the event identity for re-import matching',
+    doc?.event?.soapbox_id === eventId && typeof doc?.event?.slug === 'string');
+  check('export converts the party size to WordPress extra-guest counts',
+    doc.guests.every((g) => g.party_size >= 1
+      && g.extra_guests === (g.response === 'accepted' ? g.party_size - 1 : 0)),
+    JSON.stringify(doc.guests.map((g) => [g.response, g.party_size, g.extra_guests])));
+  check('only accepted guests count towards the seat total',
+    doc.counts.seats === doc.guests.filter((g) => g.response === 'accepted')
+      .reduce((n, g) => n + g.party_size, 0), JSON.stringify(doc.counts));
+  check('export speaks WordPress response vocabulary',
+    doc.guests.every((g) => ['accepted', 'declined', 'pending'].includes(g.response)),
+    JSON.stringify(doc.guests.map((g) => g.response)));
+  const accepted = doc.guests.find((g) => g.response === 'accepted');
+  check('an accepted guest reports when they replied', Boolean(accepted && accepted.responded_at),
+    JSON.stringify(accepted));
+  check('export splits names into first and last',
+    doc.guests.every((g) => !g.name || g.last_name), JSON.stringify(doc.guests.map((g) => g.name)));
+  check('export counts match the guest rows',
+    doc.counts.guests === doc.guests.length
+    && doc.counts.accepted === doc.guests.filter((g) => g.response === 'accepted').length,
+    JSON.stringify(doc.counts));
+  check('export has no flyer picture when none was rendered', doc.flyer_image === null);
+
+  // A picture posted by the browser's rasterizer is embedded as base64.
+  const px = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const withFlyer = (await A.api('POST', `/api/events/${eventId}/export/wordpress`,
+    { flyer_image: `data:image/png;base64,${px}` })).data;
+  check('a posted flyer picture is embedded in the document',
+    withFlyer.flyer_image?.data_base64 === px && withFlyer.flyer_image?.content_type === 'image/png'
+    && withFlyer.flyer_image?.bytes > 0, JSON.stringify(withFlyer.flyer_image));
+  const junk = (await A.api('POST', `/api/events/${eventId}/export/wordpress`,
+    { flyer_image: 'data:text/html;base64,PHNjcmlwdD4=' })).data;
+  check('a non-image data URL is refused rather than embedded', junk.flyer_image === null);
+
+  const other = await B.api('POST', `/api/events/${eventId}/export/wordpress`, {});
+  check('export cannot reach across organizations', other.status === 404, String(other.status));
+}
+
 // --- bulk delete contacts --------------------------------------------------
 {
   const mk = async (name, email) =>

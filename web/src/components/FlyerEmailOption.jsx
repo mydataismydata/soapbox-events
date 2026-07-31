@@ -14,7 +14,7 @@ export default function FlyerEmailOption({ eventBasics, flyer, onChange }) {
     ? <em>Preparing the picture…</em>
     : snapshot === 'error'
       ? <em>The picture could not be prepared, so the email will go out without it.</em>
-      : flyer.flyerImageToken ? <em>Ready — it matches the flyer above.</em> : null;
+      : flyer.flyerImageToken ? <em>Ready — it matches the flyer below.</em> : null;
 
   return (
     <label className="checkbox">

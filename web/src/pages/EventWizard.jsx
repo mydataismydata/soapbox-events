@@ -376,10 +376,6 @@ export default function EventWizard() {
 
           {step === 2 ? (
             <>
-              <Card title="Design the flyer">
-                <FlyerDesigner eventBasics={basics} flyer={ev.flyer}
-                  onChange={(flyer) => patch({ flyer })} />
-              </Card>
               <Card title="Write the invitation email">
                 {templates.length > 0 ? (
                   <Field label="Start from a template">
@@ -410,6 +406,10 @@ export default function EventWizard() {
                 <button className="btn mt" onClick={previewEmail} disabled={saving}>
                   <Icon name="eye" size={14} /> Preview email
                 </button>
+              </Card>
+              <Card title="Design the flyer">
+                <FlyerDesigner eventBasics={basics} flyer={ev.flyer}
+                  onChange={(flyer) => patch({ flyer })} />
               </Card>
             </>
           ) : null}

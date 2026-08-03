@@ -6,6 +6,7 @@ import FlyerDesigner from '../components/FlyerDesigner.jsx';
 import RecipientPicker from '../components/RecipientPicker.jsx';
 import TagButtons from '../components/TagButtons.jsx';
 import InsertImageButton from '../components/InsertImageButton.jsx';
+import InsertLinkButton from '../components/InsertLinkButton.jsx';
 
 const STEPS = ['Details', 'Design & message', 'Recipients', 'Review & send'];
 
@@ -259,8 +260,12 @@ export default function BroadcastWizard() {
                     onChange={(e) => patch({ body: e.target.value })} />
                   <TagButtons tags={BROADCAST_TAGS} onInsert={(snippet) =>
                     insertAtCursor(bodyRef, b.body, snippet, (val) => patch({ body: val }))} />
-                  <InsertImageButton onInsert={(snippet) =>
-                    insertAtCursor(bodyRef, b.body, snippet, (val) => patch({ body: val }))} />
+                  <div className="row" style={{ gap: 8, marginTop: 8 }}>
+                    <InsertLinkButton textareaRef={bodyRef} onInsert={(snippet) =>
+                      insertAtCursor(bodyRef, b.body, snippet, (val) => patch({ body: val }))} />
+                    <InsertImageButton onInsert={(snippet) =>
+                      insertAtCursor(bodyRef, b.body, snippet, (val) => patch({ body: val }))} />
+                  </div>
                 </Field>
                 <button className="btn" onClick={previewEmail} disabled={saving}>
                   <Icon name="eye" size={14} /> Preview email

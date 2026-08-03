@@ -4,11 +4,13 @@
 // The Accept / Decline buttons are deliberately rendered in fixed, high-
 // contrast colors (green / red) regardless of the flyer palette so they are
 // instantly identifiable in every invitation.
-import { esc, textToHtml, stripImageMarkers } from './html.js';
+import { esc, textToHtml, stripImageMarkers, flattenLinks } from './html.js';
 import { formatDate, formatTimeRange, formatWhen } from './format.js';
 import { contrastOn } from './flyer.js';
 
 const ACCEPT_COLOR = '#16a34a';
+// Email has no stylesheet to lean on, so links carry their own colour.
+const EMAIL_LINK_STYLE = 'color:#4f46e5;';
 const DECLINE_COLOR = '#dc2626';
 
 function button(href, label, bg, color = '#ffffff') {
@@ -82,7 +84,7 @@ function shell({ preheader, contentHtml, footerHtml }) {
 // threaded in from the caller rather than built here: this module knows how an
 // email looks, not where the organization's files live.
 function bodyBlock(bodyText, imageUrl) {
-  const html = textToHtml(bodyText, { imageUrl });
+  const html = textToHtml(bodyText, { imageUrl, linkStyle: EMAIL_LINK_STYLE });
   if (!html) return '';
   return `<div style="font-size:15.5px; line-height:1.65; color:#374151;">${html}</div>`;
 }
@@ -157,7 +159,7 @@ export function renderInvitationEmail({ org, event, accent, toName, toEmail, bod
   // The plain-text alternative follows the same order as the HTML: the
   // message first, then the details it refers to.
   const text = textBlocks(
-    stripImageMarkers(bodyText),
+    flattenLinks(stripImageMarkers(bodyText)),
     [event.title, whenLine, [event.venue_name, event.venue_address].filter(Boolean).join(' — ')],
     isRsvp
       ? [`Accept: ${links.accept}`, `Decline: ${links.decline}`, `Your RSVP page: ${links.rsvp}`]
@@ -190,7 +192,7 @@ export function renderMessageEmail({ kind, org, event, toEmail, bodyText, links,
     footerHtml: footer({ orgName: org.name, toEmail, unsubUrl }),
   });
   const text = textBlocks(
-    stripImageMarkers(bodyText),
+    flattenLinks(stripImageMarkers(bodyText)),
     kind === 'cancellation' ? '' : [event.title, whenLine],
     showButtons
       ? [`Accept: ${links.accept}`, `Decline: ${links.decline}`]
@@ -210,7 +212,7 @@ export function renderBroadcastEmail({ org, title, toEmail, bodyText, viewUrl, u
     footerHtml: footer({ orgName: org.name, toEmail, unsubUrl, viewUrl }),
   });
   const text = textBlocks(
-    stripImageMarkers(bodyText),
+    flattenLinks(stripImageMarkers(bodyText)),
     viewUrl ? `View online: ${viewUrl}` : '',
     [`Sent to ${toEmail} by ${org.name}.`, unsubUrl ? `Unsubscribe: ${unsubUrl}` : ''],
   );

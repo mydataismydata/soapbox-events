@@ -625,6 +625,42 @@ let guests = [];
     check('the web version shows the same pictures',
       pageHtml.includes(`/o/alpha/files/${tok}`) && !pageHtml.includes('{{image:'));
 
+    // Links: [label](url), bare URLs, and the things that must NOT become links.
+    await A.api('PUT', `/api/broadcasts/${bId}`, {
+      body: 'See [our endorsements](https://example.org/e?a=1&b=2) today.\n\n'
+        + 'Or visit https://example.org/plain, then stop.\n\n'
+        + `{{image:${tok}}}\n\n`
+        + 'Not a link: javascript:alert(1) and ftp://example.org/x\n\n'
+        + '[bad](javascript:alert(1))',
+    });
+    const linked = await A.api('POST', `/api/broadcasts/${bId}/email-preview`, {});
+    const lh = String(linked.data?.html || '');
+    check('a labelled link renders as an anchor',
+      lh.includes('<a href="https://example.org/e?a=1&amp;b=2"') && lh.includes('>our endorsements</a>'),
+      lh.slice(lh.indexOf('example.org') - 60, lh.indexOf('example.org') + 80));
+    check('a bare URL becomes a link without swallowing the comma',
+      lh.includes('<a href="https://example.org/plain"') && lh.includes('</a>, then stop.'),
+      lh.slice(lh.indexOf('plain') - 40, lh.indexOf('plain') + 80));
+    check('javascript: and other schemes are never linked',
+      !lh.includes('href="javascript:') && !lh.includes('href="ftp:') && lh.includes('javascript:alert(1)'));
+    check('the image URL is not double-linked inside its own tag',
+      !/<a[^>]*><img/.test(lh) && !/src="<a/.test(lh));
+    // The preview endpoint returns only the HTML part, so the plain-text
+    // alternative is checked at the source.
+    const { flattenLinks, stripImageMarkers } = await import('../server/lib/html.js');
+    const flat = flattenLinks(stripImageMarkers(
+      `See [our endorsements](https://example.org/e?a=1&b=2) today.\n\n{{image:${tok}}}\n\nhttps://example.org/plain`
+    ));
+    check('the plain-text alternative keeps label and address',
+      flat.includes('our endorsements (https://example.org/e?a=1&b=2)'), flat);
+    check('the plain-text alternative leaves a bare URL alone',
+      flat.includes('https://example.org/plain') && !flat.includes('{{image:'), flat);
+
+    const linkedPage = await A.raw('GET', `/o/alpha/b/${bSlug}`);
+    const lp = await linkedPage.text();
+    check('links work on the web version too',
+      lp.includes('<a href="https://example.org/e?a=1&amp;b=2"') && lp.includes('rel="noopener noreferrer"'));
+
     // A marker naming a file that isn't there must vanish, not print itself.
     await A.api('PUT', `/api/broadcasts/${bId}`, {
       body: 'Hi {{first_name}},\n\nHere are our picks for the primary.\n\n— {{org_name}}',

@@ -50,14 +50,76 @@ export function stripImageMarkers(text) {
   return String(text || '').replace(IMAGE_RE, '').replace(/\n{3,}/g, '\n\n');
 }
 
+// Links, in the same spirit as images: written in the body rather than built
+// out of HTML. Two spellings, both readable as they stand if anything ever
+// shows the raw text:
+//
+//     [our endorsements](https://example.org/endorsements)
+//     https://example.org/endorsements
+//
+// One pass over both, so a URL that has already been consumed as the target
+// of a labelled link cannot be linked a second time. Only http(s) matches,
+// which is what keeps javascript: and data: out — there is no allowlist to
+// get wrong because no other scheme can reach the replacement at all.
+const LINK_RE = /\[([^\][\n]{1,300})\]\((https?:\/\/[^\s)]{1,600})\)|(https?:\/\/[^\s<>"']{1,600})/g;
+
+// Sentence punctuation that follows a bare URL belongs to the sentence, not
+// to the address. Entities come off first: the text has already been escaped,
+// so a trailing apostrophe arrives as "&#39;" and chopping the ";" alone
+// would leave "&#39" glued to the href.
+function trimUrlTail(url) {
+  let out = url;
+  for (let guard = 0; guard < 20; guard++) {
+    const entity = /(&quot;|&#39;|&amp;)$/.exec(out);
+    if (entity) { out = out.slice(0, -entity[0].length); continue; }
+    if (/[.,;:!?]$/.test(out)) { out = out.slice(0, -1); continue; }
+    // A closing bracket only belongs to the URL if it opened one.
+    if (out.endsWith(')') && (out.match(/\(/g) || []).length < (out.match(/\)/g) || []).length) {
+      out = out.slice(0, -1);
+      continue;
+    }
+    break;
+  }
+  return out;
+}
+
+// Runs on already-escaped text, so `url` and `label` are safe to place in an
+// attribute and in element content respectively — the escaping turned any
+// quote or angle bracket into an entity before this saw it.
+export function expandLinks(html, linkStyle = '') {
+  const style = linkStyle ? ` style="${linkStyle}"` : '';
+  return String(html).replace(LINK_RE, (match, label, url, bare) => {
+    if (bare) {
+      const href = trimUrlTail(bare);
+      if (!href) return match;
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer"${style}>${href}</a>`
+        + bare.slice(href.length);
+    }
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer"${style}>${label}</a>`;
+  });
+}
+
+// For the plain-text alternative: keep both the words and the address, since
+// a label alone would be a dead end.
+export function flattenLinks(text) {
+  return String(text || '').replace(LINK_RE, (match, label, url, bare) =>
+    (bare ? bare : `${label} (${url})`));
+}
+
 // Multiline plain text -> paragraphs. Blank lines split paragraphs; single
 // newlines become <br>. Input is escaped, so user text cannot inject HTML.
-// Pass `imageUrl` to turn {{image:…}} markers into pictures.
-export function textToHtml(text, { imageUrl } = {}) {
+// Pass `imageUrl` to turn {{image:…}} markers into pictures, and `linkStyle`
+// to colour the links inline (emails need it; public pages have a stylesheet).
+export function textToHtml(text, { imageUrl, linkStyle } = {}) {
   const paragraphs = String(text || '').trim().split(/\n\s*\n/);
   return paragraphs
     .filter((p) => p.trim())
-    .map((p) => `<p>${expandImageMarkers(esc(p.trim()).replaceAll('\n', '<br>'), imageUrl)}</p>`)
+    .map((p) => {
+      const escaped = esc(p.trim()).replaceAll('\n', '<br>');
+      // Links first, then pictures. The other way round, the bare-URL pass
+      // would find the address inside an <img src> and wrap it in an anchor.
+      return `<p>${expandImageMarkers(expandLinks(escaped, linkStyle), imageUrl)}</p>`;
+    })
     .join('\n');
 }
 

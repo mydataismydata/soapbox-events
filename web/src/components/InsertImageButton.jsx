@@ -46,7 +46,7 @@ export default function InsertImageButton({ onInsert, disabled }) {
   }
 
   return (
-    <div className="row" style={{ gap: 8, marginTop: 8 }}>
+    <div className="row" style={{ gap: 8 }}>
       <button type="button" className="btn btn-sm" disabled={disabled || busy}
         onClick={() => fileRef.current?.click()}>
         <Icon name="image" size={14} /> {busy ? 'Uploading…' : 'Insert image'}

@@ -598,6 +598,32 @@ let guests = [];
   const test = await A.api('POST', `/api/broadcasts/${bId}/test-email`, {});
   check('broadcast test email simulated', test.data?.status === 'simulated', JSON.stringify(test.data));
 
+  // "Send a copy": the real message to any address, after sending, with the
+  // headers a deliverability checker grades.
+  {
+    const copy = await A.api('POST', `/api/broadcasts/${bId}/send-copy`, { to: 'checker@example.test' });
+    check('a copy can be sent to an address that is not a recipient',
+      copy.status === 200 && copy.data?.status === 'simulated', JSON.stringify(copy.data));
+    const logged = (await A.api('GET', `/api/emails?broadcast_id=${bId}&per_page=50`)).data.emails
+      .find((e) => e.to_email === 'checker@example.test');
+    check('the copy is logged but stays out of the recipient count',
+      Boolean(logged) && logged.kind === 'test', JSON.stringify(logged?.kind));
+    check('a copy carries the real subject, not a [Test] one',
+      logged && !logged.subject.startsWith('[Test]'), logged?.subject);
+    const full = (await A.api('GET', `/api/emails/${logged.id}`)).data.email;
+    check('a copy carries an unsubscribe link',
+      String(full.html).includes('/bu/preview') && String(full.body_text).includes('Unsubscribe:'),
+      String(full.html).slice(-200));
+    const preview = await fetch(`${BASE}/o/alpha/bu/preview`);
+    check('the stand-in unsubscribe link resolves to a real page', preview.status === 200);
+    const previewText = await preview.text();
+    check('the stand-in page says nothing is subscribed',
+      previewText.includes('Nothing to unsubscribe'), previewText.slice(0, 120));
+
+    const bad = await A.api('POST', `/api/broadcasts/${bId}/send-copy`, { to: 'not-an-email' });
+    check('a copy needs a valid address', bad.status === 400, String(bad.status));
+  }
+
   // Pictures in the message body: the composer inserts {{image:<token>}} and
   // both renderings turn it into an <img> at the uploaded file's URL.
   {

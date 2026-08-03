@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import {
-  Spinner, ConfirmModal, CopyBox, useToast, Badge,
+  Spinner, ConfirmModal, CopyBox, useToast, Badge, Modal, Field,
   Banner, Card, StatGrid, Stat, Icon,
 } from '../ui.jsx';
 import EmailLog from '../components/EmailLog.jsx';
@@ -23,6 +23,8 @@ export default function BroadcastDetail() {
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyTo, setCopyTo] = useState('');
 
   const load = useCallback(async (quiet = false) => {
     try {
@@ -80,6 +82,9 @@ export default function BroadcastDetail() {
           <Link className="btn" to={`/broadcasts/${b.id}/edit`}>
             <Icon name="pencil" size={14} /> {b.status === 'draft' ? 'Continue editing' : 'Edit'}
           </Link>
+          <button className="btn" disabled={busy} onClick={() => { setCopyTo(''); setCopyOpen(true); }}>
+            <Icon name="send" size={14} /> Send a copy
+          </button>
           <button className="btn" disabled={busy} onClick={() => act(async () => {
             const d = await api.post(`/api/broadcasts/${b.id}/duplicate`);
             navigate(`/broadcasts/${d.broadcast.id}/edit`);
@@ -123,6 +128,38 @@ export default function BroadcastDetail() {
         <EmailLog scope={{ broadcast_id: id }} kinds={['broadcast', 'test']} onSummary={setSummary}
           emptyHint="Once you send (or run a test), every email shows up here with its exact content and status." />
       </Card>
+
+      {copyOpen ? (
+        <Modal title="Send a copy of this broadcast" onClose={() => setCopyOpen(false)}
+          footer={
+            <>
+              <button className="btn" onClick={() => setCopyOpen(false)}>Cancel</button>
+              <button className="btn btn-primary" disabled={busy || !copyTo.trim()}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    const d = await api.post(`/api/broadcasts/${b.id}/send-copy`, { to: copyTo.trim() });
+                    toast(d.status === 'simulated'
+                      ? 'Rendered in simulation mode — nothing was delivered'
+                      : `Copy sent to ${d.to}`);
+                    setCopyOpen(false);
+                    await load(true);
+                  } catch (err) { toast(err.message, 'bad'); }
+                  finally { setBusy(false); }
+                }}>{busy ? 'Sending…' : 'Send copy'}</button>
+            </>
+          }>
+          <p className="small muted" style={{ marginTop: 0 }}>
+            Sends this message exactly as recipients get it — same subject, unsubscribe link and headers.
+            Useful for checking how it lands, or for a deliverability service like mail-tester.
+          </p>
+          <Field label="Send to" required>
+            <input type="email" value={copyTo} maxLength={254} autoFocus
+              placeholder="someone@example.com"
+              onChange={(e) => setCopyTo(e.target.value)} />
+          </Field>
+        </Modal>
+      ) : null}
 
       {confirm?.type === 'delete' ? (
         <ConfirmModal title="Delete broadcast?" danger busy={busy}

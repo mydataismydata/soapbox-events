@@ -10,7 +10,7 @@ import { broadcastStats } from '../lib/stats.js';
 import { orgApiKey, senderFor, sendEmail } from '../lib/email.js';
 import {
   parseFlyer, publicUrl, resolveRecipients, queueBroadcastEmails,
-  renderBroadcastEmailFor, broadcastViewUrl,
+  renderBroadcastEmailFor, broadcastViewUrl, broadcastUnsubUrl, previewUnsubUrl,
 } from '../lib/sending.js';
 
 export const broadcastRouter = Router();
@@ -169,6 +169,45 @@ broadcastRouter.post('/broadcasts/:id/test-email', wrap(async (req, res) => {
   ).run(b.id, req.user.name, to, msg.subject, msg.html, msg.text, status, result.error || null);
   if (!result.ok) throw new ApiError(502, `Test email failed: ${result.error}`);
   res.json({ status });
+}));
+
+// Send the real message to one address, as-is. Unlike the test send there is
+// no "[Test]" in the subject and the unsubscribe link and List-Unsubscribe
+// header are present, because the point is to see exactly what recipients get
+// — including for a deliverability checker, which grades those headers.
+// Works after a broadcast has gone out, which is when you usually need it.
+broadcastRouter.post('/broadcasts/:id/send-copy', wrap(async (req, res) => {
+  const b = getBroadcast(req.db, req.params.id);
+  const to = v.email(req.body.to, { label: 'Recipient' });
+  const viewUrl = b.web_version ? broadcastViewUrl(req.org.slug, b) : '';
+
+  // If the address is already on the list, use that person's real unsubscribe
+  // link; otherwise a stand-in, so a stray click can't remove someone else.
+  const contact = req.db.prepare('SELECT id FROM contacts WHERE email = ?').get(to.toLowerCase());
+  const unsubUrl = contact
+    ? broadcastUnsubUrl(req.org.slug, contact.id)
+    : previewUnsubUrl(req.org.slug);
+
+  const msg = renderBroadcastEmailFor({
+    org: req.org, broadcast: b, recipient: { name: req.user.name, email: to },
+    subjectTemplate: b.subject || b.title, bodyTemplate: b.body || '', viewUrl, unsubUrl,
+  });
+  const { sender, replyTo } = senderFor(req.db, req.org.name, 'broadcast');
+  const result = await sendEmail({
+    apiKey: orgApiKey(req.db),
+    sender,
+    replyTo,
+    toName: req.user.name, toEmail: to, subject: msg.subject, html: msg.html, text: msg.text,
+    headers: [{ header: 'List-Unsubscribe', value: `<${unsubUrl}>` }],
+  });
+  const status = result.ok ? (result.simulated ? 'simulated' : 'sent') : 'failed';
+  // Logged as a test so it stays out of the recipient counts.
+  req.db.prepare(
+    `INSERT INTO email_log (broadcast_id, kind, to_name, to_email, subject, html, body_text, status, error, sent_at)
+     VALUES (?, 'test', ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+  ).run(b.id, req.user.name, to, msg.subject, msg.html, msg.text, status, result.error || null);
+  if (!result.ok) throw new ApiError(502, `Could not send the copy: ${result.error}`);
+  res.json({ status, to });
 }));
 
 broadcastRouter.post('/broadcasts/:id/send', wrap(async (req, res) => {

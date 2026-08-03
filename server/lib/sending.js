@@ -182,6 +182,17 @@ export function broadcastUnsubUrl(orgSlug, contactId) {
   return contactId ? publicUrl(orgSlug, `/bu/${signContactToken(contactId)}`) : '';
 }
 
+// Stand-in for "send a copy to an address that isn't on the list". A real
+// unsubscribe link belongs to a contact, and handing out someone else's would
+// let a stray click remove a real person. This one resolves to a page that
+// explains itself — so the copy still carries the link and the
+// List-Unsubscribe header a deliverability test is looking for.
+export const PREVIEW_UNSUB = 'preview';
+
+export function previewUnsubUrl(orgSlug) {
+  return publicUrl(orgSlug, `/bu/${PREVIEW_UNSUB}`);
+}
+
 // Turn a { contact_ids, group_ids, new_contacts } selection into a deduped
 // list of { contact_id, name, email }. New people are saved to the contact
 // list (when saveNew), mirroring the event guest flow. Meant to run inside a

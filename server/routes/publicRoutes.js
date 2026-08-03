@@ -13,7 +13,9 @@ import { getOrg, orgDb, uploadsDir, insertId } from '../lib/db.js';
 import { resolveSession } from '../lib/auth.js';
 import { esc, textToHtml, publicPage, expandImageMarkers } from '../lib/html.js';
 import { renderFlyer, flyerColors, mixWithWhite } from '../lib/flyer.js';
-import { parseFlyer, publicUrl, flyerImageUrls, verifyContactToken, orgImageUrl } from '../lib/sending.js';
+import {
+  parseFlyer, publicUrl, flyerImageUrls, verifyContactToken, orgImageUrl, PREVIEW_UNSUB,
+} from '../lib/sending.js';
 import { buildBroadcastTagContext, renderTags } from '../lib/mergeTags.js';
 import { sanitizeRichText, looksLikeHtml } from '../lib/sanitizeHtml.js';
 import { formatWhen, formatDate, firstName } from '../lib/format.js';
@@ -560,6 +562,17 @@ publicRouter.get('/b/:slug', (req, res) => {
 // Broadcast unsubscribe (stateless signed contact token; see sending.js).
 publicRouter.get('/bu/:token', (req, res) => {
   const db = req.pub.db;
+  // The link inside a "send a copy" message: a real page, but nobody's
+  // subscription is attached to it.
+  if (req.params.token === PREVIEW_UNSUB) {
+    return res.send(publicPage({
+      title: 'Unsubscribe',
+      bodyHtml: `<div class="pub-card"><h2>Nothing to unsubscribe</h2>
+        <p class="pub-muted">This was a copy of an email from ${esc(req.pub.org.name)}, sent for checking
+        rather than to a subscriber. A real message unsubscribes the person it was addressed to.</p></div>`,
+      footerHtml: orgFooter(req),
+    }));
+  }
   const contactId = verifyContactToken(req.params.token);
   const contact = contactId ? db.prepare('SELECT * FROM contacts WHERE id = ?').get(contactId) : null;
   if (!contact || !contact.email) return notFoundPage(res);

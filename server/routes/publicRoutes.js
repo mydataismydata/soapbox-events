@@ -13,7 +13,7 @@ import { getOrg, orgDb, uploadsDir, insertId } from '../lib/db.js';
 import { resolveSession } from '../lib/auth.js';
 import { esc, textToHtml, publicPage } from '../lib/html.js';
 import { renderFlyer, flyerColors, mixWithWhite } from '../lib/flyer.js';
-import { parseFlyer, publicUrl, flyerImageUrls, verifyContactToken } from '../lib/sending.js';
+import { parseFlyer, publicUrl, flyerImageUrls, verifyContactToken, orgImageUrl } from '../lib/sending.js';
 import { buildBroadcastTagContext, renderTags } from '../lib/mergeTags.js';
 import { sanitizeRichText, looksLikeHtml } from '../lib/sanitizeHtml.js';
 import { formatWhen, formatDate, firstName } from '../lib/format.js';
@@ -547,7 +547,9 @@ publicRouter.get('/b/:slug', (req, res) => {
     bodyHtml: `
       ${b.status === 'draft' ? statusBanner('Draft preview — this broadcast has not been sent yet.', 'warn') : ''}
       ${flyerHtml}
-      ${bodyText.trim() ? `<div class="pub-card">${textToHtml(bodyText)}</div>` : ''}
+      ${bodyText.trim()
+        ? `<div class="pub-card">${textToHtml(bodyText, { imageUrl: orgImageUrl(req.pub.org.slug) })}</div>`
+        : ''}
     `,
     footerHtml: orgFooter(req),
   }));

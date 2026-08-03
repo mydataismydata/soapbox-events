@@ -32,6 +32,12 @@ export function buildLinks(orgSlug, event, invite = null) {
   return links;
 }
 
+// Resolves an {{image:token}} marker in a message body to the file's public
+// URL. Emails are read anywhere, so it has to be absolute.
+export function orgImageUrl(orgSlug) {
+  return (token) => publicUrl(orgSlug, `/files/${token}`);
+}
+
 export function parseFlyer(event) {
   let raw = {};
   try { raw = JSON.parse(event.flyer || '{}'); } catch { /* corrupted json -> defaults */ }
@@ -110,7 +116,7 @@ export function renderEmailFor({ org, event, invite, kind, subjectTemplate, body
   const accent = eventAccent(event);
   const common = {
     org, event, accent, toName: name, toEmail: email,
-    bodyText, links, unsubUrl: links.unsub,
+    bodyText, links, unsubUrl: links.unsub, imageUrl: orgImageUrl(org.slug),
   };
   const rendered = kind === 'invitation'
     ? renderInvitationEmail({
@@ -246,6 +252,7 @@ export function renderBroadcastEmailFor({ org, broadcast, recipient, subjectTemp
   const rendered = renderBroadcastEmail({
     org, title: broadcast.title,
     toEmail: email, bodyText, viewUrl: viewUrl || '', unsubUrl: unsubUrl || '',
+    imageUrl: orgImageUrl(org.slug),
   });
   return { subject, html: rendered.html, text: rendered.text, toName: name, toEmail: email };
 }

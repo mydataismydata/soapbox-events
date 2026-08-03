@@ -598,6 +598,39 @@ let guests = [];
   const test = await A.api('POST', `/api/broadcasts/${bId}/test-email`, {});
   check('broadcast test email simulated', test.data?.status === 'simulated', JSON.stringify(test.data));
 
+  // Pictures in the message body: the composer inserts {{image:<token>}} and
+  // both renderings turn it into an <img> at the uploaded file's URL.
+  {
+    const pngB64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const up = await A.api('POST', '/api/uploads', { name: 'banner.png', data: `data:image/png;base64,${pngB64}` });
+    check('upload accepts a PNG for the message body', up.status === 201 && /^[A-Za-z0-9]{6,64}$/.test(up.data?.token || ''),
+      JSON.stringify(up.data));
+    const tok = up.data.token;
+    await A.api('PUT', `/api/broadcasts/${bId}`, {
+      body: `Hi {{first_name}},\n\n{{image:${tok}}}\n\nHere are our picks.\n\n{{image:${tok}|half}}\n\n— {{org_name}}`,
+    });
+    const withImg = await A.api('POST', `/api/broadcasts/${bId}/email-preview`, {});
+    const html = String(withImg.data?.html || '');
+    check('email body renders the image marker as a picture',
+      html.includes(`/o/alpha/files/${tok}`) && html.includes('<img'), html.slice(0, 200));
+    check('image URLs in email are absolute', html.includes(`${BASE}/o/alpha/files/${tok}`));
+    check('no raw marker survives into the email', !html.includes('{{image:'));
+    check('half-width images are emitted at half width',
+      html.includes('width="300"') && html.includes('width="600"'), 'expected both sizes');
+    check('the plain-text alternative drops the markers',
+      !String(withImg.data?.text || '').includes('{{image:'), String(withImg.data?.text || '').slice(0, 120));
+
+    const page = await A.raw('GET', `/o/alpha/b/${bSlug}`);
+    const pageHtml = await page.text();
+    check('the web version shows the same pictures',
+      pageHtml.includes(`/o/alpha/files/${tok}`) && !pageHtml.includes('{{image:'));
+
+    // A marker naming a file that isn't there must vanish, not print itself.
+    await A.api('PUT', `/api/broadcasts/${bId}`, {
+      body: 'Hi {{first_name}},\n\nHere are our picks for the primary.\n\n— {{org_name}}',
+    });
+  }
+
   // Send to every contact: 4 have email, 1 has none, 1 emailed one is unsubscribed.
   const send = await A.api('POST', `/api/broadcasts/${bId}/send`, { contact_ids: contactIds });
   check('broadcast send queues 3 (skips no-email + unsubscribed)',

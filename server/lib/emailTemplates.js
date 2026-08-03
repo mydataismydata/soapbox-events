@@ -4,7 +4,7 @@
 // The Accept / Decline buttons are deliberately rendered in fixed, high-
 // contrast colors (green / red) regardless of the flyer palette so they are
 // instantly identifiable in every invitation.
-import { esc, textToHtml } from './html.js';
+import { esc, textToHtml, stripImageMarkers } from './html.js';
 import { formatDate, formatTimeRange, formatWhen } from './format.js';
 import { contrastOn } from './flyer.js';
 
@@ -78,8 +78,11 @@ function shell({ preheader, contentHtml, footerHtml }) {
 </body></html>`;
 }
 
-function bodyBlock(bodyText) {
-  const html = textToHtml(bodyText);
+// `imageUrl` resolves an {{image:token}} marker to a public file URL. It is
+// threaded in from the caller rather than built here: this module knows how an
+// email looks, not where the organization's files live.
+function bodyBlock(bodyText, imageUrl) {
+  const html = textToHtml(bodyText, { imageUrl });
   if (!html) return '';
   return `<div style="font-size:15.5px; line-height:1.65; color:#374151;">${html}</div>`;
 }
@@ -133,11 +136,11 @@ function flyerPicture(url, links) {
 
 // --- public API ------------------------------------------------------------
 
-export function renderInvitationEmail({ org, event, accent, toName, toEmail, bodyText, links, flyerImageUrl, unsubUrl }) {
+export function renderInvitationEmail({ org, event, accent, toName, toEmail, bodyText, links, flyerImageUrl, unsubUrl, imageUrl }) {
   const whenLine = formatWhen(event);
   const isRsvp = event.rsvp_mode === 'rsvp';
   const content = `
-    ${bodyBlock(bodyText)}
+    ${bodyBlock(bodyText, imageUrl)}
     ${detailsBox({ event, links })}
     ${isRsvp ? rsvpButtons(links) : `
       <div style="text-align:center; padding:16px 0 4px;">
@@ -154,7 +157,7 @@ export function renderInvitationEmail({ org, event, accent, toName, toEmail, bod
   // The plain-text alternative follows the same order as the HTML: the
   // message first, then the details it refers to.
   const text = textBlocks(
-    bodyText,
+    stripImageMarkers(bodyText),
     [event.title, whenLine, [event.venue_name, event.venue_address].filter(Boolean).join(' — ')],
     isRsvp
       ? [`Accept: ${links.accept}`, `Decline: ${links.decline}`, `Your RSVP page: ${links.rsvp}`]
@@ -172,12 +175,12 @@ const KIND_PREHEADERS = {
   cancellation: 'Event cancelled',
 };
 
-export function renderMessageEmail({ kind, org, event, toEmail, bodyText, links, unsubUrl }) {
+export function renderMessageEmail({ kind, org, event, toEmail, bodyText, links, unsubUrl, imageUrl }) {
   const label = KIND_PREHEADERS[kind] || org.name;
   const whenLine = formatWhen(event);
   const showButtons = kind === 'nudge' && event.rsvp_mode === 'rsvp' && event.status !== 'cancelled';
   const content = `
-    ${bodyBlock(bodyText)}
+    ${bodyBlock(bodyText, imageUrl)}
     ${kind === 'cancellation' ? '' : detailsBox({ event, links })}
     ${showButtons ? rsvpButtons(links) : ''}
   `;
@@ -187,7 +190,7 @@ export function renderMessageEmail({ kind, org, event, toEmail, bodyText, links,
     footerHtml: footer({ orgName: org.name, toEmail, unsubUrl }),
   });
   const text = textBlocks(
-    bodyText,
+    stripImageMarkers(bodyText),
     kind === 'cancellation' ? '' : [event.title, whenLine],
     showButtons
       ? [`Accept: ${links.accept}`, `Decline: ${links.decline}`]
@@ -200,14 +203,14 @@ export function renderMessageEmail({ kind, org, event, toEmail, bodyText, links,
 // Standalone broadcast (email blast not tied to an event): just the message
 // body, then the footer with the "view online" and unsubscribe links. The
 // flyer still fronts the web version — it is no longer stamped on the email.
-export function renderBroadcastEmail({ org, title, toEmail, bodyText, viewUrl, unsubUrl }) {
+export function renderBroadcastEmail({ org, title, toEmail, bodyText, viewUrl, unsubUrl, imageUrl }) {
   const html = shell({
     preheader: title || org.name,
-    contentHtml: bodyBlock(bodyText),
+    contentHtml: bodyBlock(bodyText, imageUrl),
     footerHtml: footer({ orgName: org.name, toEmail, unsubUrl, viewUrl }),
   });
   const text = textBlocks(
-    bodyText,
+    stripImageMarkers(bodyText),
     viewUrl ? `View online: ${viewUrl}` : '',
     [`Sent to ${toEmail} by ${org.name}.`, unsubUrl ? `Unsubscribe: ${unsubUrl}` : ''],
   );

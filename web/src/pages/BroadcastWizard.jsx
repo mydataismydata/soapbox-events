@@ -5,6 +5,7 @@ import { Field, Modal, Spinner, useToast, insertAtCursor, Banner, Card, Icon } f
 import FlyerDesigner from '../components/FlyerDesigner.jsx';
 import RecipientPicker from '../components/RecipientPicker.jsx';
 import TagButtons from '../components/TagButtons.jsx';
+import InsertImageButton from '../components/InsertImageButton.jsx';
 
 const STEPS = ['Details', 'Design & message', 'Recipients', 'Review & send'];
 
@@ -257,6 +258,8 @@ export default function BroadcastWizard() {
                   <textarea ref={bodyRef} rows={9} value={b.body} maxLength={20000}
                     onChange={(e) => patch({ body: e.target.value })} />
                   <TagButtons tags={BROADCAST_TAGS} onInsert={(snippet) =>
+                    insertAtCursor(bodyRef, b.body, snippet, (val) => patch({ body: val }))} />
+                  <InsertImageButton onInsert={(snippet) =>
                     insertAtCursor(bodyRef, b.body, snippet, (val) => patch({ body: val }))} />
                 </Field>
                 <button className="btn" onClick={previewEmail} disabled={saving}>

@@ -11,13 +11,53 @@ export function esc(value) {
     .replaceAll("'", '&#39;');
 }
 
+// Pictures inside a message body. The body is plain text everywhere in this
+// app, so an image is a marker the composer inserts rather than an <img> the
+// author has to write:
+//
+//     {{image:<upload token>}}          full width
+//     {{image:<upload token>|half}}     half, centred
+//
+// The marker survives merge-tag rendering untouched (renderTags only matches
+// {{lower_case_words}}), and it is expanded AFTER escaping, so the only HTML
+// that reaches the reader is built here from a validated token.
+const IMAGE_RE = /\{\{\s*image:([A-Za-z0-9]{6,64})(?:\s*\|\s*(full|half|small))?\s*\}\}/g;
+
+// Email bodies are 600px wide. Anything narrower is centred.
+const IMAGE_WIDTHS = { full: 600, half: 300, small: 200 };
+
+// `width` is spelled out as an attribute as well as in the style, because
+// Outlook ignores max-width and will otherwise print the image at its
+// natural pixel size, however large that is.
+function imageTag(url, size) {
+  const w = IMAGE_WIDTHS[size] || IMAGE_WIDTHS.full;
+  const centre = w < IMAGE_WIDTHS.full ? ' margin-left:auto; margin-right:auto;' : '';
+  return `<img src="${esc(url)}" alt="" width="${w}" style="width:100%; max-width:${w}px;`
+    + ` height:auto; display:block; border:0; border-radius:8px;${centre}">`;
+}
+
+// Replaces markers with <img>, or removes them when there is no way to build
+// a URL — a leftover "{{image:…}}" in front of a guest would be worse.
+export function expandImageMarkers(html, imageUrl) {
+  return String(html).replace(IMAGE_RE, (_m, token, size) => {
+    const url = typeof imageUrl === 'function' ? imageUrl(token) : '';
+    return url ? imageTag(url, size) : '';
+  });
+}
+
+// For the plain-text alternative, where a picture has nothing to say.
+export function stripImageMarkers(text) {
+  return String(text || '').replace(IMAGE_RE, '').replace(/\n{3,}/g, '\n\n');
+}
+
 // Multiline plain text -> paragraphs. Blank lines split paragraphs; single
 // newlines become <br>. Input is escaped, so user text cannot inject HTML.
-export function textToHtml(text) {
+// Pass `imageUrl` to turn {{image:…}} markers into pictures.
+export function textToHtml(text, { imageUrl } = {}) {
   const paragraphs = String(text || '').trim().split(/\n\s*\n/);
   return paragraphs
     .filter((p) => p.trim())
-    .map((p) => `<p>${esc(p.trim()).replaceAll('\n', '<br>')}</p>`)
+    .map((p) => `<p>${expandImageMarkers(esc(p.trim()).replaceAll('\n', '<br>'), imageUrl)}</p>`)
     .join('\n');
 }
 

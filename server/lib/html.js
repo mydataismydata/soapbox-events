@@ -174,6 +174,9 @@ const PUBLIC_CSS = `
   .rt-content { line-height: 1.6; }
   .rt-content p { margin: 0 0 10px; }
   .rt-content p:last-child { margin-bottom: 0; }
+  .rt-content img { display: block; max-width: 100%; height: auto; border-radius: 8px; margin: 6px 0; }
+  .rt-content img.rt-img-half { max-width: 50%; margin-left: auto; margin-right: auto; }
+  .rt-content img.rt-img-small { max-width: 200px; margin-left: auto; margin-right: auto; }
   .rt-ff-serif { font-family: Georgia, 'Times New Roman', serif; }
   .rt-ff-sans { font-family: 'Helvetica Neue', Arial, sans-serif; }
   .rt-ff-mono { font-family: 'Courier New', Courier, monospace; }

@@ -1011,6 +1011,11 @@ button.chip.active,
   color: var(--c-ink);
 }
 .rt-editor:empty::before { content: attr(data-placeholder); color: var(--c-faint); }
+/* Pictures in the editor sit exactly where they will in the email. */
+.rt-editor img { display: block; max-width: 100%; height: auto; border-radius: 8px; margin: 6px 0; }
+.rt-editor img.rt-img-half { max-width: 50%; margin-left: auto; margin-right: auto; }
+.rt-editor img.rt-img-small { max-width: 200px; margin-left: auto; margin-right: auto; }
+.rt-editor a { color: var(--c-accent-text); }
 .rt-ff-serif { font-family: Georgia, 'Times New Roman', serif; }
 .rt-ff-sans { font-family: 'Helvetica Neue', Arial, sans-serif; }
 .rt-ff-mono { font-family: var(--font-mono); }

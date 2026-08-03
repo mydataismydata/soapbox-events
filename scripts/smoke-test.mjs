@@ -661,6 +661,44 @@ let guests = [];
     check('links work on the web version too',
       lp.includes('<a href="https://example.org/e?a=1&amp;b=2"') && lp.includes('rel="noopener noreferrer"'));
 
+    // Rich-text bodies from the formatting bar.
+    const rich = `<p><b>Bold</b> and <i>italic</i> and <u>under</u>, `
+      + `<span class="rt-ff-serif rt-fs-lg">styled</span>.</p>`
+      + `<p><a href="https://example.org/x">a link</a> and `
+      + `<a href="javascript:alert(1)">not a link</a></p>`
+      + `<p><img src="/o/alpha/files/${tok}" class="rt-img-half" alt=""></p>`
+      + `<p><img src="https://evil.example/track.gif" alt=""></p>`
+      + `<p><script>alert(1)</script><span onclick="alert(1)">click</span></p>`;
+    await A.api('PUT', `/api/broadcasts/${bId}`, { body: rich });
+    const rp = await A.api('POST', `/api/broadcasts/${bId}/email-preview`, {});
+    const rh = String(rp.data?.html || '');
+    check('rich text keeps bold, italic and underline',
+      rh.includes('<b>Bold</b>') && rh.includes('<i>italic</i>') && rh.includes('<u>under</u>'));
+    check('font and size classes become inline styles for email',
+      rh.includes('font-family:Georgia') && rh.includes('font-size:19px') && !rh.includes('class="rt-ff-serif'),
+      rh.slice(rh.indexOf('styled') - 120, rh.indexOf('styled') + 20));
+    check('a rich-text link survives with its target',
+      rh.includes('<a href="https://example.org/x" target="_blank" rel="noopener noreferrer"'));
+    check('a javascript: href is stripped but its words remain',
+      !rh.includes('javascript:') && rh.includes('not a link'));
+    check('an image from this organization renders at its chosen width',
+      rh.includes(`/o/alpha/files/${tok}`) && rh.includes('width="300"'));
+    check('an image from anywhere else is dropped', !rh.includes('evil.example'));
+    check('scripts and event handlers never survive',
+      !rh.includes('<script') && !rh.includes('onclick'), rh.slice(-260));
+
+    const richPage = await A.raw('GET', `/o/alpha/b/${bSlug}`);
+    const rpg = await richPage.text();
+    check('the web version keeps the classes its stylesheet knows',
+      rpg.includes('class="rt-ff-serif rt-fs-lg"') && rpg.includes('class="rt-img-half"')
+      && !rpg.includes('evil.example'));
+
+    // Legacy plain-text bodies still render as paragraphs.
+    await A.api('PUT', `/api/broadcasts/${bId}`, { body: 'Line one.\n\nLine two.' });
+    const legacy = await A.api('POST', `/api/broadcasts/${bId}/email-preview`, {});
+    check('plain-text bodies still render as paragraphs',
+      String(legacy.data?.html || '').includes('<p>Line one.</p>'));
+
     // A marker naming a file that isn't there must vanish, not print itself.
     await A.api('PUT', `/api/broadcasts/${bId}`, {
       body: 'Hi {{first_name}},\n\nHere are our picks for the primary.\n\n— {{org_name}}',

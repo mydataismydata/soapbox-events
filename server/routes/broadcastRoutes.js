@@ -45,7 +45,7 @@ function parseAudience(b) {
 const BROADCAST_FIELDS = {
   title: (x) => v.str(x, { label: 'Title', max: 200 }),
   subject: (x) => v.optStr(x, { label: 'Subject', max: 300 }),
-  body: (x) => v.optStr(x, { label: 'Message', max: 20000 }),
+  body: (x) => v.optStr(x, { label: 'Message', max: 60000 }),
   web_version: (x) => (v.bool(x, true) ? 1 : 0),
   flyer: (x) => JSON.stringify(normalizeFlyer(x)),
   audience: (x) => JSON.stringify(sanitizeAudience(x)),
@@ -130,7 +130,7 @@ broadcastRouter.post('/broadcasts/:id/email-preview', wrap(async (req, res) => {
   const subject = req.body.subject !== undefined && String(req.body.subject).trim() !== ''
     ? v.str(req.body.subject, { label: 'Subject', max: 300 }) : (b.subject || b.title);
   const body = req.body.body !== undefined && String(req.body.body).trim() !== ''
-    ? v.str(req.body.body, { label: 'Body', max: 20000 }) : (b.body || '');
+    ? v.str(req.body.body, { label: 'Body', max: 60000 }) : (b.body || '');
   const viewUrl = b.web_version ? broadcastViewUrl(req.org.slug, b) : '';
   const msg = renderBroadcastEmailFor({
     org: req.org, broadcast: b, recipient: { name: 'Alex Rivera', email: 'alex@example.com' },

@@ -4,7 +4,8 @@
 // The Accept / Decline buttons are deliberately rendered in fixed, high-
 // contrast colors (green / red) regardless of the flyer palette so they are
 // instantly identifiable in every invitation.
-import { esc, textToHtml, stripImageMarkers, flattenLinks } from './html.js';
+import { esc, textToHtml, stripImageMarkers, flattenLinks, expandImageMarkers } from './html.js';
+import { sanitizeRichText, looksLikeHtml, stripHtml } from './sanitizeHtml.js';
 import { formatDate, formatTimeRange, formatWhen } from './format.js';
 import { contrastOn } from './flyer.js';
 
@@ -84,9 +85,20 @@ function shell({ preheader, contentHtml, footerHtml }) {
 // threaded in from the caller rather than built here: this module knows how an
 // email looks, not where the organization's files live.
 function bodyBlock(bodyText, imageUrl) {
-  const html = textToHtml(bodyText, { imageUrl, linkStyle: EMAIL_LINK_STYLE });
+  // Rich text from the composer is sanitized and re-styled for email; older
+  // plain-text bodies keep their paragraph-and-marker treatment.
+  const html = looksLikeHtml(bodyText)
+    ? expandImageMarkers(sanitizeRichText(bodyText, { mode: 'email', maxLength: 60000 }), imageUrl)
+    : textToHtml(bodyText, { imageUrl, linkStyle: EMAIL_LINK_STYLE });
   if (!html) return '';
   return `<div style="font-size:15.5px; line-height:1.65; color:#374151;">${html}</div>`;
+}
+
+// The plain-text alternative of whichever body shape came in.
+function bodyToText(bodyText) {
+  return looksLikeHtml(bodyText)
+    ? stripHtml(stripImageMarkers(bodyText))
+    : flattenLinks(stripImageMarkers(bodyText));
 }
 
 // Plain-text alternative: drop the blocks that came out empty, then separate
@@ -159,7 +171,7 @@ export function renderInvitationEmail({ org, event, accent, toName, toEmail, bod
   // The plain-text alternative follows the same order as the HTML: the
   // message first, then the details it refers to.
   const text = textBlocks(
-    flattenLinks(stripImageMarkers(bodyText)),
+    bodyToText(bodyText),
     [event.title, whenLine, [event.venue_name, event.venue_address].filter(Boolean).join(' — ')],
     isRsvp
       ? [`Accept: ${links.accept}`, `Decline: ${links.decline}`, `Your RSVP page: ${links.rsvp}`]
@@ -192,7 +204,7 @@ export function renderMessageEmail({ kind, org, event, toEmail, bodyText, links,
     footerHtml: footer({ orgName: org.name, toEmail, unsubUrl }),
   });
   const text = textBlocks(
-    flattenLinks(stripImageMarkers(bodyText)),
+    bodyToText(bodyText),
     kind === 'cancellation' ? '' : [event.title, whenLine],
     showButtons
       ? [`Accept: ${links.accept}`, `Decline: ${links.decline}`]
@@ -212,7 +224,7 @@ export function renderBroadcastEmail({ org, title, toEmail, bodyText, viewUrl, u
     footerHtml: footer({ orgName: org.name, toEmail, unsubUrl, viewUrl }),
   });
   const text = textBlocks(
-    flattenLinks(stripImageMarkers(bodyText)),
+    bodyToText(bodyText),
     viewUrl ? `View online: ${viewUrl}` : '',
     [`Sent to ${toEmail} by ${org.name}.`, unsubUrl ? `Unsubscribe: ${unsubUrl}` : ''],
   );

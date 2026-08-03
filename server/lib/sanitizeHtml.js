@@ -8,12 +8,28 @@
 // dropped. Text between tags is HTML-escaped. There is no path for scripts,
 // event handlers, styles, urls, or unknown tags to pass through.
 
-const ALLOWED_TAGS = new Set(['b', 'strong', 'i', 'em', 'u', 'br', 'p', 'div', 'span']);
-const VOID_TAGS = new Set(['br']);
+const ALLOWED_TAGS = new Set(['b', 'strong', 'i', 'em', 'u', 'br', 'p', 'div', 'span', 'a', 'img']);
+const VOID_TAGS = new Set(['br', 'img']);
 const ALLOWED_CLASSES = new Set([
   'rt-ff-serif', 'rt-ff-sans', 'rt-ff-mono',
   'rt-fs-sm', 'rt-fs-lg', 'rt-fs-xl',
+  'rt-img-half', 'rt-img-small',
 ]);
+
+// Email has no stylesheet to lean on, so the same classes are re-emitted as
+// inline styles when rendering for an inbox. Sizes are absolute there because
+// `em` compounds unpredictably across clients.
+const EMAIL_STYLES = {
+  'rt-ff-serif': "font-family:Georgia,'Times New Roman',serif;",
+  'rt-ff-sans': "font-family:'Helvetica Neue',Arial,sans-serif;",
+  'rt-ff-mono': "font-family:'Courier New',Courier,monospace;",
+  'rt-fs-sm': 'font-size:13px;',
+  'rt-fs-lg': 'font-size:19px;',
+  'rt-fs-xl': 'font-size:25px;',
+};
+const EMAIL_LINK_STYLE = 'color:#4f46e5;';
+// Widths mirror the marker syntax: the body column is 600px.
+const IMAGE_WIDTHS = { 'rt-img-small': 200, 'rt-img-half': 300 };
 
 // Matches a start/end tag, tolerating quoted attribute values that contain '>'.
 const TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
@@ -25,15 +41,58 @@ function escapeText(text) {
     .replace(/>/g, '&gt;');
 }
 
-function safeClass(attrs) {
-  const m = /class\s*=\s*("([^"]*)"|'([^']*)')/i.exec(attrs);
-  if (!m) return '';
-  const raw = m[2] ?? m[3] ?? '';
-  const kept = raw.split(/\s+/).filter((c) => ALLOWED_CLASSES.has(c));
-  return kept.join(' ');
+function attr(attrs, name) {
+  const m = new RegExp(`${name}\\s*=\\s*("([^"]*)"|'([^']*)')`, 'i').exec(attrs);
+  return m ? (m[2] ?? m[3] ?? '') : '';
 }
 
-export function sanitizeRichText(input, { maxLength = 20000 } = {}) {
+function safeClass(attrs) {
+  const raw = attr(attrs, 'class');
+  return raw.split(/\s+/).filter((c) => ALLOWED_CLASSES.has(c)).join(' ');
+}
+
+// Only three schemes can ever reach an href, and the check runs on the value
+// with whitespace and control characters stripped, so "java\nscript:" cannot
+// sneak past by being spelled oddly.
+function safeHref(attrs) {
+  const raw = attr(attrs, 'href').replace(/[\s\u0000-\u001f]/g, '');
+  if (!raw) return '';
+  return /^(https?:\/\/|mailto:)/i.test(raw) ? raw : '';
+}
+
+// Images may only point at this installation's own uploads. An arbitrary
+// external src would let a newsletter silently phone home to anywhere.
+const FILE_SRC_RE = /^(?:https?:\/\/[^/\s]+)?\/o\/[a-z0-9][a-z0-9-]{0,29}\/files\/[A-Za-z0-9]{6,64}$/;
+
+function safeSrc(attrs) {
+  const raw = attr(attrs, 'src').replace(/[\s\u0000-\u001f]/g, '');
+  return FILE_SRC_RE.test(raw) ? raw : '';
+}
+
+function attrEscape(value) {
+  return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function classAttr(cls, email) {
+  if (!cls) return '';
+  if (!email) return ` class="${cls}"`;
+  const style = cls.split(/\s+/).map((c) => EMAIL_STYLES[c] || '').join('');
+  return style ? ` style="${style}"` : '';
+}
+
+function imageHtml(src, cls, email) {
+  const width = IMAGE_WIDTHS[cls.split(/\s+/).find((c) => IMAGE_WIDTHS[c])] || 600;
+  if (!email) return `<img src="${attrEscape(src)}" alt=""${cls ? ` class="${cls}"` : ''}>`;
+  const centre = width < 600 ? ' margin-left:auto; margin-right:auto;' : '';
+  return `<img src="${attrEscape(src)}" alt="" width="${width}" style="width:100%;`
+    + ` max-width:${width}px; height:auto; display:block; border:0; border-radius:8px;${centre}">`;
+}
+
+// `mode: 'email'` swaps the stylesheet's classes for inline styles, which is
+// the only thing an email client will honour.
+export function sanitizeRichText(input, { maxLength = 20000, mode = 'page' } = {}) {
+  const email = mode === 'email';
   let html = String(input ?? '');
   if (html.length > maxLength) html = html.slice(0, maxLength);
 
@@ -57,10 +116,24 @@ export function sanitizeRichText(input, { maxLength = 20000 } = {}) {
         open.splice(idx);
       }
     } else if (VOID_TAGS.has(tag)) {
-      out += '<br>';
+      if (tag === 'img') {
+        const src = safeSrc(m[3] || '');
+        if (src) out += imageHtml(src, safeClass(m[3] || ''), email);
+      } else {
+        out += '<br>';
+      }
+    } else if (tag === 'a') {
+      // A link whose target didn't pass still keeps its words — it just stops
+      // being a link, which is the safe half of what the author wanted.
+      const href = safeHref(m[3] || '');
+      out += href
+        ? `<a href="${attrEscape(href)}" target="_blank" rel="noopener noreferrer"`
+          + `${email ? ` style="${EMAIL_LINK_STYLE}"` : ''}>`
+        : '<a>';
+      open.push('a');
     } else {
       const cls = safeClass(m[3] || '');
-      out += `<${tag}${cls ? ` class="${cls}"` : ''}>`;
+      out += `<${tag}${classAttr(cls, email)}>`;
       open.push(tag);
     }
   }
@@ -90,5 +163,5 @@ export function stripHtml(input) {
 // Whether a stored description is HTML (new rich text) vs. legacy plain text,
 // so old descriptions still render with their line breaks.
 export function looksLikeHtml(text) {
-  return /<(?:b|strong|i|em|u|br|p|div|span)\b[^>]*>/i.test(String(text ?? ''));
+  return /<(?:b|strong|i|em|u|br|p|div|span|a|img)\b[^>]*>/i.test(String(text ?? ''));
 }

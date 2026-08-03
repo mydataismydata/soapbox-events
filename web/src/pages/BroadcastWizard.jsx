@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api.js';
-import { Field, Modal, Spinner, useToast, insertAtCursor, Banner, Card, Icon } from '../ui.jsx';
+import { Field, Modal, Spinner, useToast, Banner, Card, Icon } from '../ui.jsx';
 import FlyerDesigner from '../components/FlyerDesigner.jsx';
 import RecipientPicker from '../components/RecipientPicker.jsx';
 import TagButtons from '../components/TagButtons.jsx';
-import InsertImageButton from '../components/InsertImageButton.jsx';
-import InsertLinkButton from '../components/InsertLinkButton.jsx';
+import RichText, { looksLikeHtml, plainToHtml } from '../components/RichText.jsx';
 
 const STEPS = ['Details', 'Design & message', 'Recipients', 'Review & send'];
 
@@ -24,7 +23,7 @@ Write your message here.
 — {{org_name}}`;
 
 const BLANK = {
-  title: '', subject: '', body: DEFAULT_BODY, web_version: true,
+  title: '', subject: '', body: plainToHtml(DEFAULT_BODY), web_version: true,
   flyer: {
     style: 'blue', font: 'sans', scale: 'm',
     eyebrow: '', tagline: '', note: '', contact: '', showHost: false, showAddress: false,
@@ -61,7 +60,9 @@ export default function BroadcastWizard() {
           ...BLANK,
           title: bc.title ?? '',
           subject: bc.subject ?? '',
-          body: bc.body ?? '',
+          // Bodies written before the formatting bar are plain text; the
+          // editor needs markup or their line breaks vanish.
+          body: looksLikeHtml(bc.body) ? bc.body : plainToHtml(bc.body),
           web_version: bc.web_version,
           flyer: { ...BLANK.flyer, ...bc.flyer },
         });
@@ -256,16 +257,11 @@ export default function BroadcastWizard() {
                   </Field>
                 ) : null}
                 <Field label="Message" hint="Placeholders fill in per recipient. The masthead below and an unsubscribe footer are added automatically.">
-                  <textarea ref={bodyRef} rows={9} value={b.body} maxLength={20000}
-                    onChange={(e) => patch({ body: e.target.value })} />
-                  <TagButtons tags={BROADCAST_TAGS} onInsert={(snippet) =>
-                    insertAtCursor(bodyRef, b.body, snippet, (val) => patch({ body: val }))} />
-                  <div className="row" style={{ gap: 8, marginTop: 8 }}>
-                    <InsertLinkButton textareaRef={bodyRef} onInsert={(snippet) =>
-                      insertAtCursor(bodyRef, b.body, snippet, (val) => patch({ body: val }))} />
-                    <InsertImageButton onInsert={(snippet) =>
-                      insertAtCursor(bodyRef, b.body, snippet, (val) => patch({ body: val }))} />
-                  </div>
+                  <RichText ref={bodyRef} links images value={b.body}
+                    placeholder="Write your message…"
+                    onChange={(html) => patch({ body: html })} />
+                  <TagButtons tags={BROADCAST_TAGS}
+                    onInsert={(snippet) => bodyRef.current?.insertText(snippet)} />
                 </Field>
                 <button className="btn" onClick={previewEmail} disabled={saving}>
                   <Icon name="eye" size={14} /> Preview email

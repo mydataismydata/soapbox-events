@@ -50,7 +50,7 @@ export default function EventWizard() {
   const [maxStep, setMaxStep] = useState(editing ? STEPS.length - 1 : 0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [recipients, setRecipients] = useState({ contact_ids: [], group_ids: [], new_contacts: [] });
+  const [recipients, setRecipients] = useState({ contact_ids: [], group_ids: [], excluded_contact_ids: [], new_contacts: [] });
   const [guests, setGuests] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [emailPreview, setEmailPreview] = useState(null);
@@ -143,10 +143,11 @@ export default function EventWizard() {
     const result = await api.post(`/api/events/${evId}/guests`, {
       contact_ids: recipients.contact_ids,
       group_ids: recipients.group_ids,
+      excluded_contact_ids: recipients.excluded_contact_ids,
       new_contacts: recipients.new_contacts.filter((n) => n.name.trim()),
       save_new: true,
     });
-    setRecipients({ contact_ids: [], group_ids: [], new_contacts: [] });
+    setRecipients({ contact_ids: [], group_ids: [], excluded_contact_ids: [], new_contacts: [] });
     await refreshGuests(evId);
     toast(`${result.added} guest${result.added === 1 ? '' : 's'} added${result.skipped ? ` (${result.skipped} already on the list)` : ''}`);
   }

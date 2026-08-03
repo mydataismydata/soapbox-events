@@ -43,7 +43,7 @@ export default function BroadcastWizard() {
   const [maxStep, setMaxStep] = useState(editing ? STEPS.length - 1 : 0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [recipients, setRecipients] = useState({ contact_ids: [], group_ids: [], new_contacts: [] });
+  const [recipients, setRecipients] = useState({ contact_ids: [], group_ids: [], excluded_contact_ids: [], new_contacts: [] });
   const [templates, setTemplates] = useState([]);
   const [emailPreview, setEmailPreview] = useState(null);
   const [confirmSend, setConfirmSend] = useState(false);
@@ -85,6 +85,7 @@ export default function BroadcastWizard() {
     return {
       contact_ids: recipients.contact_ids,
       group_ids: recipients.group_ids,
+      excluded_contact_ids: recipients.excluded_contact_ids,
       new_contacts: recipients.new_contacts.filter((n) => n.name.trim()),
     };
   }
@@ -174,6 +175,7 @@ export default function BroadcastWizard() {
   useEffect(() => {
     const sel = {
       contact_ids: recipients.contact_ids, group_ids: recipients.group_ids,
+      excluded_contact_ids: recipients.excluded_contact_ids,
       new_contacts: recipients.new_contacts.filter((n) => n.name.trim()),
     };
     if (!sel.contact_ids.length && !sel.group_ids.length && !sel.new_contacts.length) {

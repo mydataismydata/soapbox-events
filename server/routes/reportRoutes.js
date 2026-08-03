@@ -62,6 +62,7 @@ reportRouter.post('/recipients/preview', wrap(async (req, res) => {
   res.json(previewRecipients(req.db, {
     contactIds: v.intArray(req.body.contact_ids, { label: 'contact_ids' }),
     groupIds: v.intArray(req.body.group_ids, { label: 'group_ids' }),
+    excludedIds: v.intArray(req.body.excluded_contact_ids, { label: 'excluded_contact_ids' }),
     newContacts: Array.isArray(req.body.new_contacts) ? req.body.new_contacts : [],
   }));
 }));

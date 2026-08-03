@@ -4,6 +4,12 @@ import { Field, Banner, Icon } from '../ui.jsx';
 
 // Choose who gets invited: pick whole groups, tick individual contacts, and
 // add brand-new people inline. Reports the selection upward on every change.
+//
+// Picking a group brings its members in, but the ticks stay live: unticking
+// someone the group brought records an exclusion rather than being refused,
+// so "the Choir, but not Ben" needs no new group. Exclusions are held
+// separately from the group, so removing and re-adding the group keeps them —
+// and they apply last, wherever the person came from.
 export default function RecipientPicker({ value, onChange, alreadyInvited = new Set() }) {
   const [contacts, setContacts] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -32,15 +38,34 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = new 
     return set;
   }, [contacts, sel.group_ids]);
 
+  const excluded = useMemo(() => new Set(sel.excluded_contact_ids || []), [sel.excluded_contact_ids]);
+
   const effectiveCount = useMemo(() => {
     const ids = new Set(sel.contact_ids);
     for (const id of groupMemberIds) ids.add(id);
+    for (const id of excluded) ids.delete(id);
     return ids.size + sel.new_contacts.filter((n) => n.name.trim()).length;
-  }, [sel, groupMemberIds]);
+  }, [sel, groupMemberIds, excluded]);
 
+  // One tick per person, whichever way they got here: ticking clears any
+  // exclusion and adds them; unticking removes them and, if a group would
+  // still bring them back, records the exclusion that keeps them out.
   function toggleContact(id) {
-    const has = sel.contact_ids.includes(id);
-    onChange({ ...sel, contact_ids: has ? sel.contact_ids.filter((x) => x !== id) : [...sel.contact_ids, id] });
+    const on = (sel.contact_ids.includes(id) || groupMemberIds.has(id)) && !excluded.has(id);
+    const rest = (sel.excluded_contact_ids || []).filter((x) => x !== id);
+    if (on) {
+      onChange({
+        ...sel,
+        contact_ids: sel.contact_ids.filter((x) => x !== id),
+        excluded_contact_ids: groupMemberIds.has(id) ? [...rest, id] : rest,
+      });
+    } else {
+      onChange({
+        ...sel,
+        contact_ids: sel.contact_ids.includes(id) ? sel.contact_ids : [...sel.contact_ids, id],
+        excluded_contact_ids: rest,
+      });
+    }
   }
   function toggleGroup(id) {
     const has = sel.group_ids.includes(id);
@@ -98,14 +123,14 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = new 
             <tbody>
               {filtered.map((c) => {
                 const viaGroup = groupMemberIds.has(c.id);
+                const isExcluded = excluded.has(c.id);
                 const invited = alreadyInvited.has((c.email || '').toLowerCase()) && c.email;
                 return (
                   <tr key={c.id}>
                     <td style={{ width: 34 }}>
                       <input type="checkbox"
                         aria-label={`Invite ${c.name}`}
-                        checked={sel.contact_ids.includes(c.id) || viaGroup}
-                        disabled={viaGroup}
+                        checked={(sel.contact_ids.includes(c.id) || viaGroup) && !isExcluded}
                         onChange={() => toggleContact(c.id)} />
                     </td>
                     <td>
@@ -116,8 +141,9 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = new 
                       </div>
                       <div className="t-sub">{c.email || <em>no email — can't receive invitations</em>}</div>
                     </td>
-                    <td className="t-sub" style={{ textAlign: 'right' }}>
-                      {viaGroup ? 'via group' : ''}
+                    <td className="t-sub nowrap" style={{ textAlign: 'right' }}>
+                      {viaGroup && isExcluded ? <span className="badge badge-amber">Removed</span>
+                        : viaGroup ? 'via group' : ''}
                     </td>
                   </tr>
                 );

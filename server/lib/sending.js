@@ -186,13 +186,18 @@ export function broadcastUnsubUrl(orgSlug, contactId) {
 // list of { contact_id, name, email }. New people are saved to the contact
 // list (when saveNew), mirroring the event guest flow. Meant to run inside a
 // transaction when saving is involved.
-export function resolveRecipients(db, { contactIds = [], groupIds = [], newContacts = [], saveNew = true }) {
+export function resolveRecipients(db, {
+  contactIds = [], groupIds = [], excludedIds = [], newContacts = [], saveNew = true,
+}) {
   const ids = new Set(contactIds.map(Number));
   for (const gid of groupIds) {
     for (const m of db.prepare('SELECT contact_id FROM group_members WHERE group_id = ?').all(gid)) {
       ids.add(Number(m.contact_id));
     }
   }
+  // Someone unticked in the list stays out, even though their group is in.
+  // Applied last so it wins over every way of being included.
+  for (const id of excludedIds) ids.delete(Number(id));
 
   const out = [];
   const seenEmail = new Set();
@@ -232,8 +237,8 @@ export function resolveRecipients(db, { contactIds = [], groupIds = [], newConta
 // Dry-run count of how many emails a { contact_ids, group_ids, new_contacts }
 // selection would actually send: unique addresses, minus no-email and
 // unsubscribed. Used to show recipient counts (not group counts) before send.
-export function previewRecipients(db, { contactIds = [], groupIds = [], newContacts = [] }) {
-  const resolved = resolveRecipients(db, { contactIds, groupIds, newContacts, saveNew: false });
+export function previewRecipients(db, { contactIds = [], groupIds = [], excludedIds = [], newContacts = [] }) {
+  const resolved = resolveRecipients(db, { contactIds, groupIds, excludedIds, newContacts, saveNew: false });
   let recipients = 0;
   for (const r of resolved) {
     if (r.email && !isUnsubscribed(db, r.email)) recipients++;

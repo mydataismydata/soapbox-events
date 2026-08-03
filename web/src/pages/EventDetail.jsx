@@ -69,7 +69,7 @@ export default function EventDetail() {
   const [guestSort, sortGuestsBy] = useSort('name');
   const [error, setError] = useState('');
   const [addOpen, setAddOpen] = useState(false);
-  const [recipients, setRecipients] = useState({ contact_ids: [], group_ids: [], new_contacts: [] });
+  const [recipients, setRecipients] = useState({ contact_ids: [], group_ids: [], excluded_contact_ids: [], new_contacts: [] });
   const [confirm, setConfirm] = useState(null); // {type, ...}
   const [exporting, setExporting] = useState(false);
   const [cancelNotify, setCancelNotify] = useState(true);
@@ -431,7 +431,7 @@ export default function EventDetail() {
                     save_new: true,
                   });
                   toast(`${result.added} added${result.skipped ? `, ${result.skipped} already invited` : ''}`);
-                  setRecipients({ contact_ids: [], group_ids: [], new_contacts: [] });
+                  setRecipients({ contact_ids: [], group_ids: [], excluded_contact_ids: [], new_contacts: [] });
                   setAddOpen(false);
                 })}>
                 Add to event

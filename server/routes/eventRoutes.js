@@ -203,6 +203,7 @@ eventRouter.post('/events/:id/guests', wrap(async (req, res) => {
   const event = getEvent(req.db, req.params.id);
   const contactIds = new Set(v.intArray(req.body.contact_ids, { label: 'contact_ids' }));
   const groupIds = v.intArray(req.body.group_ids, { label: 'group_ids' });
+  const excludedIds = v.intArray(req.body.excluded_contact_ids, { label: 'excluded_contact_ids' });
   const saveNew = v.bool(req.body.save_new, true);
   const newContacts = Array.isArray(req.body.new_contacts) ? req.body.new_contacts.slice(0, 500) : [];
 
@@ -210,6 +211,9 @@ eventRouter.post('/events/:id/guests', wrap(async (req, res) => {
     const members = req.db.prepare('SELECT contact_id FROM group_members WHERE group_id = ?').all(gid);
     for (const m of members) contactIds.add(Number(m.contact_id));
   }
+  // Unticking someone the group brought in keeps them out, whichever order
+  // the two were chosen in.
+  for (const id of excludedIds) contactIds.delete(Number(id));
 
   const existingByContact = new Set(
     req.db.prepare('SELECT contact_id FROM invites WHERE event_id = ? AND contact_id IS NOT NULL')

@@ -781,6 +781,55 @@ let guests = [];
   check('dashboard exposes broadcasts list', Array.isArray(dashB.data?.broadcasts));
 }
 
+// --- excluding one person from a chosen group ------------------------------
+{
+  const mk = async (name, email) =>
+    (await A.api('POST', '/api/contacts', { name, email })).data.contact.id;
+  const x1 = await mk('Excl One', 'excl1@guest.test');
+  const x2 = await mk('Excl Two', 'excl2@guest.test');
+  const x3 = await mk('Excl Three', 'excl3@guest.test');
+  const gid = (await A.api('POST', '/api/groups', { name: 'Excl Group', contact_ids: [x1, x2, x3] })).data.group.id;
+
+  const whole = await A.api('POST', '/api/recipients/preview', { group_ids: [gid] });
+  check('preview counts a whole group', whole.data?.recipients === 3, JSON.stringify(whole.data));
+  const minusOne = await A.api('POST', '/api/recipients/preview', {
+    group_ids: [gid], excluded_contact_ids: [x2],
+  });
+  check('preview drops someone excluded from a chosen group',
+    minusOne.data?.recipients === 2, JSON.stringify(minusOne.data));
+  // An exclusion beats an explicit tick as well as a group.
+  const both = await A.api('POST', '/api/recipients/preview', {
+    group_ids: [gid], contact_ids: [x2], excluded_contact_ids: [x2],
+  });
+  check('an exclusion outranks being picked individually too',
+    both.data?.recipients === 2, JSON.stringify(both.data));
+
+  const ev = await A.api('POST', '/api/events', { title: 'Exclusion Test', date: '2030-01-01' });
+  const exEventId = ev.data.event.id;
+  const added = await A.api('POST', `/api/events/${exEventId}/guests`, {
+    group_ids: [gid], excluded_contact_ids: [x2],
+  });
+  check('inviting a group minus one adds only the rest', added.data?.added === 2, JSON.stringify(added.data));
+  const invited = (await A.api('GET', `/api/events/${exEventId}/guests`)).data.guests.map((g) => g.email);
+  check('the excluded person is not on the guest list',
+    !invited.includes('excl2@guest.test') && invited.includes('excl1@guest.test'), JSON.stringify(invited));
+
+  // Broadcasts keep exclusions in the stored audience, so re-opening a draft
+  // and sending later still leaves the same person out.
+  const bc = await A.api('POST', '/api/broadcasts', {
+    title: 'Exclusion Broadcast', subject: 'Hello', body: 'Hi {{first_name}}',
+    audience: { group_ids: [gid], excluded_contact_ids: [x2] },
+  });
+  const reopened = (await A.api('GET', `/api/broadcasts/${bc.data.broadcast.id}`)).data.broadcast;
+  check('a broadcast remembers who was excluded',
+    (reopened.audience?.excluded_contact_ids || []).includes(x2), JSON.stringify(reopened.audience));
+  const sent = await A.api('POST', `/api/broadcasts/${bc.data.broadcast.id}/send`, {});
+  check('sending a broadcast honours the stored exclusion', sent.data?.queued === 2, JSON.stringify(sent.data));
+
+  await A.api('POST', '/api/contacts/bulk-delete', { contact_ids: [x1, x2, x3] });
+  await A.api('DELETE', `/api/events/${exEventId}`);
+}
+
 // --- WordPress export ------------------------------------------------------
 {
   const doc = (await A.api('POST', `/api/events/${eventId}/export/wordpress`, {})).data;

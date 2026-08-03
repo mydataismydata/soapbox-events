@@ -30,15 +30,21 @@ function sanitizeAudience(a) {
       .map((n) => ({ name: String(n?.name || '').slice(0, 200), email: String(n?.email || '').slice(0, 254) }))
       .filter((n) => n.name.trim())
     : [];
-  return { contact_ids: ints(o.contact_ids), group_ids: ints(o.group_ids), new_contacts: news };
+  return {
+    contact_ids: ints(o.contact_ids), group_ids: ints(o.group_ids),
+    excluded_contact_ids: ints(o.excluded_contact_ids), new_contacts: news,
+  };
 }
 
 function parseAudience(b) {
   try {
     const a = JSON.parse(b.audience || '{}');
-    return { contact_ids: a.contact_ids || [], group_ids: a.group_ids || [], new_contacts: a.new_contacts || [] };
+    return {
+      contact_ids: a.contact_ids || [], group_ids: a.group_ids || [],
+      excluded_contact_ids: a.excluded_contact_ids || [], new_contacts: a.new_contacts || [],
+    };
   } catch {
-    return { contact_ids: [], group_ids: [], new_contacts: [] };
+    return { contact_ids: [], group_ids: [], excluded_contact_ids: [], new_contacts: [] };
   }
 }
 
@@ -174,6 +180,7 @@ broadcastRouter.post('/broadcasts/:id/send', wrap(async (req, res) => {
   const sel = {
     contactIds: v.intArray(req.body.contact_ids ?? stored.contact_ids, { label: 'contact_ids' }),
     groupIds: v.intArray(req.body.group_ids ?? stored.group_ids, { label: 'group_ids' }),
+    excludedIds: v.intArray(req.body.excluded_contact_ids ?? stored.excluded_contact_ids, { label: 'excluded_contact_ids' }),
     newContacts: Array.isArray(req.body.new_contacts) ? req.body.new_contacts : stored.new_contacts,
     saveNew: true,
   };

@@ -1,7 +1,7 @@
 {
   "name": "soapbox",
   "version": "1.0.0",
-  "build": 36,
+  "build": 37,
   "private": true,
   "type": "module",
   "description": "Self-hosted, multi-organization event invitations: events, custom flyers, RSVPs, contact lists, and email delivery.",

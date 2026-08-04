@@ -4,6 +4,26 @@ import { Field, Banner, Icon } from '../ui.jsx';
 
 const NOBODY = new Set();
 
+// The same picker serves events and broadcasts, but the people it picks are
+// called different things in each: an event has guests, a broadcast goes to
+// contacts. Nothing else about the two differs, so only the words are keyed.
+const WORDING = {
+  guest: {
+    one: 'guest',
+    many: 'guests',
+    groups: 'Invite whole groups',
+    tick: (name) => `Invite ${name}`,
+    empty: 'No guests selected yet — you can also skip this and share the event link instead.',
+  },
+  contact: {
+    one: 'contact',
+    many: 'contacts',
+    groups: 'Send to whole groups',
+    tick: (name) => `Send to ${name}`,
+    empty: 'No contacts selected yet — pick a group above, or tick people from the list.',
+  },
+};
+
 // Choose who gets invited: pick whole groups, tick individual contacts, and
 // add brand-new people inline. Reports the selection upward on every change.
 //
@@ -16,7 +36,8 @@ const NOBODY = new Set();
 // alreadyInvited (emails already on the event) locks those rows instead of
 // just labelling them, so the running total is what will actually be added
 // rather than what was ticked.
-export default function RecipientPicker({ value, onChange, alreadyInvited = NOBODY }) {
+export default function RecipientPicker({ value, onChange, alreadyInvited = NOBODY, noun = 'guest' }) {
+  const w = WORDING[noun] || WORDING.guest;
   const [contacts, setContacts] = useState([]);
   const [groups, setGroups] = useState([]);
   const [q, setQ] = useState('');
@@ -107,7 +128,7 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
   return (
     <div>
       {groups.length > 0 ? (
-        <Field label="Invite whole groups">
+        <Field label={w.groups}>
           <div className="chip-row">
             {groups.map((g) => {
               const active = sel.group_ids.includes(g.id);
@@ -151,7 +172,7 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
                   <tr key={c.id} style={invited ? { opacity: 0.55 } : undefined}>
                     <td style={{ width: 34 }}>
                       <input type="checkbox" disabled={invited}
-                        aria-label={invited ? `${c.name} is already invited` : `Invite ${c.name}`}
+                        aria-label={invited ? `${c.name} is already invited` : w.tick(c.name)}
                         checked={!invited && (sel.contact_ids.includes(c.id) || viaGroup) && !isExcluded}
                         onChange={() => toggleContact(c.id)} />
                     </td>
@@ -199,8 +220,8 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
         {tally.selected === 0
           ? (tally.onAlready
             ? `Nobody new selected — all ${tally.onAlready} of the people picked are already invited.`
-            : 'No guests selected yet — you can also skip this and share the event link instead.')
-          : `${tally.selected} ${alreadyInvited.size ? 'new ' : ''}guest${tally.selected === 1 ? '' : 's'} selected.`}
+            : w.empty)
+          : `${tally.selected} ${alreadyInvited.size ? 'new ' : ''}${tally.selected === 1 ? w.one : w.many} selected.`}
         {tally.selected > 0 && tally.onAlready
           ? ` ${tally.onAlready} other${tally.onAlready === 1 ? ' is' : 's are'} already invited and won’t be added again.`
           : ''}

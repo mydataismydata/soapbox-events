@@ -281,7 +281,7 @@ export default function BroadcastWizard() {
 
           {step === 2 ? (
             <Card title="Who receives this?">
-              <RecipientPicker value={recipients} onChange={setRecipients} />
+              <RecipientPicker value={recipients} onChange={setRecipients} noun="contact" />
             </Card>
           ) : null}
 

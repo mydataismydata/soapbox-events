@@ -10,6 +10,7 @@ import RecipientPicker from '../components/RecipientPicker.jsx';
 import TagButtons from '../components/TagButtons.jsx';
 import EmailLog from '../components/EmailLog.jsx';
 import { exportEventForWordPress } from '../components/exportForWordPress.js';
+import { sendQueue, sendLabel, sendSummary } from '../components/sendQueue.js';
 
 // Guest columns you can order by. Responses sort into a deliberate order
 // rather than alphabetically, so accepted / declined / no reply group up.
@@ -120,13 +121,17 @@ export default function EventDetail() {
     return sortRows(matched, guestSort, GUEST_SORTS);
   }, [guests, filter, guestQuery, guestSort]);
 
+  // Stable identity so the picker isn't rebuilding its lookup every keystroke.
+  const invitedEmails = useMemo(
+    () => new Set(guests.map((g) => g.email).filter(Boolean)), [guests]);
+
   if (error) return <div className="page"><Banner tone="bad">{error}</Banner></div>;
   if (!data) return <div className="page"><Spinner /></div>;
 
   const ev = data.event;
   const stats = data.stats;
-  const sendable = guests.filter((g) =>
-    ['not_sent', 'failed'].includes(g.email_status) && !g.response && g.email && !g.unsubscribed).length;
+  const queue = sendQueue(guests);
+  const { sendable } = queue;
 
   async function act(fn, okMsg) {
     setBusy(true);
@@ -289,10 +294,13 @@ export default function EventDetail() {
               <button className="btn btn-primary btn-sm" onClick={() => setAddOpen(true)}>
                 <Icon name="plus" size={14} /> Add guests
               </button>
-              {sendable > 0 && ev.status !== 'cancelled' ? (
-                <button className="btn btn-green btn-sm" disabled={busy}
+              {/* Stays put once there's a guest list, so "everyone has been
+                  emailed" and "this event can't do that" don't look alike. */}
+              {guests.length > 0 && ev.status !== 'cancelled' ? (
+                <button className="btn btn-green btn-sm" disabled={busy || sendable === 0}
+                  title={sendable === 0 ? 'Add guests to the list and this sends to just them.' : undefined}
                   onClick={() => setConfirm({ type: 'send' })}>
-                  <Icon name="send" size={14} /> Send invitations ({sendable})
+                  <Icon name="send" size={14} /> {sendLabel(queue)}
                 </button>
               ) : null}
               <a className="btn btn-sm" href={`/api/export/events/${ev.id}/guests.csv`}>
@@ -430,7 +438,8 @@ export default function EventDetail() {
                     new_contacts: recipients.new_contacts.filter((n) => n.name.trim()),
                     save_new: true,
                   });
-                  toast(`${result.added} added${result.skipped ? `, ${result.skipped} already invited` : ''}`);
+                  toast(`${result.added} added${result.skipped ? `, ${result.skipped} already invited` : ''}`
+                    + (result.added && !queue.firstPush ? ' · not emailed yet' : ''));
                   setRecipients({ contact_ids: [], group_ids: [], excluded_contact_ids: [], new_contacts: [] });
                   setAddOpen(false);
                 })}>
@@ -438,8 +447,14 @@ export default function EventDetail() {
               </button>
             </>
           }>
-          <RecipientPicker value={recipients} onChange={setRecipients}
-            alreadyInvited={new Set(guests.map((g) => g.email).filter(Boolean))} />
+          {!queue.firstPush ? (
+            <Banner tone="info">
+              Adding someone doesn’t email them. They join the list unsent, and the green
+              <strong> Send invitation to N new guests </strong>
+              button then invites just them — nobody already invited is contacted again.
+            </Banner>
+          ) : null}
+          <RecipientPicker value={recipients} onChange={setRecipients} alreadyInvited={invitedEmails} />
         </Modal>
       ) : null}
 
@@ -493,9 +508,9 @@ export default function EventDetail() {
       ) : null}
 
       {confirm?.type === 'send' ? (
-        <ConfirmModal title="Send invitations?" busy={busy}
-          message={`Invitation emails will be queued for ${sendable} guest${sendable === 1 ? '' : 's'} who haven't been emailed yet.`}
-          confirmLabel="Send" onClose={() => setConfirm(null)}
+        <ConfirmModal title={`${sendLabel(queue)}?`} busy={busy}
+          message={sendSummary(queue)}
+          confirmLabel={`Send ${sendable}`} onClose={() => setConfirm(null)}
           onConfirm={() => act(async () => {
             const result = await api.post(`/api/events/${ev.id}/send`, {});
             toast(`${result.queued} invitation${result.queued === 1 ? '' : 's'} queued`);

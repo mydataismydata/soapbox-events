@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import { Field, Banner, Icon } from '../ui.jsx';
 
+const NOBODY = new Set();
+
 // Choose who gets invited: pick whole groups, tick individual contacts, and
 // add brand-new people inline. Reports the selection upward on every change.
 //
@@ -10,7 +12,11 @@ import { Field, Banner, Icon } from '../ui.jsx';
 // so "the Choir, but not Ben" needs no new group. Exclusions are held
 // separately from the group, so removing and re-adding the group keeps them —
 // and they apply last, wherever the person came from.
-export default function RecipientPicker({ value, onChange, alreadyInvited = new Set() }) {
+//
+// alreadyInvited (emails already on the event) locks those rows instead of
+// just labelling them, so the running total is what will actually be added
+// rather than what was ticked.
+export default function RecipientPicker({ value, onChange, alreadyInvited = NOBODY }) {
   const [contacts, setContacts] = useState([]);
   const [groups, setGroups] = useState([]);
   const [q, setQ] = useState('');
@@ -40,17 +46,33 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = new 
 
   const excluded = useMemo(() => new Set(sel.excluded_contact_ids || []), [sel.excluded_contact_ids]);
 
-  const effectiveCount = useMemo(() => {
+  const invitedIds = useMemo(() => {
+    const set = new Set();
+    if (alreadyInvited.size === 0) return set;
+    for (const c of contacts) {
+      const email = (c.email || '').toLowerCase();
+      if (email && alreadyInvited.has(email)) set.add(c.id);
+    }
+    return set;
+  }, [contacts, alreadyInvited]);
+
+  // Split rather than summed: picking a group nearly always sweeps up people
+  // who are already on the event, and a total that counts them would promise
+  // more than "Add to event" delivers.
+  const tally = useMemo(() => {
     const ids = new Set(sel.contact_ids);
     for (const id of groupMemberIds) ids.add(id);
     for (const id of excluded) ids.delete(id);
-    return ids.size + sel.new_contacts.filter((n) => n.name.trim()).length;
-  }, [sel, groupMemberIds, excluded]);
+    let onAlready = 0;
+    for (const id of invitedIds) if (ids.delete(id)) onAlready++;
+    return { selected: ids.size + sel.new_contacts.filter((n) => n.name.trim()).length, onAlready };
+  }, [sel, groupMemberIds, excluded, invitedIds]);
 
   // One tick per person, whichever way they got here: ticking clears any
   // exclusion and adds them; unticking removes them and, if a group would
   // still bring them back, records the exclusion that keeps them out.
   function toggleContact(id) {
+    if (invitedIds.has(id)) return; // already on the event — nothing to toggle
     const on = (sel.contact_ids.includes(id) || groupMemberIds.has(id)) && !excluded.has(id);
     const rest = (sel.excluded_contact_ids || []).filter((x) => x !== id);
     if (on) {
@@ -122,15 +144,15 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = new 
           <table className="table">
             <tbody>
               {filtered.map((c) => {
+                const invited = invitedIds.has(c.id);
                 const viaGroup = groupMemberIds.has(c.id);
                 const isExcluded = excluded.has(c.id);
-                const invited = alreadyInvited.has((c.email || '').toLowerCase()) && c.email;
                 return (
-                  <tr key={c.id}>
+                  <tr key={c.id} style={invited ? { opacity: 0.55 } : undefined}>
                     <td style={{ width: 34 }}>
-                      <input type="checkbox"
-                        aria-label={`Invite ${c.name}`}
-                        checked={(sel.contact_ids.includes(c.id) || viaGroup) && !isExcluded}
+                      <input type="checkbox" disabled={invited}
+                        aria-label={invited ? `${c.name} is already invited` : `Invite ${c.name}`}
+                        checked={!invited && (sel.contact_ids.includes(c.id) || viaGroup) && !isExcluded}
                         onChange={() => toggleContact(c.id)} />
                     </td>
                     <td>
@@ -142,8 +164,9 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = new 
                       <div className="t-sub">{c.email || <em>no email — can't receive invitations</em>}</div>
                     </td>
                     <td className="t-sub nowrap" style={{ textAlign: 'right' }}>
-                      {viaGroup && isExcluded ? <span className="badge badge-amber">Removed</span>
-                        : viaGroup ? 'via group' : ''}
+                      {invited ? '' /* the badge beside the name already says so */
+                        : viaGroup && isExcluded ? <span className="badge badge-amber">Removed</span>
+                          : viaGroup ? 'via group' : ''}
                     </td>
                   </tr>
                 );
@@ -173,8 +196,14 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = new 
       </Field>
 
       <Banner tone="info" style={{ marginBottom: 0 }}>
-        {effectiveCount === 0 ? 'No guests selected yet — you can also skip this and share the event link instead.'
-          : `${effectiveCount} guest${effectiveCount === 1 ? '' : 's'} selected.`}
+        {tally.selected === 0
+          ? (tally.onAlready
+            ? `Nobody new selected — all ${tally.onAlready} of the people picked are already invited.`
+            : 'No guests selected yet — you can also skip this and share the event link instead.')
+          : `${tally.selected} ${alreadyInvited.size ? 'new ' : ''}guest${tally.selected === 1 ? '' : 's'} selected.`}
+        {tally.selected > 0 && tally.onAlready
+          ? ` ${tally.onAlready} other${tally.onAlready === 1 ? ' is' : 's are'} already invited and won’t be added again.`
+          : ''}
       </Banner>
     </div>
   );

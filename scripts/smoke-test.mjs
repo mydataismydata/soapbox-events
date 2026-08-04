@@ -9,6 +9,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { sendQueue, sendLabel, sendSummary } from '../web/src/components/sendQueue.js';
 
 const PORT = 3870 + Math.floor(Math.random() * 100);
 const BASE = `http://localhost:${PORT}`;
@@ -964,6 +965,80 @@ let guests = [];
     senderFor(off, 'Alpha', 'broadcast').sender.email === 'meetings@alpha.test');
 
   await A.api('PUT', '/api/settings', { broadcast_sender_split: false });
+}
+
+// --- topping up an event that has already been invited ---------------------
+{
+  const mk = async (name, email) =>
+    (await A.api('POST', '/api/contacts', { name, email })).data.contact.id;
+  const first = await mk('Topup First', 'topup1@guest.test');
+  const second = await mk('Topup Second', 'topup2@guest.test');
+  const late = await mk('Topup Late', 'topup3@guest.test');
+
+  const evId = (await A.api('POST', '/api/events', {
+    title: 'Topup Supper', date: '2030-04-04', time: '18:00',
+  })).data.event.id;
+  await A.api('POST', `/api/events/${evId}/guests`, { contact_ids: [first, second] });
+  const push = await A.api('POST', `/api/events/${evId}/send`, {});
+  check('the first push invites everyone on the list', push.data?.queued === 2, JSON.stringify(push.data));
+
+  // The whole point: revisit the guest list later, add someone who was left
+  // out, and send to just them.
+  const add = await A.api('POST', `/api/events/${evId}/guests`, { contact_ids: [first, second, late] });
+  check('re-adding people already invited adds only the new one',
+    add.data?.added === 1 && add.data?.skipped === 2, JSON.stringify(add.data));
+
+  const topup = await A.api('POST', `/api/events/${evId}/send`, {});
+  check('a second send reaches only the guest added since', topup.data?.queued === 1, JSON.stringify(topup.data));
+
+  const guests = (await A.api('GET', `/api/events/${evId}/guests`)).data.guests;
+  const byEmail = Object.fromEntries(guests.map((g) => [g.email, g]));
+  check('nobody already invited was emailed twice',
+    (await A.api('GET', `/api/emails?event_id=${evId}`)).data.emails
+      .filter((e) => e.kind === 'invitation' && e.to_email === 'topup1@guest.test').length === 1);
+  check('the late guest is now queued too', byEmail['topup3@guest.test']?.email_status !== 'not_sent',
+    JSON.stringify(byEmail['topup3@guest.test']));
+
+  const empty = await A.api('POST', `/api/events/${evId}/send`, {});
+  check('sending again with nobody new is refused', empty.status === 400, String(empty.status));
+
+  // The button's wording, over the guest shapes it has to describe.
+  const G = (email_status, extra = {}) => ({ email_status, email: 'x@y.test', response: null, ...extra });
+  const fresh = sendQueue([G('not_sent'), G('not_sent')]);
+  check('a first push counts the whole list', fresh.firstPush && fresh.sendable === 2);
+  check('a first push keeps the plain wording', sendLabel(fresh) === 'Send invitations (2)');
+
+  const topUp = sendQueue([G('sent'), G('sent'), G('not_sent')]);
+  check('a top-up is not a first push', !topUp.firstPush && topUp.added === 1);
+  check('a top-up names its audience', sendLabel(topUp) === 'Send invitation to 1 new guest',
+    sendLabel(topUp));
+  check('a top-up of several reads as plural',
+    sendLabel(sendQueue([G('sent'), G('not_sent'), G('not_sent')])) === 'Send invitations to 2 new guests');
+  check('a top-up explains that nobody gets a second copy',
+    sendSummary(topUp).includes('added since the last send')
+      && sendSummary(topUp).includes('second copy'), sendSummary(topUp));
+
+  const done = sendQueue([G('sent'), G('sent')]);
+  check('an event with nothing pending has nothing to send', done.sendable === 0);
+  check('the button still names itself when there is nothing to send',
+    sendLabel(done) === 'Send invitations to new guests');
+
+  // A failed delivery is a retry, not a new guest — saying "new" would lie.
+  check('failures read as a retry rather than a new guest',
+    sendLabel(sendQueue([G('sent'), G('failed')])) === 'Retry 1 failed invitation');
+  check('new guests and retries together drop to a neutral count',
+    sendLabel(sendQueue([G('sent'), G('failed'), G('not_sent')])) === 'Send 2 pending invitations');
+
+  // People who can't be reached are counted out of the total, and said so.
+  const blocked = sendQueue([
+    G('sent'), G('not_sent'), G('not_sent', { email: '' }), G('not_sent', { unsubscribed: true }),
+  ]);
+  check('unreachable guests are left out of the count', blocked.sendable === 1, JSON.stringify(blocked));
+  check('the summary says who is being skipped and why',
+    sendSummary(blocked).includes('1 with no email address') && sendSummary(blocked).includes('1 unsubscribed'),
+    sendSummary(blocked));
+  check('someone who already replied is never re-invited',
+    sendQueue([G('failed', { response: 'yes' })]).sendable === 0);
 }
 
 // ---------------------------------------------------------------------------

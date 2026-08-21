@@ -2,14 +2,35 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import {
   Spinner, Modal, ConfirmModal, Empty, Field, useToast, Badge, Banner, Card,
-  IconButton, Icon,
+  IconButton, Icon, SortTh, useSort, sortRows,
 } from '../ui.jsx';
+
+// Contacts arriving from a CSV or a guest list may only ever have had a single
+// name, so the form falls back to splitting it the same way the server does.
+function nameParts(contact) {
+  if (!contact) return { first_name: '', last_name: '' };
+  if (contact.first_name || contact.last_name) {
+    return { first_name: contact.first_name || '', last_name: contact.last_name || '' };
+  }
+  const clean = String(contact.name || '').trim().replace(/\s+/g, ' ');
+  const cut = clean.indexOf(' ');
+  return cut === -1
+    ? { first_name: clean, last_name: '' }
+    : { first_name: clean.slice(0, cut), last_name: clean.slice(cut + 1) };
+}
+
+const CONTACT_SORTS = {
+  first_name: (c) => (c.first_name || c.name || '').toLowerCase(),
+  last_name: (c) => (c.last_name || '').toLowerCase(),
+  email: (c) => (c.email || '').toLowerCase(),
+  phone: (c) => c.phone || '',
+};
 
 function ContactModal({ contact, onClose, onSaved }) {
   const toast = useToast();
   const [form, setForm] = useState({
-    name: contact?.name || '', email: contact?.email || '',
-    phone: contact?.phone || '', notes: contact?.notes || '',
+    ...nameParts(contact),
+    email: contact?.email || '', phone: contact?.phone || '', notes: contact?.notes || '',
   });
   const [busy, setBusy] = useState(false);
   const editing = Boolean(contact?.id);
@@ -45,15 +66,24 @@ function ContactModal({ contact, onClose, onSaved }) {
             </button>
           ) : null}
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={save} disabled={busy || !form.name.trim()}>
+          <button className="btn btn-primary" onClick={save}
+            disabled={busy || !(form.first_name.trim() || form.last_name.trim())}>
             {busy ? 'Saving…' : 'Save'}
           </button>
         </>
       }>
-      <Field label="Name" required>
-        <input value={form.name} maxLength={200} autoFocus
-          onChange={(e) => setForm({ ...form, name: e.target.value })} />
-      </Field>
+      {/* Either one on its own is enough — plenty of contacts are a single
+          word ("Mom", "Reception") and refusing them helps nobody. */}
+      <div className="field-row">
+        <Field label="First name" required>
+          <input value={form.first_name} maxLength={100} autoFocus
+            onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
+        </Field>
+        <Field label="Last name">
+          <input value={form.last_name} maxLength={100}
+            onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+        </Field>
+      </div>
       <div className="field-row">
         <Field label="Email" hint="Needed to receive email invitations.">
           <input type="email" value={form.email} maxLength={254}
@@ -111,9 +141,9 @@ function ImportModal({ onClose, onDone }) {
         </>
       }>
       <p className="small muted" style={{ marginTop: 0 }}>
-        Columns recognized (any order, case-insensitive): <code>name</code> (or <code>first name</code> +
-        <code> last name</code>), <code>email</code>, <code>phone</code>, <code>notes</code>.
-        Rows whose email already exists are skipped, so re-importing is safe.
+        Columns recognized (any order, case-insensitive): <code>first name</code> + <code>last name</code>
+        {' '}(or a single <code>name</code>, split at the first space), <code>email</code>, <code>phone</code>,
+        {' '}<code>notes</code>. Rows whose email already exists are skipped, so re-importing is safe.
       </p>
       <div className="row" style={{ marginBottom: 10 }}>
         <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
@@ -124,7 +154,7 @@ function ImportModal({ onClose, onDone }) {
         <span className="small muted">or paste below</span>
       </div>
       <Field>
-        <textarea rows={9} value={csv} placeholder={'name,email,phone\nAva Thompson,ava@example.com,555-0101'}
+        <textarea rows={9} value={csv} placeholder={'first name,last name,email,phone\nAva,Thompson,ava@example.com,555-0101'}
           onChange={(e) => setCsv(e.target.value)}
           style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }} />
       </Field>
@@ -150,6 +180,7 @@ export default function Contacts() {
   const [selected, setSelected] = useState(new Set());
   const [modal, setModal] = useState(null); // {type: 'edit'|'new'|'import'|'delete', contact}
   const [busy, setBusy] = useState(false);
+  const [sort, sortBy] = useSort('first_name');
 
   async function load() {
     const [c, g] = await Promise.all([api.get('/api/contacts'), api.get('/api/groups')]);
@@ -162,12 +193,12 @@ export default function Contacts() {
   const filtered = useMemo(() => {
     if (!contacts) return [];
     const needle = q.trim().toLowerCase();
-    if (!needle) return contacts;
-    return contacts.filter((c) =>
+    const matched = !needle ? contacts : contacts.filter((c) =>
       c.name.toLowerCase().includes(needle)
       || (c.email || '').toLowerCase().includes(needle)
       || (c.phone || '').includes(needle));
-  }, [contacts, q]);
+    return sortRows(matched, sort, CONTACT_SORTS);
+  }, [contacts, q, sort]);
 
   const groupName = (id) => groups.find((g) => g.id === id)?.name;
 
@@ -290,7 +321,11 @@ export default function Contacts() {
                       checked={selected.size === filtered.length && filtered.length > 0}
                       onChange={(e) => setSelected(e.target.checked ? new Set(filtered.map((c) => c.id)) : new Set())} />
                   </th>
-                  <th>Name</th><th>Email</th><th>Phone</th><th>Groups</th>
+                  <SortTh label="First name" k="first_name" sort={sort} onSort={sortBy} />
+                  <SortTh label="Last name" k="last_name" sort={sort} onSort={sortBy} />
+                  <SortTh label="Email" k="email" sort={sort} onSort={sortBy} />
+                  <SortTh label="Phone" k="phone" sort={sort} onSort={sortBy} />
+                  <th>Groups</th>
                   <th><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
@@ -303,11 +338,12 @@ export default function Contacts() {
                     </td>
                     <td>
                       <div className="row" style={{ gap: 7 }}>
-                        <span className="t-main">{c.name}</span>
+                        <span className="t-main">{nameParts(c).first_name || '—'}</span>
                         {c.unsubscribed_at ? <Badge tone="amber" dot>Unsubscribed</Badge> : null}
                       </div>
                       {c.notes ? <div className="t-sub" title={c.notes}>{c.notes.slice(0, 60)}</div> : null}
                     </td>
+                    <td><span className="t-main">{nameParts(c).last_name || '—'}</span></td>
                     <td className="t-sub">{c.email || '—'}</td>
                     <td className="t-sub">{c.phone || '—'}</td>
                     <td>

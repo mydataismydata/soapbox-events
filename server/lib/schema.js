@@ -235,4 +235,21 @@ export const ORG_MIGRATIONS = [
   CREATE INDEX idx_email_log_event ON email_log(event_id);
   CREATE INDEX idx_email_log_broadcast ON email_log(broadcast_id);
   `,
+  // Migration 4: contacts collect a first and last name of their own. `name`
+  // stays as the display string every other table and template already reads,
+  // composed from the two on write. The backfill splits at the first space,
+  // which is exactly what {{first_name}} has always rendered — so no existing
+  // contact's greeting changes. A one-word name is a first name.
+  `
+  ALTER TABLE contacts ADD COLUMN first_name TEXT NOT NULL DEFAULT '';
+  ALTER TABLE contacts ADD COLUMN last_name TEXT NOT NULL DEFAULT '';
+  UPDATE contacts SET
+    first_name = CASE WHEN instr(trim(name), ' ') > 0
+                      THEN substr(trim(name), 1, instr(trim(name), ' ') - 1)
+                      ELSE trim(name) END,
+    last_name  = CASE WHEN instr(trim(name), ' ') > 0
+                      THEN ltrim(substr(trim(name), instr(trim(name), ' ') + 1))
+                      ELSE '' END;
+  CREATE INDEX idx_contacts_last_name ON contacts(last_name COLLATE NOCASE);
+  `,
 ];

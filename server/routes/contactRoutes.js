@@ -1,13 +1,35 @@
 import { Router } from 'express';
-import { insertId, withTx } from '../lib/db.js';
+import { withTx } from '../lib/db.js';
 import { wrap, v, ApiError } from '../lib/validate.js';
 import { parseCsv, csvToContacts } from '../lib/csv.js';
+import { personName, contactInserter, MAX_NAME_PART } from '../lib/contacts.js';
 
 export const contactRouter = Router();
 
-function contactFields(body, { partial = false } = {}) {
+// The form posts first_name/last_name; the CSV importer and older API callers
+// post a single name. Either is accepted, and `name` is always recomposed so
+// the display string can never drift from the parts.
+function contactFields(body, { partial = false, base = null } = {}) {
   const out = {};
-  if (!partial || body.name !== undefined) out.name = v.str(body.name, { label: 'Name', max: 200 });
+  const sentParts = body.first_name !== undefined || body.last_name !== undefined;
+  if (!partial || sentParts || body.name !== undefined) {
+    // An edit can send one half on its own — renaming someone after a
+    // marriage, say. The half that wasn't sent keeps what it had, or the
+    // composed name would drop it.
+    const parts = sentParts
+      ? {
+        first_name: body.first_name !== undefined
+          ? v.optStr(body.first_name, { label: 'First name', max: MAX_NAME_PART })
+          : (base?.first_name || ''),
+        last_name: body.last_name !== undefined
+          ? v.optStr(body.last_name, { label: 'Last name', max: MAX_NAME_PART })
+          : (base?.last_name || ''),
+      }
+      : { name: v.str(body.name, { label: 'Name', max: 200 }) };
+    const n = personName(parts);
+    if (!n.name) throw new ApiError(400, 'A first or last name is required.');
+    Object.assign(out, n);
+  }
   if (!partial || body.email !== undefined) out.email = v.optEmail(body.email, { label: 'Email' });
   if (!partial || body.phone !== undefined) out.phone = v.optStr(body.phone, { label: 'Phone', max: 50 });
   if (!partial || body.notes !== undefined) out.notes = v.optStr(body.notes, { label: 'Notes', max: 2000 });
@@ -20,9 +42,9 @@ function listContacts(db, q) {
     const like = `%${q.replace(/[%_]/g, '')}%`;
     rows = db.prepare(
       `SELECT * FROM contacts
-       WHERE name LIKE ? OR email LIKE ? OR phone LIKE ?
+       WHERE name LIKE ? OR last_name LIKE ? OR email LIKE ? OR phone LIKE ?
        ORDER BY name COLLATE NOCASE`
-    ).all(like, like, like);
+    ).all(like, like, like, like);
   } else {
     rows = db.prepare('SELECT * FROM contacts ORDER BY name COLLATE NOCASE').all();
   }
@@ -46,10 +68,8 @@ contactRouter.post('/contacts', wrap(async (req, res) => {
     const dup = req.db.prepare('SELECT id FROM contacts WHERE email = ?').get(f.email);
     if (dup) throw new ApiError(409, 'A contact with this email already exists.');
   }
-  const info = req.db.prepare(
-    'INSERT INTO contacts (name, email, phone, notes) VALUES (?, ?, ?, ?)'
-  ).run(f.name, f.email || null, f.phone || null, f.notes || null);
-  const contact = req.db.prepare('SELECT * FROM contacts WHERE id = ?').get(insertId(info));
+  const id = contactInserter(req.db)(f);
+  const contact = req.db.prepare('SELECT * FROM contacts WHERE id = ?').get(id);
   res.status(201).json({ contact: { ...contact, group_ids: [] } });
 }));
 
@@ -57,15 +77,17 @@ contactRouter.put('/contacts/:id', wrap(async (req, res) => {
   const id = v.int(req.params.id, { label: 'id', min: 1 });
   const existing = req.db.prepare('SELECT * FROM contacts WHERE id = ?').get(id);
   if (!existing) throw new ApiError(404, 'Contact not found.');
-  const f = contactFields(req.body, { partial: true });
+  const f = contactFields(req.body, { partial: true, base: existing });
   if (f.email) {
     const dup = req.db.prepare('SELECT id FROM contacts WHERE email = ? AND id != ?').get(f.email, id);
     if (dup) throw new ApiError(409, 'Another contact already uses this email.');
   }
   const merged = { ...existing, ...f };
   req.db.prepare(
-    `UPDATE contacts SET name = ?, email = ?, phone = ?, notes = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(merged.name, merged.email || null, merged.phone || null, merged.notes || null, id);
+    `UPDATE contacts SET name = ?, first_name = ?, last_name = ?, email = ?, phone = ?, notes = ?,
+            updated_at = datetime('now') WHERE id = ?`
+  ).run(merged.name, merged.first_name, merged.last_name,
+    merged.email || null, merged.phone || null, merged.notes || null, id);
   res.json({ ok: true });
 }));
 
@@ -110,16 +132,16 @@ contactRouter.post('/contacts/import', wrap(async (req, res) => {
   const csvText = v.str(req.body.csv, { label: 'CSV content', max: 5_000_000 });
   const { contacts, errors } = csvToContacts(parseCsv(csvText));
   if (contacts.length === 0) {
-    throw new ApiError(400, errors[0] || 'No contacts found in the file. Expected columns: name, email, phone, notes.');
+    throw new ApiError(400, errors[0] || 'No contacts found in the file. Expected columns: first name and last name (or name), email, phone, notes.');
   }
   let added = 0;
   let skipped = 0;
   withTx(req.db, () => {
     const existsStmt = req.db.prepare('SELECT id FROM contacts WHERE email = ?');
-    const insertStmt = req.db.prepare('INSERT INTO contacts (name, email, phone, notes) VALUES (?, ?, ?, ?)');
+    const insert = contactInserter(req.db);
     for (const c of contacts) {
       if (c.email && existsStmt.get(c.email)) { skipped++; continue; }
-      insertStmt.run(c.name, c.email || null, c.phone || null, c.notes || null);
+      insert(c);
       added++;
     }
   });

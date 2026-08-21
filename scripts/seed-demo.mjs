@@ -5,6 +5,7 @@
 //   node scripts/seed-demo.mjs
 import { config } from '../server/lib/env.js';
 import { getOrg, setSetting, insertId } from '../server/lib/db.js';
+import { contactInserter } from '../server/lib/contacts.js';
 import { createOrgWithAdmin } from '../server/lib/orgSetup.js';
 import { randomSlug, randomToken } from '../server/lib/tokens.js';
 import { queueEmails, getInvitesForEvent, DEFAULT_BODIES } from '../server/lib/sending.js';
@@ -46,10 +47,9 @@ const PEOPLE = [
   ['Liam Murphy', '', '555-0112'],
 ];
 const contactIds = [];
+const addContact = contactInserter(db);
 for (const [name, email, phone] of PEOPLE) {
-  const info = db.prepare('INSERT INTO contacts (name, email, phone) VALUES (?, ?, ?)')
-    .run(name, email || null, phone || null);
-  contactIds.push(insertId(info));
+  contactIds.push(addContact({ name, email, phone }));
 }
 
 // --- groups ----------------------------------------------------------------

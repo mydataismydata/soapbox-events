@@ -56,8 +56,8 @@ export function parseCsv(text) {
   return rows.filter((r) => r.some((cell) => cell.trim() !== ''));
 }
 
-// Interpret a parsed CSV as contacts. Accepts flexible headers: name (or
-// first/last name pair), email, phone, notes — case-insensitive, any order.
+// Interpret a parsed CSV as contacts. Accepts flexible headers: first/last
+// name pair (or a single name), email, phone, notes — case-insensitive, any order.
 // Without a header row, columns are assumed to be name,email,phone,notes.
 export function csvToContacts(rows) {
   if (rows.length === 0) return { contacts: [], errors: ['The file is empty.'] };
@@ -85,10 +85,11 @@ export function csvToContacts(rows) {
   const errors = [];
   dataRows.forEach((row, i) => {
     const cell = (j) => (j >= 0 && j < row.length ? row[j].trim() : '');
-    let name = cell(idx.name);
-    if (!name && (idx.firstName >= 0 || idx.lastName >= 0)) {
-      name = [cell(idx.firstName), cell(idx.lastName)].filter(Boolean).join(' ');
-    }
+    // A file with first/last columns keeps them apart; one with a single name
+    // column is split downstream by personName().
+    const firstPart = cell(idx.firstName);
+    const lastPart = cell(idx.lastName);
+    let name = cell(idx.name) || [firstPart, lastPart].filter(Boolean).join(' ');
     const email = cell(idx.email).toLowerCase();
     const phone = cell(idx.phone);
     const notes = cell(idx.notes);
@@ -98,7 +99,12 @@ export function csvToContacts(rows) {
       errors.push(`Row ${i + (hasHeader ? 2 : 1)}: "${email}" is not a valid email — row skipped.`);
       return;
     }
-    contacts.push({ name: name.slice(0, 200), email, phone: phone.slice(0, 50), notes: notes.slice(0, 1000) });
+    contacts.push({
+      name: name.slice(0, 200),
+      first_name: firstPart.slice(0, 100),
+      last_name: lastPart.slice(0, 100),
+      email, phone: phone.slice(0, 50), notes: notes.slice(0, 1000),
+    });
   });
   return { contacts, errors };
 }

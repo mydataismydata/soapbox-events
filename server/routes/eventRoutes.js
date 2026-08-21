@@ -6,6 +6,7 @@ import { normalizeFlyer } from '../lib/flyer.js';
 import { sanitizeRichText } from '../lib/sanitizeHtml.js';
 import { eventStats } from '../lib/stats.js';
 import { buildEventExport } from '../lib/wpExport.js';
+import { contactInserter } from '../lib/contacts.js';
 import { orgApiKey, senderFor, sendEmail } from '../lib/email.js';
 import { getSetting } from '../lib/db.js';
 import {
@@ -234,7 +235,7 @@ eventRouter.post('/events/:id/guests', wrap(async (req, res) => {
     );
     const getContact = req.db.prepare('SELECT * FROM contacts WHERE id = ?');
     const contactByEmail = req.db.prepare('SELECT * FROM contacts WHERE email = ?');
-    const insertContact = req.db.prepare('INSERT INTO contacts (name, email, phone) VALUES (?, ?, ?)');
+    const insertContact = contactInserter(req.db);
 
     for (const cid of contactIds) {
       const contact = getContact.get(cid);
@@ -258,11 +259,11 @@ eventRouter.post('/events/:id/guests', wrap(async (req, res) => {
         if (existing) {
           contactId = existing.id;
         } else if (saveNew) {
-          contactId = insertId(insertContact.run(name, email, phone || null));
+          contactId = insertContact({ name, email, phone });
           contactsCreated++;
         }
       } else if (saveNew) {
-        contactId = insertId(insertContact.run(name, null, phone || null));
+        contactId = insertContact({ name, phone });
         contactsCreated++;
       }
       if (contactId && existingByContact.has(contactId)) { skipped++; continue; }
@@ -321,9 +322,11 @@ eventRouter.post('/events/:id/guests/:inviteId/add-contact', wrap(async (req, re
   if (!invite.guest_email) throw new ApiError(400, 'This guest has no email to save.');
   let contact = req.db.prepare('SELECT * FROM contacts WHERE email = ?').get(invite.guest_email.toLowerCase());
   if (!contact) {
-    const info = req.db.prepare('INSERT INTO contacts (name, email) VALUES (?, ?)')
-      .run(invite.guest_name || invite.guest_email, invite.guest_email.toLowerCase());
-    contact = req.db.prepare('SELECT * FROM contacts WHERE id = ?').get(insertId(info));
+    const newId = contactInserter(req.db)({
+      name: invite.guest_name || invite.guest_email,
+      email: invite.guest_email.toLowerCase(),
+    });
+    contact = req.db.prepare('SELECT * FROM contacts WHERE id = ?').get(newId);
   }
   req.db.prepare('UPDATE invites SET contact_id = ? WHERE id = ?').run(contact.id, invite.id);
   res.json({ ok: true, contact_id: contact.id });

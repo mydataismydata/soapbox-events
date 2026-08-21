@@ -31,6 +31,8 @@ export const EXPORT_VERSION = 1;
 // document is JSON and gets base64'd, so it pays to keep a ceiling.
 const MAX_FLYER_BYTES = 8 * 1024 * 1024;
 
+// Fallback for a guest with no contact row (someone who RSVP'd through the
+// share link). Contacts carry their own first/last and are used as stored.
 // "Elena Rossi" -> first "Elena", last "Rossi". One-word names become the
 // last name, since that is the field WordPress sorts and greets on.
 export function splitName(full) {
@@ -110,9 +112,13 @@ export function buildEventExport(db, org, event, { flyerDataUrl = '' } = {}) {
     const email = (i.contact_email || i.guest_email || '').toLowerCase();
     const response = RESPONSE[i.response] || 'pending';
     const partySize = Math.max(1, Number(i.party_size) || 1);
+    // A contact's own first/last beat any guess made from the display name.
+    const stored = i.contact_first_name || i.contact_last_name
+      ? { first_name: i.contact_first_name || '', last_name: i.contact_last_name || '' }
+      : null;
     return {
       name,
-      ...splitName(name),
+      ...(stored || splitName(name)),
       email,
       phone: i.contact_phone || '',
       response,

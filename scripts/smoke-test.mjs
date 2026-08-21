@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { sendQueue, sendLabel, sendSummary } from '../web/src/components/sendQueue.js';
+import { personName, splitPersonName } from '../server/lib/contacts.js';
 
 const PORT = 3870 + Math.floor(Math.random() * 100);
 const BASE = `http://localhost:${PORT}`;
@@ -1039,6 +1040,90 @@ let guests = [];
     sendSummary(blocked));
   check('someone who already replied is never re-invited',
     sendQueue([G('failed', { response: 'yes' })]).sendable === 0);
+}
+
+// --- contacts keep a first and last name ------------------------------------
+{
+  // The parts are what the form posts, and `name` is composed from them.
+  const made = await A.api('POST', '/api/contacts', {
+    first_name: 'Ada', last_name: 'Lovelace', email: 'ada@names.test',
+  });
+  const ada = made.data?.contact;
+  check('a contact saves the name parts it was given',
+    ada?.first_name === 'Ada' && ada?.last_name === 'Lovelace', JSON.stringify(ada));
+  check('the display name is composed from the parts', ada?.name === 'Ada Lovelace', ada?.name);
+
+  // A single word is a first name, not a surname — "Hi {{first_name}}" has to
+  // greet someone.
+  const solo = (await A.api('POST', '/api/contacts', { first_name: 'Reception' })).data?.contact;
+  check('one part on its own is enough', solo?.name === 'Reception' && solo?.last_name === '');
+  const neither = await A.api('POST', '/api/contacts', { first_name: '', last_name: '' });
+  check('a contact with no name at all is refused', neither.status === 400, String(neither.status));
+
+  // Callers that only know about a single name still work, and get split.
+  const legacy = (await A.api('POST', '/api/contacts', {
+    name: 'Mary Anne Fitzgerald', email: 'maf@names.test',
+  })).data?.contact;
+  check('a single name is split into parts on the way in',
+    legacy?.first_name === 'Mary' && legacy?.last_name === 'Anne Fitzgerald', JSON.stringify(legacy));
+
+  // Editing one part recomposes the display name rather than leaving it stale.
+  await A.api('PUT', `/api/contacts/${ada.id}`, { last_name: 'Byron King' });
+  const edited = (await A.api('GET', '/api/contacts?q=ada@names.test')).data.contacts[0];
+  check('editing a part recomposes the display name', edited?.name === 'Ada Byron King', edited?.name);
+  check('the untouched part survives the edit', edited?.first_name === 'Ada');
+
+  // A partial update that says nothing about the name must not erase it.
+  await A.api('PUT', `/api/contacts/${ada.id}`, { phone: '555-0000' });
+  const kept = (await A.api('GET', '/api/contacts?q=ada@names.test')).data.contacts[0];
+  check('an update that omits the name leaves it alone',
+    kept?.name === 'Ada Byron King' && kept?.first_name === 'Ada', JSON.stringify(kept));
+
+  // Searching by surname finds people whose display name starts elsewhere.
+  const found = await A.api('GET', '/api/contacts?q=Byron');
+  check('contacts are searchable by last name', found.data.contacts.some((c) => c.id === ada.id));
+
+  // CSV round-trip: separate columns stay separate, a lone name gets split.
+  const imported = await A.api('POST', '/api/contacts/import', {
+    csv: 'First Name,Last Name,Email\nGrace,Hopper,grace@names.test\n',
+  });
+  check('a CSV with first/last columns imports them apart', imported.data?.added === 1);
+  const grace = (await A.api('GET', '/api/contacts?q=grace@names.test')).data.contacts[0];
+  check('imported parts are stored as given',
+    grace?.first_name === 'Grace' && grace?.last_name === 'Hopper', JSON.stringify(grace));
+
+  const csvOut = await (await A.raw('GET', '/api/export/contacts.csv')).text();
+  check('the CSV export has first_name and last_name columns',
+    csvOut.includes('first_name,last_name,name,email'), csvOut.slice(0, 120));
+  check('the CSV export writes the parts', csvOut.includes('Grace,Hopper,Grace Hopper'));
+
+  // Guests added straight to an event land in contacts with parts too.
+  const evId = (await A.api('POST', '/api/events', { title: 'Name Party', date: '2030-06-06' })).data.event.id;
+  await A.api('POST', `/api/events/${evId}/guests`, {
+    new_contacts: [{ name: 'Katherine Johnson', email: 'kj@names.test' }],
+  });
+  const kj = (await A.api('GET', '/api/contacts?q=kj@names.test')).data.contacts[0];
+  check('a guest saved from an event gets name parts too',
+    kj?.first_name === 'Katherine' && kj?.last_name === 'Johnson', JSON.stringify(kj));
+
+  // The WordPress export prefers what the contact actually stores.
+  const doc = (await A.api('POST', `/api/events/${evId}/export/wordpress`, {})).data;
+  const row = doc.guests.find((g) => g.email === 'kj@names.test');
+  check('the WordPress export uses the stored parts',
+    row?.first_name === 'Katherine' && row?.last_name === 'Johnson', JSON.stringify(row));
+
+  // {{first_name}} must render exactly what it always did.
+  check('a split name still greets by the first word',
+    personName({ name: 'Mary Anne Fitzgerald' }).first_name === 'Mary');
+  check('a one-word name is a first name, not a surname',
+    splitPersonName('Mom').first_name === 'Mom' && splitPersonName('Mom').last_name === '');
+  check('explicit parts beat any guess from a name',
+    personName({ name: 'Ignore Me', first_name: 'Ada', last_name: 'Lovelace' }).name === 'Ada Lovelace');
+  check('runs of whitespace collapse before splitting',
+    personName({ name: '  Ada   Lovelace ' }).name === 'Ada Lovelace');
+
+  for (const c of [ada, solo, legacy, grace, kj]) if (c) await A.api('DELETE', `/api/contacts/${c.id}`);
+  await A.api('DELETE', `/api/events/${evId}`);
 }
 
 // ---------------------------------------------------------------------------

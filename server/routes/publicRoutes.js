@@ -21,6 +21,7 @@ import { sanitizeRichText, looksLikeHtml } from '../lib/sanitizeHtml.js';
 import { formatWhen, formatDate, firstName } from '../lib/format.js';
 import { buildIcs, googleCalendarUrl } from '../lib/ics.js';
 import { randomToken } from '../lib/tokens.js';
+import { personName } from '../lib/contacts.js';
 import { take } from '../lib/ratelimit.js';
 import { isValidEmail } from '../lib/validate.js';
 
@@ -505,8 +506,11 @@ publicRouter.post('/u/:token', (req, res) => {
     db.prepare(`UPDATE contacts SET unsubscribed_at = datetime('now') WHERE id = ?`).run(existing.id);
     db.prepare('DELETE FROM group_members WHERE contact_id = ?').run(existing.id);
   } else {
-    db.prepare(`INSERT INTO contacts (name, email, unsubscribed_at) VALUES (?, ?, datetime('now'))`)
-      .run(invite.guest_name || email, email);
+    const stub = personName({ name: invite.guest_name || email });
+    db.prepare(
+      `INSERT INTO contacts (name, first_name, last_name, email, unsubscribed_at)
+       VALUES (?, ?, ?, ?, datetime('now'))`
+    ).run(stub.name, stub.first_name, stub.last_name, email);
   }
   res.send(publicPage({
     title: 'Unsubscribed',

@@ -2,6 +2,7 @@
 // queue": link building, per-recipient rendering, dedupe/skip rules.
 import { config } from './env.js';
 import { insertId } from './db.js';
+import { contactInserter } from './contacts.js';
 import { hmacHex, safeEqual } from './tokens.js';
 import { normalizeFlyer, flyerColors } from './flyer.js';
 import { buildTagContext, buildBroadcastTagContext, renderTags } from './mergeTags.js';
@@ -83,6 +84,7 @@ export function isUnsubscribed(db, email) {
 // fields cover contacts that were deleted later.
 export const INVITE_SELECT = `
   SELECT i.*, c.name AS contact_name, c.email AS contact_email, c.phone AS contact_phone,
+         c.first_name AS contact_first_name, c.last_name AS contact_last_name,
          c.unsubscribed_at AS contact_unsubscribed_at
   FROM invites i LEFT JOIN contacts c ON c.id = i.contact_id
 `;
@@ -226,7 +228,7 @@ export function resolveRecipients(db, {
   }
 
   const contactByEmail = db.prepare('SELECT * FROM contacts WHERE email = ?');
-  const insertContact = db.prepare('INSERT INTO contacts (name, email, phone) VALUES (?, ?, ?)');
+  const insertContact = contactInserter(db);
   for (const raw of Array.isArray(newContacts) ? newContacts.slice(0, 2000) : []) {
     const name = String(raw?.name || '').trim().slice(0, 200);
     if (!name) continue;
@@ -236,9 +238,9 @@ export function resolveRecipients(db, {
     if (email) {
       const existing = contactByEmail.get(email);
       if (existing) contactId = existing.id;
-      else if (saveNew) contactId = insertId(insertContact.run(name, email, phone || null));
+      else if (saveNew) contactId = insertContact({ name, email, phone });
     } else if (saveNew) {
-      contactId = insertId(insertContact.run(name, null, phone || null));
+      contactId = insertContact({ name, phone });
     }
     push(contactId, name, email);
   }

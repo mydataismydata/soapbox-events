@@ -83,6 +83,10 @@ function sendCsv(res, filename, csv) {
 reportRouter.get('/export/contacts.csv', wrap(async (req, res) => {
   const rows = req.db.prepare('SELECT * FROM contacts ORDER BY name COLLATE NOCASE').all();
   sendCsv(res, 'contacts.csv', toCsv(rows, [
+    { key: 'first_name', label: 'first_name' },
+    { key: 'last_name', label: 'last_name' },
+    // Kept alongside the parts so a file exported here still imports into
+    // anything that only knows about a single name column.
     { key: 'name', label: 'name' },
     { key: 'email', label: 'email' },
     { key: 'phone', label: 'phone' },

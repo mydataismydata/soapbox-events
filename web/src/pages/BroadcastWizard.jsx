@@ -7,7 +7,12 @@ import RecipientPicker from '../components/RecipientPicker.jsx';
 import TagButtons from '../components/TagButtons.jsx';
 import RichText, { looksLikeHtml, plainToHtml } from '../components/RichText.jsx';
 
-const STEPS = ['Details', 'Design & message', 'Recipients', 'Review & send'];
+// The masthead only exists to front the web version, so an email-only
+// broadcast has nothing to design and the step says so.
+const stepLabels = (webVersion) => [
+  'Details', webVersion ? 'Design & message' : 'Message', 'Recipients', 'Review & send',
+];
+const STEP_COUNT = 4;
 
 // Broadcasts have no event/RSVP context, so only a few tags apply.
 const BROADCAST_TAGS = [
@@ -40,7 +45,7 @@ export default function BroadcastWizard() {
   const [broadcastId, setBroadcastId] = useState(id ? Number(id) : null);
   const [b, setB] = useState(editing ? null : { ...BLANK });
   const [step, setStep] = useState(0);
-  const [maxStep, setMaxStep] = useState(editing ? STEPS.length - 1 : 0);
+  const [maxStep, setMaxStep] = useState(editing ? STEP_COUNT - 1 : 0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [recipients, setRecipients] = useState({ contact_ids: [], group_ids: [], excluded_contact_ids: [], new_contacts: [] });
@@ -206,7 +211,7 @@ export default function BroadcastWizard() {
 
       <div className="wiz">
         <div className="wiz-rail">
-          {STEPS.map((label, i) => (
+          {stepLabels(b.web_version).map((label, i) => (
             <button key={label}
               className={`wiz-step ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}
               disabled={i > maxStep}
@@ -258,7 +263,7 @@ export default function BroadcastWizard() {
                     </select>
                   </Field>
                 ) : null}
-                <Field label="Message" hint="Placeholders fill in per recipient. The masthead below and an unsubscribe footer are added automatically.">
+                <Field label="Message" hint="Placeholders fill in per recipient. An unsubscribe footer is added automatically.">
                   <RichText ref={bodyRef} links images value={b.body}
                     placeholder="Write your message…"
                     onChange={(html) => patch({ body: html })} />
@@ -269,13 +274,15 @@ export default function BroadcastWizard() {
                   <Icon name="eye" size={14} /> Preview email
                 </button>
               </Card>
-              <Card title="Design the masthead"
-                sub={b.web_version
-                  ? 'Fronts the broadcast’s web version. The email itself is just your message.'
-                  : 'Only used by the web version, which is switched off — turn it on in step 1 for this to appear anywhere.'}>
-                <FlyerDesigner mode="broadcast" eventBasics={{ title: b.title, host_name: '' }}
-                  flyer={b.flyer} onChange={(flyer) => patch({ flyer })} />
-              </Card>
+              {/* Nothing but the web version renders the masthead, so with that
+                  off there is nothing here to design. */}
+              {b.web_version ? (
+                <Card title="Design the masthead"
+                  sub="Fronts the broadcast’s web version. The email itself is just your message.">
+                  <FlyerDesigner mode="broadcast" eventBasics={{ title: b.title, host_name: '' }}
+                    flyer={b.flyer} onChange={(flyer) => patch({ flyer })} />
+                </Card>
+              ) : null}
             </>
           ) : null}
 
@@ -330,7 +337,7 @@ export default function BroadcastWizard() {
             <button className="btn" onClick={() => goTo(step - 1)} disabled={step === 0 || saving}>
               <Icon name="arrowLeft" size={15} /> Back
             </button>
-            {step < STEPS.length - 1 ? (
+            {step < STEP_COUNT - 1 ? (
               <button className="btn btn-primary" onClick={() => goTo(step + 1)} disabled={saving}>
                 {saving ? 'Saving…' : <>Continue <Icon name="arrowRight" size={15} /></>}
               </button>

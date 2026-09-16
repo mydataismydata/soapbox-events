@@ -9,12 +9,35 @@ import { buildEventExport } from '../lib/wpExport.js';
 import { contactInserter } from '../lib/contacts.js';
 import { orgApiKey, senderFor, sendEmail } from '../lib/email.js';
 import { getSetting } from '../lib/db.js';
+import { publishAndLog } from '../lib/websitePush.js';
 import {
   parseFlyer, publicUrl, getInvitesForEvent, queueEmails, renderEmailFor,
   previewLinks, logTestEmail, inviteEmail, inviteName, INVITE_SELECT, DEFAULT_BODIES,
 } from '../lib/sending.js';
 
 export const eventRouter = Router();
+
+// Tell the organization's website that its meetings have changed.
+//
+// Fire and forget, so a slow website never delays the reply. The microtask is
+// scheduled after the handler's own database work has run, which matters for
+// the delete below: the payload is built from the table, so the row has to be
+// gone before it is read.
+//
+// The try/catch is load-bearing. `wrap()` catches rejections from the
+// handler's own promise, and a microtask scheduled inside it is outside that
+// promise — a throw here would become an unhandled rejection rather than a
+// 500. An organization with no website configured does nothing at all: it
+// reads one setting and returns.
+function pushToWebsite(req, reason) {
+  queueMicrotask(async () => {
+    try {
+      await publishAndLog(req.org, { reason });
+    } catch (err) {
+      console.error('website push failed', err);
+    }
+  });
+}
 
 function getEvent(db, id) {
   const event = db.prepare('SELECT * FROM events WHERE id = ?').get(v.int(id, { label: 'event id', min: 1 }));
@@ -122,12 +145,16 @@ eventRouter.put('/events/:id', wrap(async (req, res) => {
   req.db.prepare(`UPDATE events SET ${sets}, updated_at = datetime('now') WHERE id = ?`)
     .run(...Object.keys(fields).map((k) => fields[k] === '' ? null : fields[k]), event.id);
   const updated = req.db.prepare('SELECT * FROM events WHERE id = ?').get(event.id);
+  // Only a published event is on the website. The wizard saves a draft on
+  // every step, and none of those saves change what a visitor would see.
+  if (event.status === 'published') pushToWebsite(req, 'edit');
   res.json({ event: serializeEvent(req, updated), stats: eventStats(req.db, event.id) });
 }));
 
 eventRouter.delete('/events/:id', wrap(async (req, res) => {
   const event = getEvent(req.db, req.params.id);
   req.db.prepare('DELETE FROM events WHERE id = ?').run(event.id);
+  if (event.status === 'published') pushToWebsite(req, 'delete');
   res.json({ ok: true });
 }));
 
@@ -166,6 +193,7 @@ eventRouter.post('/events/:id/publish', wrap(async (req, res) => {
   const event = getEvent(req.db, req.params.id);
   assertPublishable(event);
   req.db.prepare(`UPDATE events SET status = 'published', updated_at = datetime('now') WHERE id = ?`).run(event.id);
+  pushToWebsite(req, 'publish');
   res.json({ ok: true, status: 'published' });
 }));
 
@@ -174,6 +202,7 @@ eventRouter.post('/events/:id/cancel', wrap(async (req, res) => {
   if (event.status === 'cancelled') throw new ApiError(400, 'This event is already cancelled.');
   const notify = v.bool(req.body.notify, false);
   req.db.prepare(`UPDATE events SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?`).run(event.id);
+  if (event.status === 'published') pushToWebsite(req, 'cancel');
   const updatedEvent = { ...event, status: 'cancelled' };
   let result = { queued: 0, skipped: { no_email: 0, unsubscribed: 0 } };
   if (notify) {
@@ -354,6 +383,9 @@ eventRouter.post('/events/:id/send', wrap(async (req, res) => {
   if (event.status === 'draft') {
     req.db.prepare(`UPDATE events SET status = 'published', updated_at = datetime('now') WHERE id = ?`).run(event.id);
     event.status = 'published';
+    // Only when that branch ran. Sending a second round of invitations for an
+    // already-published meeting changes nothing a visitor would see.
+    pushToWebsite(req, 'publish');
   }
 
   const result = queueEmails(req.db, {

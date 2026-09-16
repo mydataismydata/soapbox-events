@@ -6,6 +6,7 @@
 //
 //   npm run smoke
 import { spawn, spawnSync } from 'node:child_process';
+import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -1124,6 +1125,172 @@ let guests = [];
 
   for (const c of [ada, solo, legacy, grace, kj]) if (c) await A.api('DELETE', `/api/contacts/${c.id}`);
   await A.api('DELETE', `/api/events/${evId}`);
+}
+
+// --- publishing meetings to a website ---------------------------------------
+//
+// The feature is off until an organization fills in an address and a token,
+// and the first thing to protect is the organizations that never do. A stub
+// receiver stands in for the county website: it checks the token and the
+// document shape, and records what it was sent.
+{
+  const HOOK_PORT = PORT + 500;
+  const HOOK = `http://127.0.0.1:${HOOK_PORT}/soapbox-hook.php`;
+  const TOKEN = 'smoke-token-abcdefghij';
+  const received = [];
+  const hook = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      const json = (code, obj) => {
+        res.writeHead(code, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(obj));
+      };
+      if (req.method !== 'POST') return json(405, { error: 'Use POST.' });
+      if (req.headers['x-soapbox-token'] !== TOKEN) return json(401, { error: 'Unauthorized.' });
+      let doc;
+      try { doc = JSON.parse(body); } catch { return json(400, { error: 'Body is not JSON.' }); }
+      if (doc.format !== 'soapbox-website-push' || doc.version !== 1) {
+        return json(422, { error: 'Unexpected format.' });
+      }
+      received.push({ doc, raw: body });
+      json(200, { ok: true, stored: doc.events.length, kept_local: 0 });
+    });
+  });
+  await new Promise((r) => hook.listen(HOOK_PORT, '127.0.0.1', r));
+  const settle = () => new Promise((r) => setTimeout(r, 600));
+  const log = async () => (await A.api('GET', '/api/settings/website/deliveries')).data;
+
+  // 1. An organization with no website configured notices no change at all.
+  const quiet = await A.api('POST', '/api/events', { title: 'Quiet Meeting', date: '2026-11-04' });
+  const quietId = quiet.data.event.id;
+  await A.api('POST', `/api/events/${quietId}/publish`, {});
+  await A.api('PUT', `/api/events/${quietId}`, { description: 'edited with no website' });
+  await settle();
+  check('no website configured sends nothing', received.length === 0);
+  check('no website configured writes no delivery row', (await log()).deliveries.length === 0);
+  check('the settings report no website', (await A.api('GET', '/api/settings')).data.settings.website_push_url === '');
+  await A.api('DELETE', `/api/events/${quietId}`);
+
+  // 2. Connecting proves itself, and the token never comes back to the browser.
+  await A.api('PUT', '/api/settings', { website_push_url: HOOK, website_push_token: TOKEN });
+  await settle();
+  check('saving a website address delivers straight away', received.length === 1);
+  check('and logs it as a settings save', (await log()).deliveries[0]?.reason === 'settings');
+  {
+    const settings = (await A.api('GET', '/api/settings')).data.settings;
+    check('a stored token is reported', settings.website_push_token_set === true);
+    check('but never sent back', !JSON.stringify(settings).includes(TOKEN));
+  }
+
+  // 3. Only the transitions a visitor would notice.
+  const ev = await A.api('POST', '/api/events', {
+    title: 'County Meeting', date: '2026-10-27', start_time: '18:00',
+    venue_name: 'Library', venue_address: '1960 N Ponce de Leon Blvd',
+  });
+  const id = ev.data.event.id;
+  const slug = ev.data.event.slug;
+  {
+    const before = received.length;
+    await A.api('PUT', `/api/events/${id}`, { description: 'still a draft' });
+    await settle();
+    check('editing a draft sends nothing', received.length === before);
+  }
+  await A.api('POST', `/api/events/${id}/publish`, {});
+  await settle();
+  check('publishing sends', (await log()).deliveries[0]?.reason === 'publish');
+  check('the meeting is in the payload', received.at(-1).doc.events.some((e) => e.slug === slug));
+  check('with the venue nested the way the website reads it',
+    received.at(-1).doc.events.find((e) => e.slug === slug)?.venue?.name === 'Library');
+  check('and an RSVP link back to Soapbox',
+    received.at(-1).doc.events.find((e) => e.slug === slug)?.public_url === `${BASE}/o/alpha/e/${slug}`);
+
+  await A.api('PUT', `/api/events/${id}`, { description: 'Impact fees' });
+  await settle();
+  check('editing a published meeting sends', (await log()).deliveries[0]?.reason === 'edit');
+
+  await A.api('POST', `/api/events/${id}/cancel`, { notify: false });
+  await settle();
+  check('cancelling sends', (await log()).deliveries[0]?.reason === 'cancel');
+  check('a cancelled meeting drops out of the payload',
+    !received.at(-1).doc.events.some((e) => e.slug === slug));
+  await A.api('DELETE', `/api/events/${id}`);
+
+  // 4. Sending invitations publishes a draft on the way past, which the
+  //    website has to hear about — otherwise a meeting goes out to the whole
+  //    contact list and never appears on the calendar.
+  {
+    const draft = await A.api('POST', '/api/events', { title: 'December Meeting', date: '2026-12-15' });
+    const draftId = draft.data.event.id;
+    await A.api('POST', `/api/events/${draftId}/guests`, { contact_ids: [contactIds[0]] });
+    const before = received.length;
+    await A.api('POST', `/api/events/${draftId}/send`, {});
+    await settle();
+    check('sending invitations for a draft publishes it to the website', received.length === before + 1);
+    check('and logs that as a publish', (await log()).deliveries[0]?.reason === 'publish');
+    await A.api('DELETE', `/api/events/${draftId}`);
+    await settle();
+    check('deleting a published meeting sends', (await log()).deliveries[0]?.reason === 'delete');
+    check('and it is gone from the payload',
+      !received.at(-1).doc.events.some((e) => e.title === 'December Meeting'));
+  }
+
+  // 5. The website is public. It never receives the guest list.
+  {
+    const raw = received.map((r) => r.raw).join('\n');
+    check('no email address appears in any payload', !raw.includes('@'), raw.match(/\S*@\S*/)?.[0] || '');
+    const keys = new Set(received.flatMap((r) => r.doc.events.flatMap(Object.keys)));
+    check('no guest or email fields are in the event shape',
+      !keys.has('guests') && !keys.has('invites') && !keys.has('email_subject') && !keys.has('email_body'),
+      [...keys].join(','));
+  }
+
+  // 6. A website that stops answering must never break Soapbox.
+  await A.api('PUT', '/api/settings', { website_push_token: 'wrong-token' });
+  await settle();
+  {
+    const row = (await log()).deliveries[0];
+    check('a wrong token is logged as 401', row?.status === 401, JSON.stringify(row));
+    check('and marked as not worth retrying', row?.retryable === false);
+  }
+  await A.api('PUT', '/api/settings', { website_push_token: TOKEN });
+  await settle();
+  await new Promise((r) => hook.close(r));
+  {
+    const resend = await A.api('POST', '/api/settings/website/resend');
+    const row = (await log()).deliveries[0];
+    check('a website that is down is logged with no status', row?.status === 0, JSON.stringify(row));
+    check('and marked as worth retrying', row?.retryable === true);
+    check('the resend says so rather than throwing', resend.status === 200 && resend.data?.result?.ok === false);
+    const still = await A.api('POST', '/api/events', { title: 'Unblocked', date: '2026-12-01' });
+    check('publishing still works while the website is down',
+      (await A.api('POST', `/api/events/${still.data.event.id}/publish`, {})).status === 200);
+    await A.api('DELETE', `/api/events/${still.data.event.id}`);
+  }
+
+  // 7. Turning it off is one click and loses nothing.
+  await A.api('PUT', '/api/settings', { website_push_url: '', website_push_token: '' });
+  {
+    const rows = (await log()).deliveries.length;
+    const last = await A.api('POST', '/api/events', { title: 'After Disconnecting', date: '2026-12-08' });
+    await A.api('POST', `/api/events/${last.data.event.id}/publish`, {});
+    await settle();
+    const l = await log();
+    check('disconnecting stops delivery', l.deliveries.length === rows);
+    check('and reports the organization as unconnected', l.configured === false);
+    check('the delivery history survives', l.deliveries.length > 0);
+    check('resend refuses when nothing is configured',
+      (await A.api('POST', '/api/settings/website/resend')).status === 400);
+    await A.api('DELETE', `/api/events/${last.data.event.id}`);
+  }
+
+  // 8. A member cannot read or change any of it.
+  {
+    const member = new Client();
+    await A.api('POST', '/api/users', { name: 'Push Member', email: 'member@alpha.test', role: 'member' });
+    check('the delivery log is admin-only',
+      (await member.api('GET', '/api/settings/website/deliveries')).status === 401);
+  }
 }
 
 // ---------------------------------------------------------------------------

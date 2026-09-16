@@ -252,4 +252,22 @@ export const ORG_MIGRATIONS = [
                       ELSE '' END;
   CREATE INDEX idx_contacts_last_name ON contacts(last_name COLLATE NOCASE);
   `,
+
+  // Migration 5: the website delivery log. Replaces the self-healing that
+  // polling had for free: a push that fails leaves a red row with a Resend
+  // button rather than silently never arriving.
+  `
+  CREATE TABLE website_deliveries (
+    id INTEGER PRIMARY KEY,
+    sent_at TEXT NOT NULL DEFAULT (datetime('now')),
+    reason TEXT NOT NULL,          -- publish | edit | cancel | delete | settings | manual
+    ok INTEGER NOT NULL,
+    status INTEGER NOT NULL,       -- HTTP status, 0 when the request never completed
+    events INTEGER NOT NULL DEFAULT 0,
+    flyers INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
+    retryable INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX idx_website_deliveries_sent ON website_deliveries(sent_at DESC);
+  `,
 ];

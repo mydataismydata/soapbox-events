@@ -171,6 +171,161 @@ function SendingCard({ data, isAdmin, onSaved }) {
   );
 }
 
+// Why each delivery went out, in words a volunteer can read.
+const PUSH_REASONS = {
+  publish: 'Meeting published',
+  edit: 'Meeting edited',
+  cancel: 'Meeting cancelled',
+  delete: 'Meeting deleted',
+  settings: 'Connection saved',
+  manual: 'Sent by hand',
+};
+
+// The advice after the error is a second sentence, so the error needs to end
+// like one. A site's own wording does not always oblige.
+function asSentence(text) {
+  const t = String(text || '').trim();
+  return !t || /[.!?]$/.test(t) ? t : `${t}.`;
+}
+
+function DeliveryRow({ d }) {
+  const label = PUSH_REASONS[d.reason] || d.reason;
+  return (
+    <tr>
+      <td className="t-sub">{timeAgo(d.sent_at)}</td>
+      <td><span className="t-main">{label}</span></td>
+      <td>
+        {d.ok
+          ? <Badge tone="green" dot>Delivered</Badge>
+          : <Badge tone="red" dot>{d.status ? `Failed (${d.status})` : 'No answer'}</Badge>}
+      </td>
+      <td className="t-sub">
+        {d.events} {d.events === 1 ? 'meeting' : 'meetings'}
+        {d.flyers ? `, ${d.flyers} ${d.flyers === 1 ? 'flyer' : 'flyers'}` : ''}
+      </td>
+      <td className="t-sub">
+        {d.ok ? '' : `${asSentence(d.error)} ${d.retryable ? 'Worth trying again.' : 'Trying again will not help.'}`}
+      </td>
+    </tr>
+  );
+}
+
+function WebsiteCard({ data, isAdmin, onSaved }) {
+  const toast = useToast();
+  const initial = () => ({
+    website_push_url: data.settings.website_push_url,
+    website_push_token: undefined, // never sent back to the browser
+  });
+  const [form, setForm] = useState(initial);
+  const [saved, setSaved] = useState(initial);
+  const [log, setLog] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const set = (patch) => setForm((f) => ({ ...f, ...patch }));
+
+  const connected = data.settings.website_push_url && data.settings.website_push_token_set;
+
+  async function loadLog() {
+    if (!isAdmin) return;
+    try { setLog(await api.get('/api/settings/website/deliveries')); } catch { setLog(null); }
+  }
+  useEffect(() => { loadLog(); }, [isAdmin]);
+
+  async function save() {
+    setBusy(true);
+    try {
+      const payload = { website_push_url: form.website_push_url };
+      if (form.website_push_token !== undefined) payload.website_push_token = form.website_push_token;
+      await api.put('/api/settings', payload);
+      toast('Website settings saved');
+      const next = { ...form, website_push_token: undefined };
+      setForm(next);
+      setSaved(next);
+      await onSaved();
+      // Saving a connection sends a delivery to prove it, and that delivery is
+      // a network round trip the save did not wait for. Look once now and once
+      // after it has had time to land.
+      await loadLog();
+      setTimeout(loadLog, 2000);
+    } catch (err) {
+      toast(err.message, 'bad');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resend() {
+    setBusy(true);
+    try {
+      const d = await api.post('/api/settings/website/resend');
+      setLog({ configured: true, deliveries: d.deliveries });
+      toast(d.result.ok ? 'Sent to the website' : d.result.error, d.result.ok ? 'ok' : 'bad');
+    } catch (err) {
+      toast(err.message, 'bad');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Typing in the token box counts as a change — except typing and deleting
+  // again when no token was stored, which would save nothing.
+  const tokenChanged = form.website_push_token !== undefined
+    && (form.website_push_token !== '' || data.settings.website_push_token_set);
+  const dirty = tokenChanged || form.website_push_url !== saved.website_push_url;
+
+  return (
+    <Card title="Publish to a website"
+      actions={isAdmin && connected
+        ? <button className="btn btn-sm" onClick={resend} disabled={busy}>
+            <Icon name="refresh" size={14} /> Resend now
+          </button>
+        : null}>
+      <p className="small muted" style={{ marginTop: 0 }}>
+        {connected
+          ? 'Every published meeting is sent to this address whenever one is published, edited, cancelled or deleted. The website replaces its copy with what arrives. Guests, replies and email addresses are never included.'
+          : 'Optional. Give a website address here and Soapbox will keep its meetings calendar up to date by itself. Leave it empty and nothing is ever sent.'}
+      </p>
+
+      <div className="field-row">
+        <Field label="Website address"
+          hint="The address the website showed you when you pressed Connect Soapbox — it ends in /soapbox-hook.php.">
+          <input value={form.website_push_url} maxLength={400} disabled={!isAdmin}
+            placeholder="https://example.org/soapbox-hook.php"
+            onChange={(e) => set({ website_push_url: e.target.value })} />
+        </Field>
+        <Field label="Token"
+          hint={data.settings.website_push_token_set
+            ? 'A token is saved for this organization. Enter a new one to replace it, or save an empty field to disconnect.'
+            : 'Shown once by the website, next to the address. It cannot be read back afterwards.'}>
+          <input type="password" placeholder={data.settings.website_push_token_set ? '••••••••••••' : ''}
+            value={form.website_push_token ?? ''} disabled={!isAdmin}
+            onChange={(e) => set({ website_push_token: e.target.value })} />
+        </Field>
+      </div>
+
+      {isAdmin ? (
+        <div className="row" style={{ gap: 'var(--sp-3)' }}>
+          <button className="btn btn-primary" onClick={save} disabled={busy || !dirty}>
+            {busy ? 'Saving…' : 'Save website settings'}
+          </button>
+          {!dirty && !busy ? <span className="small muted">No unsaved changes.</span> : null}
+        </div>
+      ) : <p className="small muted">Only administrators can change this.</p>}
+
+      {isAdmin && log?.deliveries?.length ? (
+        <>
+          <h3 className="small" style={{ marginBottom: 0 }}>Recent deliveries</h3>
+          <div className="table-wrap">
+            <table className="table">
+              <thead><tr><th>When</th><th>Why</th><th>Result</th><th>Sent</th><th>Detail</th></tr></thead>
+              <tbody>{log.deliveries.map((d) => <DeliveryRow key={d.id} d={d} />)}</tbody>
+            </table>
+          </div>
+        </>
+      ) : null}
+    </Card>
+  );
+}
+
 function UsersCard() {
   const toast = useToast();
   const { user: me } = useAuth();
@@ -404,6 +559,8 @@ export default function Settings() {
       </Card>
 
       <SendingCard data={data} isAdmin={isAdmin} onSaved={load} />
+
+      <WebsiteCard data={data} isAdmin={isAdmin} onSaved={load} />
 
       {isAdmin ? <UsersCard /> : null}
 

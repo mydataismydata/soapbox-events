@@ -1104,6 +1104,25 @@ button.chip.active,
   white-space: nowrap;
 }
 
+/* Small copy button beside a value in a table cell. It stays muted until
+   pointed at, and shows a green tick for a moment after a copy. */
+.copy-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--c-faint);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.copy-btn:hover { background: var(--c-surface-3); color: var(--c-ink); }
+.copy-btn.is-copied { color: var(--c-ok); }
+
 .kv {
   display: flex;
   gap: var(--sp-3);

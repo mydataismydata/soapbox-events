@@ -387,6 +387,43 @@ export function CopyBox({ value }) {
   );
 }
 
+// Icon-only copy button that sits beside a value, such as an email address in
+// a table row. After a copy the icon turns into a tick for a moment, and a
+// hidden status line says so to screen readers. That line sits beside the
+// button, not inside it: a button's children are not read out. The click
+// stops here, so a clickable row underneath never sees it.
+export function CopyButton({ value, label = 'Copy', copiedLabel = 'Copied' }) {
+  const toast = useToast();
+  const [copied, setCopied] = useState(false);
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  async function copy(e) {
+    e.stopPropagation();
+    try {
+      // navigator.clipboard does not exist outside a secure context (plain
+      // http to a LAN address). That throws here and lands in the catch, the
+      // same as a browser refusing permission.
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast('Could not copy — select the text manually', 'bad');
+    }
+  }
+
+  return (
+    <>
+      <button type="button" className={`copy-btn${copied ? ' is-copied' : ''}`}
+        title={copied ? copiedLabel : label} aria-label={label} onClick={copy}>
+        <Icon name={copied ? 'check' : 'copy'} size={14} />
+      </button>
+      <span className="sr-only" role="status">{copied ? copiedLabel : ''}</span>
+    </>
+  );
+}
+
 // Insert text at the caret of a textarea/input controlled by React.
 export function insertAtCursor(ref, current, snippet, onChange) {
   const el = ref.current;

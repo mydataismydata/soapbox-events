@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import {
   Spinner, Modal, ConfirmModal, Empty, Field, useToast, Badge, Banner, Card,
-  IconButton, Icon, SortTh, useSort, sortRows,
+  IconButton, Icon, SortTh, useSort, sortRows, CopyButton,
 } from '../ui.jsx';
 
 // Contacts arriving from a CSV or a guest list may only ever have had a single
@@ -344,7 +344,15 @@ export default function Contacts() {
                       {c.notes ? <div className="t-sub" title={c.notes}>{c.notes.slice(0, 60)}</div> : null}
                     </td>
                     <td><span className="t-main">{nameParts(c).last_name || '—'}</span></td>
-                    <td className="t-sub">{c.email || '—'}</td>
+                    <td className="t-sub">
+                      {c.email ? (
+                        <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+                          <span>{c.email}</span>
+                          <CopyButton value={c.email} label="Copy email address"
+                            copiedLabel="Email address copied" />
+                        </div>
+                      ) : '—'}
+                    </td>
                     <td className="t-sub">{c.phone || '—'}</td>
                     <td>
                       <div className="chip-row">

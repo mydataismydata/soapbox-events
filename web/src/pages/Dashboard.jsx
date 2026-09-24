@@ -81,14 +81,18 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Each tile opens the page its number comes from. The events list
+          leads with its Upcoming section and the email log with the newest,
+          so neither needs a filter to land on what was counted. */}
       <StatGrid>
-        <Stat icon="ticket" label="Upcoming events" value={counts.upcoming}
+        <Stat icon="ticket" label="Upcoming events" value={counts.upcoming} to="/events"
           sub={`${counts.drafts} draft${counts.drafts === 1 ? '' : 's'}`} />
-        <Stat icon="user" label="Contacts" value={counts.contacts}
+        <Stat icon="user" label="Contacts" value={counts.contacts} to="/contacts"
           sub={`${counts.groups} group${counts.groups === 1 ? '' : 's'}`} />
-        <Stat icon="mail" label="Emails this month" value={month_emails}
+        <Stat icon="mail" label="Emails this month" value={month_emails} to="/emails"
           sub={quota?.configured ? 'via SMTP2GO' : 'simulation mode'} />
         <Stat icon="send" label="Email quota left" value={<QuotaValue quota={quota} />}
+          to="/settings#sending"
           sub={quota?.configured && !quota.error
             ? `${quota.used} of ${quota.max} used this cycle`
             : quota?.configured ? quota.error : 'no SMTP2GO key yet'} />

@@ -4,6 +4,7 @@
 import React, {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from 'react';
+import { Link } from 'react-router-dom';
 import Icon from './icons.jsx';
 
 // --- theme -----------------------------------------------------------------
@@ -193,15 +194,20 @@ export function StatGrid({ children, style }) {
   return <div className="stat-grid" style={style}>{children}</div>;
 }
 
-export function Stat({ icon, label, value, sub, tone }) {
-  return (
-    <div className={`stat${tone ? ` tone-${tone}` : ''}`}>
+// With `to`, the whole tile is a link to the page its number is counted from.
+export function Stat({ icon, label, value, sub, tone, to }) {
+  const cls = `stat${tone ? ` tone-${tone}` : ''}`;
+  const body = (
+    <>
       {icon ? <div className="stat-ico"><Icon name={icon} size={15} /></div> : null}
       <div className="label">{label}</div>
       <div className="value">{value}</div>
       {sub != null ? <div className="sub">{sub}</div> : null}
-    </div>
+    </>
   );
+  return to
+    ? <Link className={cls} to={to}>{body}</Link>
+    : <div className={cls}>{body}</div>;
 }
 
 // A selectable option card with a radio mark — used for RSVP mode and the

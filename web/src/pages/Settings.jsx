@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { api, timeAgo } from '../api.js';
 import { useAuth } from '../App.jsx';
 import { Spinner, Modal, Field, useToast, Badge, Banner, Card, Icon } from '../ui.jsx';
@@ -75,7 +76,7 @@ function SendingCard({ data, isAdmin, onSaved }) {
   const dirty = keyChanged || SENDING_FIELDS.some((k) => form[k] !== saved[k]);
 
   return (
-    <Card title="Email sending">
+    <Card id="sending" title="Email sending">
       {quota ? (
         simulation ? (
           <Banner tone="warn">
@@ -483,6 +484,8 @@ export default function Settings() {
   const [defStart, setDefStart] = useState('');
   const [defEnd, setDefEnd] = useState('');
   const [busy, setBusy] = useState(false);
+  const { hash } = useLocation();
+  const loaded = Boolean(data);
 
   async function load() {
     const d = await api.get('/api/settings');
@@ -492,6 +495,14 @@ export default function Settings() {
     setDefEnd(d.settings.default_end_time || '');
   }
   useEffect(() => { load().catch((e) => toast(e.message, 'bad')); }, []);
+
+  // The dashboard's quota tile links to #sending. The cards only exist once
+  // the settings have loaded, which is after the browser has already looked
+  // for the anchor, so jump to it here. Keyed on the first load, not on
+  // `data`, or every save further up the page would scroll away from it.
+  useEffect(() => {
+    if (loaded && hash) document.getElementById(hash.slice(1))?.scrollIntoView();
+  }, [loaded, hash]);
 
   if (!data) return <div className="page"><Spinner /></div>;
 

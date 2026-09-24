@@ -25,6 +25,9 @@
   box-shadow: var(--sh-xs);
 }
 .card + .card { margin-top: var(--sp-4); }
+/* A card another page links straight to (Settings#sending) stops clear of the
+   sticky topbar instead of sliding under it. */
+.card[id] { scroll-margin-top: calc(var(--topbar-h) + var(--sp-4)); }
 .card-pad { padding: var(--sp-4) var(--sp-5); }
 .card-title {
   font-size: var(--fs-md);
@@ -114,6 +117,19 @@
 .stat.tone-ok .value { color: var(--c-ok); }
 .stat.tone-bad .value { color: var(--c-bad); }
 .stat.tone-warn .value { color: var(--c-warn); }
+
+/* A stat that links somewhere. It keeps its own colours rather than turning
+   into link text, and lifts on hover the way a table row does. The strip
+   clips its tiles, so the focus ring is drawn inside the edge, square. */
+a.stat {
+  color: var(--c-ink);
+  text-decoration: none;
+  transition: background var(--transition);
+}
+a.stat:hover { background: var(--c-surface-2); text-decoration: none; }
+a.stat .stat-ico { transition: background var(--transition), color var(--transition); }
+a.stat:hover .stat-ico { background: var(--c-accent-soft); color: var(--c-accent-text); }
+a.stat:focus-visible { outline-offset: -2px; border-radius: 0; }
 
 /* Compact per-row counters (dashboard event rows). */
 .mini-tiles {

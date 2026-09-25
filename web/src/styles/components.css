@@ -25,6 +25,10 @@
   box-shadow: var(--sh-xs);
 }
 .card + .card { margin-top: var(--sp-4); }
+/* Cards side by side already get the grid's gap; the stacking margin above
+   would drop every card after the first below its neighbours. */
+.grid2 > .card + .card,
+.grid3 > .card + .card { margin-top: 0; }
 /* A card another page links straight to (Settings#sending) stops clear of the
    sticky topbar instead of sliding under it. */
 .card[id] { scroll-margin-top: calc(var(--topbar-h) + var(--sp-4)); }
@@ -48,6 +52,9 @@
   min-height: 46px;
 }
 .card-head .card-title { margin: 0; }
+/* A small button reaches into the strip's padding rather than growing it, so
+   a header with an action is as tall as one without and titles line up. */
+.card-head .btn-sm { margin-block: -5px; }
 .card-head-sub {
   font-size: var(--fs-sm);
   color: var(--c-muted);

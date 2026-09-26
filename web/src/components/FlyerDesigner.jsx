@@ -81,6 +81,11 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
   const wide = Boolean(presets?.styles.find((s) => s.id === flyer.style)?.landscape);
   const slotCount = wide ? 1 : 3;
 
+  // The photo templates (Dark, Light) take a full-bleed background photo. The
+  // style's `photo` value is its tone, which decides how the field is worded.
+  const photoTone = presets?.styles.find((s) => s.id === flyer.style)?.photo || '';
+  const shadeName = photoTone === 'light' ? 'white' : 'black';
+
   // Featured images live in parallel arrays (imageTokens / imageCaptions), one
   // entry per slot. imageToken / imageCaption mirror the first slot so older
   // readers still work. These helpers always write both the arrays and mirror.
@@ -124,9 +129,9 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
     }
   }
 
-  // The Dark template's full-bleed background photo. It uploads through the same
-  // endpoint as featured images but lives in its own token (flyer.bgToken); the
-  // renderer lays a gradient scrim over it so the text stays legible.
+  // The photo templates' full-bleed background photo. It uploads through the
+  // same endpoint as featured images but lives in its own token (flyer.bgToken);
+  // the renderer lays a reverse vignette over it so the text stays legible.
   async function uploadBg(file) {
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) { toast('Images must be 5 MB or smaller', 'bad'); return; }
@@ -242,11 +247,11 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
     </Field>
   );
 
-  // The Dark template paints an uploaded photo across the whole flyer. Only that
-  // template uses it, so the field appears when Dark is selected.
-  const background = flyer.style === 'dark' ? (
+  // The photo templates paint an uploaded photo across the flyer. Only they use
+  // it, so the field appears when one of them is selected.
+  const background = photoTone ? (
     <Field label="Background image"
-      hint="Sits behind the text and is darkened with a gradient so the words stay readable. Tall/portrait photos work best. JPEG/PNG/GIF/WebP up to 5 MB.">
+      hint={`Sits behind the text and is ${photoTone === 'light' ? 'lightened' : 'darkened'} with a gradient so the words stay readable. Tall/portrait photos work best. JPEG/PNG/GIF/WebP up to 5 MB.`}>
       <input ref={bgFileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
         style={{ display: 'none' }} onChange={(e) => uploadBg(e.target.files?.[0])} />
       <div className="row">
@@ -269,12 +274,12 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
             <input type="checkbox" checked={!!flyer.bgTopHalf}
               onChange={(e) => set({ bgTopHalf: e.target.checked })} />
             <span><span className="cb-label">Overlay on top half only</span>
-              <div className="cb-sub">Fits the photo to the flyer’s width along the top and fades it into solid black from halfway down, so the lower half is plain black.</div></span>
+              <div className="cb-sub">Fits the photo to the flyer’s width along the top and fades it into solid {shadeName} from halfway down, so the lower half is plain {shadeName}.</div></span>
           </label>
         </div>
       ) : (
         <p className="small muted" style={{ marginTop: 8 }}>
-          No image yet — the flyer shows a deep navy gradient until you add one.
+          No image yet — the flyer shows a {photoTone === 'light' ? 'soft white' : 'deep navy'} gradient until you add one.
         </p>
       )}
     </Field>

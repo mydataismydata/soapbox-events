@@ -209,14 +209,14 @@ const deadline = new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)
   check('create event', r.status === 201 && eventId > 0 && /^[a-z0-9]{10}$/.test(eventSlug || ''));
 
   const upd = await A.api('PUT', `/api/events/${eventId}`, {
-    flyer: { style: 'red', font: 'sans', scale: 'l', eyebrow: 'Save the date', tagline: 'Dinner & dancing',
+    flyer: { style: 'retro', font: 'sans', scale: 'l', eyebrow: 'Save the date', tagline: 'Dinner & dancing',
       contact: 'Questions? Call Jane', showAddress: true, bgTopHalf: true,
       imageColumns: 3, imageTokens: ['imgAAAAAA', 'imgBBBBBB', 'imgCCCCCC'], imageCaptions: ['Ada Speaker', 'Grace Speaker', 'Alan Speaker'] },
     email_subject: "You're invited: {{event_title}}",
     email_body: 'Hi {{first_name}},\n\nJoin us at {{venue_name}} on {{event_date}}.\n\nRSVP: {{rsvp_link}}',
   });
   const uflyer = upd.data?.event?.flyer || {};
-  check('update event + flyer', upd.status === 200 && uflyer.style === 'red');
+  check('update event + flyer', upd.status === 200 && uflyer.style === 'retro');
   check('flyer stores 3 image columns', uflyer.imageColumns === 3 && Array.isArray(uflyer.imageTokens) && uflyer.imageTokens.length === 3);
   check('flyer image tokens + captions stored', uflyer.imageTokens?.[2] === 'imgCCCCCC' && uflyer.imageCaptions?.[1] === 'Grace Speaker');
   check('flyer mirrors first image for legacy readers', uflyer.imageToken === 'imgAAAAAA' && uflyer.imageCaption === 'Ada Speaker');
@@ -425,9 +425,11 @@ let guests = [];
   const pres = await A.api('GET', '/api/flyer/presets');
   const ids = (pres.data?.styles || []).map((s) => s.id);
   check('six templates, four portrait then two wide',
-    ids.join(',') === 'classic,dark,red,retro,spotlight,panel', ids.join(','));
+    ids.join(',') === 'classic,dark,light,retro,spotlight,panel', ids.join(','));
   const wideIds = (pres.data?.styles || []).filter((s) => s.landscape).map((s) => s.id);
   check('wide templates flagged for the designer', wideIds.join(',') === 'spotlight,panel', wideIds.join(','));
+  const photoStyles = (pres.data?.styles || []).filter((s) => s.photo).map((s) => `${s.id}:${s.photo}`);
+  check('photo templates flagged with their tone', photoStyles.join(',') === 'dark:dark,light:light', photoStyles.join(','));
 
   // The Dark template paints an uploaded photo as a full-bleed background under
   // a legibility scrim; with no image it falls back to a gradient ground.
@@ -457,6 +459,24 @@ let guests = [];
       && darkTopHtml.includes('max-height:calc(50% + ') && darkTopHtml.includes('mask-image:linear-gradient')
       && !darkTopHtml.includes("background-image:url('"));
   check('dark top-half keeps the vignette over the photo', darkTopHtml.includes('filter:blur('));
+  // Light is Dark with white for black: the same vignette core and the same
+  // top-half fade, byte for byte, in the other colour.
+  const renderStyle = async (style, extra = {}) => (await A.raw('POST', '/api/flyer/preview', {
+    body: { event: { title: 'Gala Evening', date: future }, flyer: { style, bgToken: 'bgIMGxxxx', ...extra } },
+  })).text();
+  const coreOf = (h) => (h.match(/<div style="position:absolute; inset:[^"]*filter:blur\([^)]*\);"><\/div>/) || [''])[0];
+  const boxOf = (h) => (h.match(/<div style="position:absolute; top:0; left:0; right:0; max-height:[^"]*">/) || [''])[0];
+  const [darkCover, lightCover] = [await renderStyle('dark'), await renderStyle('light')];
+  check('light has the same vignette core as dark, in white', coreOf(lightCover) !== ''
+    && coreOf(lightCover) === coreOf(darkCover).replace('rgba(6,9,16,1)', '#ffffff'));
+  const [darkHalf, lightHalf] = [await renderStyle('dark', { bgTopHalf: true }), await renderStyle('light', { bgTopHalf: true })];
+  check('light has the same top-half fade as dark, into white', boxOf(lightHalf) !== ''
+    && boxOf(lightHalf) === boxOf(darkHalf) && lightHalf.includes('background-color:#ffffff;'));
+  const lightPlain = await (await A.raw('POST', '/api/flyer/preview', {
+    body: { event: { title: 'Gala Evening', date: future }, flyer: { style: 'light' } },
+  })).text();
+  check('light with no image uses a soft white ground',
+    !lightPlain.includes('/files/') && lightPlain.includes('radial-gradient(120% 85% at 50% 0%, #ffffff 0%'));
 
   // A long tagline must shrink and wrap rather than run off the flyer's edge.
   const longTag = 'Doors open early for coffee, live music, and a neighbourhood potluck supper';
@@ -616,7 +636,7 @@ let guests = [];
     subject: 'Our endorsements for {{org_name}}',
     body: 'Hi {{first_name}},\n\nHere are our picks for the primary.\n\n— {{org_name}}',
     web_version: true,
-    flyer: { style: 'red', eyebrow: 'Announcement' },
+    flyer: { style: 'light', eyebrow: 'Announcement' },
   });
   const bId = cr.data?.broadcast?.id;
   const bSlug = cr.data?.broadcast?.slug;

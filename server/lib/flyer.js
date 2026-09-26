@@ -2,19 +2,21 @@
 // size scale, short text slots, optional featured images) and rendered to
 // self-contained HTML with inline styles only. Each style is a self-contained
 // template with its own fixed colours — there is no separate palette to pick.
-// The Dark style additionally takes an uploaded background photo. The same
-// renderer backs the designer's live preview and the public event landing page,
-// so what you design is exactly what guests see.
+// The Dark and Light styles additionally take an uploaded background photo. The
+// same renderer backs the designer's live preview and the public event landing
+// page, so what you design is exactly what guests see.
 import { esc } from './html.js';
 import { formatDate, formatTimeRange } from './format.js';
 
 // `landscape: true` marks the wide templates: they run side-on, with the type
 // on the left and a single tall photo down the right, so they take one image
-// instead of three and render on a wider card.
+// instead of three and render on a wider card. `photo` marks the templates that
+// take a background photo; its value is the template's tone ('dark' / 'light'),
+// which the designer uses to show the Background image field and word it.
 export const STYLES = [
   { id: 'classic', label: 'Classic', description: 'Ivory card in a fine gold double-frame — a star emblem, a large title-case headline and small-caps details. Formal and understated.' },
-  { id: 'dark', label: 'Dark', description: 'A full-bleed background photo under a dark gradient, with bright type and a gold accent. Add a background image below. Dramatic and modern.' },
-  { id: 'red', label: 'Red', description: 'Bold red inside a starred white border, a small waving flag, tagline on a straight ribbon.' },
+  { id: 'dark', label: 'Dark', photo: 'dark', description: 'A full-bleed background photo under a dark gradient, with bright type and a gold accent. Add a background image below. Dramatic and modern.' },
+  { id: 'light', label: 'Light', photo: 'light', description: 'A full-bleed background photo under a white gradient, with dark type and a gold accent. Add a background image below. Bright and airy.' },
   { id: 'retro', label: 'Retro', description: 'Vintage navy, red and parchment stripes. All type — no photo needed.' },
   { id: 'spotlight', label: 'Spotlight', landscape: true, description: 'Wide. Bright-blue-to-midnight gradient, details on a white card, your photo standing at the right.' },
   { id: 'panel', label: 'Panel', landscape: true, description: 'Wide. Deep navy with a huge headline, an oversized date and a full-height photo panel.' },
@@ -31,15 +33,21 @@ const THEMES = {
   // emblem); `goldText` is the darker gold that passes AA on ivory for the
   // small-caps eyebrow and host line.
   classic: { bg: '#f6f1e6', ink: '#1a2a4f', accent: '#1a2a4f', accent2: '#b0873a', red: '#9c2b2e', navy: '#1a2a4f', gold: '#b0873a', goldSoft: '#d8c49a', goldText: '#836326' },
-  // Deep near-black ground under an uploaded photo. `ground` is the no-photo
-  // fallback; the renderer lays a rectangular reverse-vignette over any image
-  // (black centre, photo revealed in a frame at the edges) so the text stays
-  // legible. `gold` is the accent for the eyebrow, emblem, RSVP outline and host
-  // line.
-  dark: { bg: '#0b0f1a', ink: '#f6f8fc', accent: '#c8a24a', accent2: '#c8a24a', red: '#c8a24a', navy: '#0b0f1a',
-    gold: '#d3b063', muted: 'rgba(246,248,252,0.76)', faint: 'rgba(246,248,252,0.58)',
+  // The two photo templates share one renderer (renderPhoto) and differ only
+  // here. `shade` is what the reverse vignette and the top-half fade go to —
+  // black on Dark, white on Light — and the card itself in top-half mode.
+  // `ground` is the no-photo fallback, `glow` the soft shadow behind every line
+  // of type, and `frame` / `frameBg` edge a featured image. `gold` is the
+  // decorative accent (emblem, rules, RSVP outline) and `goldText` the gold
+  // that type is set in — darker on Light, so it passes AA on white.
+  dark: { bg: '#0b0f1a', shade: 'rgba(6,9,16,1)', ink: '#f6f8fc', accent: '#c8a24a', accent2: '#c8a24a', red: '#c8a24a', navy: '#0b0f1a',
+    gold: '#d3b063', goldText: '#d3b063', muted: 'rgba(246,248,252,0.76)', faint: 'rgba(246,248,252,0.58)',
+    glow: 'rgba(0,0,0,0.55)', frame: 'rgba(255,255,255,0.85)', frameBg: 'rgba(255,255,255,0.08)',
     ground: 'radial-gradient(120% 85% at 50% 0%, #1c2745 0%, #0b0f1a 58%, #05070d 100%)' },
-  red: { bg: '#bb392c', ink: '#ffffff', accent: '#bb392c', accent2: '#16264c', red: '#bb392c', navy: '#16264c', ribbon: '#16264c', ribbonInk: '#ffffff' },
+  light: { bg: '#ffffff', shade: '#ffffff', ink: '#1a2a4f', accent: '#1a2a4f', accent2: '#b0873a', red: '#b0873a', navy: '#1a2a4f',
+    gold: '#b0873a', goldText: '#836326', muted: 'rgba(26,42,79,0.74)', faint: 'rgba(26,42,79,0.66)',
+    glow: 'rgba(255,255,255,0.7)', frame: 'rgba(26,42,79,0.16)', frameBg: '#ffffff',
+    ground: 'radial-gradient(120% 85% at 50% 0%, #ffffff 0%, #f6f8fb 58%, #e9edf3 100%)' },
   retro: { bg: '#1e3a5f', ink: '#ece3cb', accent: '#1e3a5f', accent2: '#c0432f', red: '#c0432f', navy: '#1e3a5f', parchment: '#ddd2b4' },
   spotlight: { bg: '#0a1440', ink: '#ffffff', accent: '#12307f', accent2: '#e4f065', red: '#c02c39', navy: '#0a1440',
     // Bright blue on the left running down to near-black navy on the right.
@@ -79,8 +87,8 @@ export const DEFAULT_FLYER = {
   imageCaption: '', // legacy mirror of imageCaptions[0]
   includeFlyerImage: false, // show a picture of the flyer in the invitation email
   flyerImageToken: '', // upload token of that picture, rendered by the designer
-  bgToken: '', // full-bleed background image, used by the Dark template
-  bgTopHalf: false, // Dark: fit that image to the width along the top, fading to black from halfway down
+  bgToken: '', // full-bleed background image, used by the photo templates (Dark, Light)
+  bgTopHalf: false, // photo templates: fit that image to the width along the top, fading out from halfway down
 };
 
 export function normalizeFlyer(raw) {
@@ -255,36 +263,6 @@ function rsvpBadge(scale, { bg, ink, marginTop = 0 }) {
     padding:${px(6 * scale)} ${px(16 * scale)}; border-radius:999px;">RSVP Requested</span></div>`;
 }
 
-// A centred banner for the tagline: a flat bar with flag-notched ends. It caps
-// its width and wraps — a long tagline shrinks and then runs onto a second line
-// rather than pushing out past the flyer's edge.
-const RIBBON_MAX = 400;
-
-function straightRibbon(text, { bandColor, ink, scale, font }) {
-  if (!text) return '';
-  const notch = px(14 * scale);
-  return `<span style="display:inline-block; max-width:${px(RIBBON_MAX * scale)}; margin-top:${px(20 * scale)};
-    background:${bandColor}; color:${ink}; font-family:${font.heading}; font-weight:800;
-    font-size:${px(fitSize(text, 15 * scale, 34, { min: 0.62 }))}; letter-spacing:0.08em; line-height:1.3;
-    text-transform:uppercase; text-align:center; padding:${px(10 * scale)} ${px(34 * scale)};
-    clip-path:polygon(0 0, 100% 0, calc(100% - ${notch}) 50%, 100% 100%, 0 100%, ${notch} 50%);">${esc(text)}</span>`;
-}
-
-// Shared centred date/time/venue/host block used by the white and red
-// templates. `ink` is the main colour, `sub` the muted one.
-function metaStacked({ event, flyer, hostLine, scale, ink, sub }) {
-  const w = whenParts(event);
-  const parts = [];
-  if (w.date) parts.push(`<div style="font-size:${px(16 * scale)}; font-weight:800; color:${ink};">${esc(w.date)}</div>`);
-  if (w.time) parts.push(`<div style="font-size:${px(14 * scale)}; margin-top:3px; color:${sub};">${esc(w.time)}</div>`);
-  if (event.venue_name) parts.push(`<div style="font-size:${px(14.5 * scale)}; margin-top:10px; font-weight:700; color:${ink};">${esc(event.venue_name)}</div>`);
-  if (flyer.showAddress && event.venue_address) parts.push(`<div style="font-size:${px(13 * scale)}; margin-top:2px; color:${sub};">${esc(event.venue_address)}</div>`);
-  if (hostLine) parts.push(`<div style="font-size:${px(11.5 * scale)}; margin-top:14px; text-transform:uppercase; letter-spacing:0.16em; color:${sub};">${esc(hostLine)}</div>`);
-  if (flyer.contact) parts.push(`<div style="font-size:${px(12.5 * scale)}; margin-top:8px; color:${sub};">${esc(flyer.contact)}</div>`);
-  if (!parts.length) return '';
-  return `<div style="margin-top:${px(22 * scale)};">${parts.join('')}</div>`;
-}
-
 // The venue/time line shared by the compact templates: venue name and time
 // always show; the address is opt-in via the flyer's showAddress toggle.
 function venueTimeBits(event, flyer) {
@@ -340,35 +318,6 @@ function bigDateParts(iso) {
 }
 
 // --- templates -------------------------------------------------------------
-
-function renderRed({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta }) {
-  const c = colors;
-  const corner = (pos) => `<span style="position:absolute; ${pos} color:#ffffff; background:${c.bg}; font-size:22px; line-height:1; padding:0 2px;">&#9733;</span>`;
-  const eyebrow = flyer.eyebrow ? `<div style="display:flex; align-items:center; justify-content:center; gap:${px(12 * scale)};
-      color:#fff; font-family:${font.heading}; font-weight:700; font-size:${px(fitSize(flyer.eyebrow, 17 * scale, 30))};
-      letter-spacing:0.14em; text-transform:uppercase;">
-      <span style="font-size:${px(12 * scale)};">&#9733;</span>${esc(flyer.eyebrow)}<span style="font-size:${px(12 * scale)};">&#9733;</span></div>` : '';
-  const img = featuredImages(images, { scale, colors: c, frame: imageFrame('#ffffff', '#ffffff'), captionColor: 'rgba(255,255,255,0.85)', marginTop: 18 });
-  const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp' ? rsvpBadge(scale, { bg: c.navy, ink: '#ffffff', marginTop: 20 }) : '';
-  const rule = `<div style="height:2px; width:70%; background:rgba(255,255,255,0.85); margin:${px(20 * scale)} auto;"></div>`;
-  const meta = hideEventMeta ? '' : metaStacked({ event, flyer, hostLine, scale, ink: '#ffffff', sub: 'rgba(255,255,255,0.82)' });
-  return `
-    <div style="background:${c.bg}; padding:16px;">
-      <div style="position:relative; border:2px dashed rgba(255,255,255,0.9); padding:${px(34 * scale)} ${px(26 * scale)} ${px(34 * scale)}; text-align:center;">
-        ${corner('top:-11px; left:-11px;')}${corner('top:-11px; right:-11px;')}
-        ${corner('bottom:-11px; left:-11px;')}${corner('bottom:-11px; right:-11px;')}
-        ${eyebrow}
-        <div style="font-family:${font.heading}; font-weight:800; color:#ffffff; font-size:${px(fitSize(event.title, 50 * scale, 16))};
-          line-height:1.03; text-transform:uppercase; margin-top:${px(10 * scale)};">${esc(event.title || 'Untitled event')}</div>
-        <div style="display:flex; justify-content:center;">${straightRibbon(flyer.tagline, { bandColor: c.ribbon, ink: c.ribbonInk, scale, font })}</div>
-        ${img}
-        ${rsvp}
-        ${flyer.note ? `${rule}<div style="color:#fff; font-family:${font.heading}; font-weight:800; font-size:${px(fitSize(flyer.note, 17 * scale, 34))};
-          letter-spacing:0.03em; text-transform:uppercase; line-height:1.3;">${esc(flyer.note)}</div>` : ''}
-        ${meta ? `${rule}${meta}` : (flyer.note ? rule : '')}
-      </div>
-    </div>`;
-}
 
 function renderRetro({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta }) {
   const c = colors;
@@ -621,23 +570,25 @@ function fadeOutMask(band) {
   return `linear-gradient(to bottom, ${stops.join(', ')})`;
 }
 
-// A dramatic dark invitation. An uploaded photo (the flyer's Background image)
-// fills the card, and a rectangular "reverse vignette" — a blurred solid-black
-// core inset from the edges — hides the photo behind the text and reveals it
-// only in a frame around the card. With "Overlay on top half only" the photo is
-// instead fitted to the width along the top and fades to black from halfway
-// down, with the same vignette over the part it shows in. Every line also
-// carries a soft shadow. With no photo it falls back to a rich radial navy
+// The photo templates, Dark and Light — one renderer, two palettes (see THEMES),
+// so their vignetting and fades are identical and only the colours differ. An
+// uploaded photo (the flyer's Background image) fills the card, and a
+// rectangular "reverse vignette" — a blurred solid core of `shade` (black on
+// Dark, white on Light) inset from the edges — hides the photo behind the text
+// and reveals it only in a frame around the card. With "Overlay on top half
+// only" the photo is instead fitted to the width along the top and fades into
+// `shade` from halfway down, with the same vignette over the part it shows in.
+// Every line also carries a soft glow. With no photo it falls back to a radial
 // ground, so the style still looks intentional on its own.
-function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, bgUrl }) {
+function renderPhoto({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, bgUrl }) {
   const c = colors;
   const w = whenParts(event);
   const vb = venueTimeBits(event, flyer);
   const bright = c.ink;
 
-  // `shade` is the black the vignette and the top-half fade both go to, and
+  // `shade` is what the vignette and the top-half fade both go to, and
   // `feather` the vignette's blur radius — shared so the two feather alike.
-  const shade = 'rgba(6,9,16,1)';
+  const shade = c.shade;
   const feather = 28 * scale;
   const topHalf = Boolean(bgUrl && flyer.bgTopHalf);
 
@@ -645,7 +596,7 @@ function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideE
   // inside a double-quoted style="" attribute, so it uses single quotes
   // internally; bgUrl is a server-built /files/<token> URL (alphanumeric token),
   // so it carries no quotes of its own. In top-half mode the card itself is
-  // plain `shade`, so the blacked-out lower half has no seam against it.
+  // plain `shade`, so the faded-out lower half has no seam against it.
   let bg;
   if (topHalf) bg = `background-color:${shade};`;
   else if (bgUrl) bg = `background-color:${c.bg}; background-image:url('${esc(bgUrl)}'); background-size:cover; background-position:center; background-repeat:no-repeat;`;
@@ -659,7 +610,7 @@ function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideE
   // edge instead, so there is never a hard line where the photo ends. It is a
   // mask rather than a black overlay: the box can end on a fraction of a pixel,
   // and an overlay lets a sliver of the photo bleed through on that last row as
-  // a faint bright line, whereas a mask makes the photo itself transparent.
+  // a faint visible line, whereas a mask makes the photo itself transparent.
   const band = 4 * feather;
   const mask = fadeOutMask(band);
   const photo = topHalf
@@ -668,12 +619,12 @@ function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideE
         <img src="${esc(bgUrl)}" alt="" style="display:block; width:100%; height:auto;"></div>`
     : '';
 
-  // The reverse vignette: a solid-black rounded rectangle inset from the card
-  // edges, blurred so its edges feather in both directions and melt into the
-  // photo — no hard outline, just a soft rectangular dark field. The blur is
+  // The reverse vignette: a solid rounded rectangle of `shade` inset from the
+  // card edges, blurred so its edges feather in both directions and melt into
+  // the photo — no hard outline, just a soft rectangular field. The blur is
   // kept to under half the inset (28 vs 60) so the feather dies out before the
-  // card edge, leaving the photo clean and bright at the perimeter with no dark
-  // ring; the inset stays under the content padding (below) so every line of
+  // card edge, leaving the photo clean at the perimeter with no shaded ring;
+  // the inset stays under the content padding (below) so every line of
   // text sits on the solid centre. It applies in top-half mode too, over the
   // part of the card the photo shows in. A separate element (not a background
   // layer) so it can carry the blur without touching the crisp text above it.
@@ -691,9 +642,10 @@ function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideE
     <span style="color:${c.gold}; font-size:${px(10 * scale)}; line-height:1;">&#9670;</span>
     <div style="height:1px; width:${px(66 * scale)}; background:${c.gold};"></div></div>`;
 
-  // Featured images get a translucent-white frame so they read as part of the
-  // photo rather than a hard white block.
-  const img = featuredImages(images, { scale, colors: c, frame: imageFrame('rgba(255,255,255,0.85)', 'rgba(255,255,255,0.08)'), captionColor: c.muted, marginTop: 22 });
+  // Featured images get a soft frame in the palette's tone — translucent white
+  // on Dark, a faint ink hairline on Light — so they read as part of the flyer
+  // rather than a hard block.
+  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.frame, c.frameBg), captionColor: c.muted, marginTop: 22 });
 
   const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp'
     ? `<div style="margin-top:${px(20 * scale)};"><span style="display:inline-block; border:1.5px solid ${c.gold}; color:${bright};
@@ -707,17 +659,17 @@ function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideE
     if (w.time) meta.push(`<div style="font-size:${px(14 * scale)}; margin-top:${px(3 * scale)}; color:${c.muted};">${esc(w.time)}</div>`);
     if (vb.venue) meta.push(`<div style="font-size:${px(15 * scale)}; margin-top:${px(10 * scale)}; font-weight:700; color:${bright};">${esc(vb.venue)}</div>`);
     if (hostLine) meta.push(`<div style="font-family:${font.heading}; font-weight:700; font-size:${px(11 * scale)}; margin-top:${px(14 * scale)};
-      letter-spacing:0.18em; text-transform:uppercase; color:${c.gold};">${esc(hostLine)}</div>`);
+      letter-spacing:0.18em; text-transform:uppercase; color:${c.goldText};">${esc(hostLine)}</div>`);
     if (flyer.contact) meta.push(`<div style="font-size:${px(12.5 * scale)}; margin-top:${px(8 * scale)}; color:${c.muted};">${esc(flyer.contact)}</div>`);
   }
   const metaBlock = meta.length ? `<div style="margin-top:${px(20 * scale)};">${meta.join('')}</div>` : '';
   const showDivider = !hideEventMeta && (meta.length || rsvp);
 
   const content = `
-    <div style="position:relative; z-index:1; text-align:center; text-shadow:0 1px 3px rgba(0,0,0,0.55);">
+    <div style="position:relative; z-index:1; text-align:center; text-shadow:0 1px 3px ${c.glow};">
       ${emblem}
       ${flyer.eyebrow ? `<div style="font-family:${font.heading}; font-weight:700; font-size:${px(fitSize(flyer.eyebrow, 14 * scale, 34))};
-        letter-spacing:0.24em; text-transform:uppercase; color:${c.gold};">${esc(flyer.eyebrow)}</div>` : ''}
+        letter-spacing:0.24em; text-transform:uppercase; color:${c.goldText};">${esc(flyer.eyebrow)}</div>` : ''}
       <div style="font-family:${font.heading}; font-weight:800; font-size:${px(fitSize(event.title, 46 * scale, 15))}; line-height:1.06;
         color:${bright}; margin-top:${px(10 * scale)};">${esc(event.title || 'Untitled event')}</div>
       ${flyer.tagline ? `<div style="font-size:${px(fitSize(flyer.tagline, 16.5 * scale, 48, { min: 0.7 }))}; font-style:italic; line-height:1.4;
@@ -739,9 +691,8 @@ function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideE
 }
 
 const RENDERERS = {
-  classic: renderClassic, dark: renderDark,
-  red: renderRed, retro: renderRetro,
-  spotlight: renderSpotlight, panel: renderPanel,
+  classic: renderClassic, dark: renderPhoto, light: renderPhoto,
+  retro: renderRetro, spotlight: renderSpotlight, panel: renderPanel,
 };
 
 // hideEventMeta drops the date/time/venue/host block so the same styles power

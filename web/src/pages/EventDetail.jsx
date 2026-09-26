@@ -211,7 +211,7 @@ export default function EventDetail() {
                 + (doc.flyer_image ? ' with the flyer' : ' (no flyer picture)'));
             } catch (err) { toast(err.message, 'bad'); }
             finally { setExporting(false); }
-          }}><Icon name="download" size={14} /> {exporting ? 'Exporting…' : 'Export for WordPress'}</button>
+          }}><Icon name="download" size={14} /> {exporting ? 'Exporting…' : 'Export to site'}</button>
           {ev.status === 'published'
             ? <button className="btn btn-danger" onClick={() => setConfirm({ type: 'cancel' })}>Cancel event</button>
             : <button className="btn btn-danger" onClick={() => setConfirm({ type: 'delete' })}>

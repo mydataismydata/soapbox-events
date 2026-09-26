@@ -5,7 +5,7 @@ plugin stays in place because it builds the event pages on the main website;
 Soapbox does the inviting and collects the replies. This document is the
 contract between them.
 
-**Where:** an event's page → **Export for WordPress**. Downloads
+**Where:** an event's page → **Export to site**. Downloads
 `soapbox-<event-slug>-<date>.json`.
 
 **What it is:** a complete snapshot of one event — its details, its invitation

@@ -19,7 +19,16 @@ body {
   color: var(--c-ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: 'cv05' 1, 'ss01' 1;
+}
+
+/* Numbers, dates and amounts read straight in mono, tabular so columns of
+   figures line up. */
+.mono,
+.stat .value,
+.mini-tile .mt-value,
+.t-sub {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 h1, h2, h3, h4 {

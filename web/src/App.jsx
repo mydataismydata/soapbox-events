@@ -1,9 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { api, onUnauthorized } from './api.js';
 import { ToastProvider, ThemeProvider, ThemeToggle, Spinner } from './ui.jsx';
 import Icon from './icons.jsx';
-import Logo from './components/Logo.jsx';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import EventsList from './pages/EventsList.jsx';
@@ -24,35 +23,21 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
-// Grouped like the reference layouts: what you send, who you send it to, and
-// the reusable pieces. `group` starts a new labelled section in the rail.
-const NAV = [
-  { to: '/', label: 'Dashboard', icon: 'home', end: true },
-  { to: '/events', label: 'Events', icon: 'ticket' },
-  { to: '/broadcasts', label: 'Broadcasts', icon: 'megaphone' },
-  { group: 'Audience' },
-  { to: '/contacts', label: 'Contacts', icon: 'user' },
-  { to: '/groups', label: 'Groups', icon: 'users' },
-  { group: 'Library' },
+// The tab row carries what you send and who you send it to; the reusable
+// pieces and settings live in the account menu so the row stays short.
+const PRIMARY = [
+  { to: '/', label: 'Dashboard', end: true },
+  { to: '/events', label: 'Events' },
+  { to: '/broadcasts', label: 'Broadcasts' },
+  { to: '/contacts', label: 'Contacts' },
+  { to: '/groups', label: 'Groups' },
+];
+const MENU = [
   { to: '/venues', label: 'Venues', icon: 'pin' },
   { to: '/templates', label: 'Templates', icon: 'file' },
   { to: '/emails', label: 'Email log', icon: 'inbox' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
-
-const COLLAPSE_KEY = 'soapbox.sidebar.collapsed';
-// Below this the rail stops being a rail and becomes an off-canvas drawer.
-const NARROW = '(max-width: 900px)';
-
-// The topbar label follows the route: deepest matching nav entry wins, so
-// /events/12/edit still reads "Events".
-function sectionLabel(pathname) {
-  const items = NAV.filter((n) => n.to);
-  const match = items
-    .filter((n) => (n.end ? pathname === n.to : pathname.startsWith(n.to)))
-    .sort((a, b) => b.to.length - a.to.length)[0];
-  return match?.label || 'Soapbox';
-}
 
 function initials(name) {
   return (name || '?')
@@ -63,119 +48,95 @@ function initials(name) {
     .join('');
 }
 
-function Layout({ children }) {
-  const { user, org, app, logout } = useAuth();
+// Avatar + name button that opens the secondary navigation and sign-out. It
+// closes on a click outside, on Escape, and whenever the route changes.
+function AccountMenu({ user, logout }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
   const location = useLocation();
-  const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; }
-  });
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [isNarrow, setIsNarrow] = useState(() => window.matchMedia(NARROW).matches);
 
-  // Picking a destination closes the mobile drawer.
-  useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
-
-  // Three signals for one fact, because none of them is universally
-  // delivered: some engines (and headless viewport overrides) change width
-  // without dispatching the media-query event, or without a resize event.
-  // A ResizeObserver on the root element catches what the others miss.
-  useEffect(() => {
-    const mq = window.matchMedia(NARROW);
-    const sync = () => setIsNarrow(mq.matches);
-    mq.addEventListener('change', sync);
-    window.addEventListener('resize', sync);
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(sync) : null;
-    ro?.observe(document.documentElement);
-    return () => {
-      mq.removeEventListener('change', sync);
-      window.removeEventListener('resize', sync);
-      ro?.disconnect();
-    };
-  }, []);
+  useEffect(() => { setOpen(false); }, [location.pathname]);
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') setDrawerOpen(false); };
+    if (!open) return undefined;
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
-
-  function toggleRail() {
-    // Read the width here rather than trusting isNarrow: this decides which
-    // control the button *is*, so it must not depend on a resize event having
-    // been delivered. The state is resynced on the way past.
-    const narrow = window.matchMedia(NARROW).matches;
-    setIsNarrow(narrow);
-    // Under 900px the rail is an off-canvas drawer; above it, a width toggle.
-    if (narrow) {
-      setDrawerOpen((v) => !v);
-      return;
-    }
-    setCollapsed((v) => {
-      const next = !v;
-      try { localStorage.setItem(COLLAPSE_KEY, next ? '1' : '0'); } catch { /* private mode */ }
-      return next;
-    });
-  }
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
 
   return (
-    <div className={`shell ${collapsed ? 'is-collapsed' : ''} ${drawerOpen ? 'is-open' : ''}`}>
-      <aside className="sidebar">
-        <div className="side-head">
-          {/* Collapsed only narrows the rail on wide screens — below 900px it
-              is a drawer, which always has room for the full lockup. */}
-          <Logo className="side-logo" variant={collapsed && !isNarrow ? 'mark' : 'full'} />
-          <div className="side-org" title={org.name}>{org.name}</div>
-        </div>
-
-        <nav className="side-nav" aria-label="Main">
-          {NAV.map((item) => (item.group ? (
-            <div className="side-group" key={`g-${item.group}`}>{item.group}</div>
-          ) : (
-            <NavLink key={item.to} to={item.to} end={item.end} title={item.label}>
-              <span className="nav-ico"><Icon name={item.icon} size={17} /></span>
-              <span className="nav-label">{item.label}</span>
-            </NavLink>
-          )))}
-        </nav>
-
-        <div className="side-foot">
-          <div className="side-avatar" aria-hidden="true">{initials(user.name)}</div>
-          <div className="side-who">
+    <div className="acct" ref={ref}>
+      <button
+        className="acct-btn"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <span className="acct-avatar" aria-hidden="true">{initials(user.name)}</span>
+        <span className="acct-name">{user.name}</span>
+        <Icon className="acct-caret" name="chevronDown" size={14} />
+      </button>
+      {open ? (
+        <div className="acct-menu" role="menu">
+          <div className="acct-head">
             <div className="who-name" title={user.name}>{user.name}</div>
             <div className="who-meta" title={user.email}>{user.email}</div>
           </div>
-          <button className="side-btn" onClick={logout} title="Sign out" aria-label="Sign out">
-            <Icon name="logout" size={16} />
+          {MENU.map((m) => (
+            <NavLink key={m.to} to={m.to} role="menuitem"
+              className={({ isActive }) => (isActive ? 'active' : '')}>
+              <span className="acct-ico"><Icon name={m.icon} size={16} /></span>
+              {m.label}
+            </NavLink>
+          ))}
+          <div className="acct-sep" />
+          <button role="menuitem" onClick={logout}>
+            <span className="acct-ico"><Icon name="logout" size={16} /></span>
+            Sign out
           </button>
         </div>
-      </aside>
-
-      {drawerOpen ? (
-        <button className="scrim" aria-label="Close menu" onClick={() => setDrawerOpen(false)} />
       ) : null}
+    </div>
+  );
+}
 
-      <main className="main">
-        <header className="topbar">
-          <button
-            className="icon-btn"
-            onClick={toggleRail}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <Icon name="panelLeft" size={17} />
-          </button>
-          <span className="topbar-title">{sectionLabel(location.pathname)}</span>
-          <div className="topbar-actions">
+function Layout({ children }) {
+  const { user, org, app, logout } = useAuth();
+  return (
+    <div className="shell">
+      <header className="appbar">
+        <div className="appbar-top">
+          <span className="brandmark">Soapbox</span>
+          <span className="appbar-sep" aria-hidden="true">/</span>
+          <span className="appbar-org" title={org.name}>{org.name}</span>
+          <div className="appbar-right">
             {app?.build ? (
               <span className="build-chip" title={`Version ${app.version}`}>
                 v{app.version} · build {app.build}
               </span>
             ) : null}
             <ThemeToggle />
+            <AccountMenu user={user} logout={logout} />
           </div>
-        </header>
-        {children}
-      </main>
+        </div>
+        <div className="appbar-tabs-row">
+          <nav className="appbar-tabs" aria-label="Main">
+            {PRIMARY.map((t) => (
+              <NavLink key={t.to} to={t.to} end={t.end}
+                className={({ isActive }) => `appbar-tab ${isActive ? 'active' : ''}`}>
+                {t.label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
+      </header>
+
+      <main className="main">{children}</main>
     </div>
   );
 }

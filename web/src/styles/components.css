@@ -92,35 +92,32 @@
   min-width: 0;
 }
 .stat .label {
-  font-size: var(--fs-base);
-  font-weight: 500;
-  color: var(--c-muted);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-ink-2);
   line-height: 1.35;
 }
 .stat .value {
-  font-size: var(--fs-2xl);
-  font-weight: 640;
-  letter-spacing: -0.025em;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   margin-top: var(--sp-2);
-  line-height: 1.15;
+  line-height: 1.1;
   overflow-wrap: anywhere;
 }
 .stat .sub {
+  font-family: var(--font-mono);
   font-size: var(--fs-sm);
   color: var(--c-muted);
   margin-top: 3px;
   line-height: 1.35;
 }
-.stat-ico {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--r-md);
-  background: var(--c-surface-3);
-  color: var(--c-ink-2);
-  display: grid;
-  place-items: center;
-  margin-bottom: var(--sp-3);
-}
+/* The clean grid is label + number; the icon chips the old theme drew are
+   not part of this system. */
+.stat-ico { display: none; }
 .stat.tone-ok .value { color: var(--c-ok); }
 .stat.tone-bad .value { color: var(--c-bad); }
 .stat.tone-warn .value { color: var(--c-warn); }
@@ -178,8 +175,8 @@ a.stat:focus-visible { outline-offset: -2px; border-radius: 0; }
   justify-content: center;
   gap: 6px;
   font: inherit;
-  font-size: var(--fs-base);
-  font-weight: 560;
+  font-size: var(--fs-md);
+  font-weight: 600;
   line-height: 1;
   color: var(--c-ink);
   background: var(--c-surface);
@@ -479,13 +476,15 @@ table.table {
 }
 .table th {
   text-align: left;
-  font-size: var(--fs-sm);
-  font-weight: 560;
-  color: var(--c-muted);
-  letter-spacing: 0;
-  padding: 9px var(--sp-4);
-  background: var(--c-surface-2);
-  border-bottom: 1px solid var(--c-line);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--c-ink-2);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 10px var(--sp-4);
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-line-strong);
   white-space: nowrap;
 }
 .table td {
@@ -581,28 +580,27 @@ a.t-main:hover { color: var(--c-accent-text); }
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: var(--fs-sm);
-  font-weight: 560;
-  padding: 2px 8px;
-  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: var(--r-sm);
   border: 1px solid transparent;
   white-space: nowrap;
   vertical-align: 1px;
 }
-.badge .dot {
-  width: 5px;
-  height: 5px;
-  border-radius: var(--r-pill);
-  background: currentColor;
-  flex: none;
-}
+/* This system names states in words and repeats the state in colour; it does
+   not use status dots. */
+.badge .dot { display: none; }
 .badge-green { background: var(--c-ok-soft); border-color: var(--c-ok-line); color: var(--c-ok); }
-.badge-red { background: var(--c-bad-soft); border-color: var(--c-bad-line); color: var(--c-bad); }
+/* A bad-state tag carries a dashed border, so it reads as an alert even in
+   grayscale. */
+.badge-red { background: var(--c-bad-soft); border-color: var(--c-bad-line); border-style: dashed; color: var(--c-bad); }
 .badge-amber { background: var(--c-warn-soft); border-color: var(--c-warn-line); color: var(--c-warn); }
 .badge-indigo { background: var(--c-info-soft); border-color: var(--c-info-line); color: var(--c-info); }
 .badge-gray { background: var(--c-surface-3); border-color: var(--c-line); color: var(--c-muted); }
-:root[data-theme='light'] .badge-green { color: #146c33; }
-:root[data-theme='light'] .badge-amber { color: #8f4e00; }
 
 .chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
 .chip {
@@ -614,7 +612,7 @@ a.t-main:hover { color: var(--c-accent-text); }
   color: var(--c-ink-2);
   background: var(--c-surface-3);
   border: 1px solid var(--c-line);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-sm);
   padding: 3px 10px;
 }
 button.chip { cursor: pointer; transition: background var(--transition), border-color var(--transition); }
@@ -663,8 +661,8 @@ button.chip.active,
   align-items: flex-start;
   gap: var(--sp-2);
   border: 1px solid transparent;
-  border-radius: var(--r-md);
-  padding: 9px var(--sp-3);
+  border-radius: var(--r-lg);
+  padding: 10px var(--sp-3);
   font-size: var(--fs-base);
   line-height: 1.5;
   margin-bottom: var(--sp-3);
@@ -1079,15 +1077,15 @@ button.chip.active,
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .progressbar {
-  height: 6px;
+  height: 4px;
   background: var(--c-surface-3);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-sm);
   overflow: hidden;
 }
 .progressbar > div {
   height: 100%;
   background: var(--c-accent);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-sm);
   transition: width 0.3s;
 }
 
@@ -1154,43 +1152,73 @@ button.chip.active,
 }
 
 /* === login =============================================================== */
+/* Two columns: the sign-in column on a pale ground, a brand column on card. */
 
-.login-wrap {
+.login {
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: 560px minmax(0, 1fr);
   background: var(--c-canvas);
-  padding: var(--sp-5);
 }
-.login-card {
-  background: var(--c-surface);
-  border: 1px solid var(--c-line);
-  border-radius: var(--r-xl);
-  box-shadow: var(--sh-md);
-  padding: var(--sp-7) var(--sp-7) var(--sp-6);
-  width: 100%;
-  max-width: 380px;
+.login-aside {
+  background: var(--c-surface-2);
+  border-right: 1px solid var(--c-line);
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-8) 64px;
 }
-/* The heading is kept for structure; the logo inside supplies its text. */
-.login-brand { margin: 0; }
-.login-card .login-logo { height: 30px; }
-.login-sub {
-  color: var(--c-muted);
+.login-brandmark {
+  font-family: var(--font-mono);
   font-size: var(--fs-base);
-  margin: 3px 0 var(--sp-5);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-ink);
 }
+.login-form-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.login-form { width: 100%; max-width: 380px; }
+.login-title { font-size: var(--fs-2xl); font-weight: 700; line-height: 1.2; margin: 0; }
+.login-sub {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-ink-2);
+  margin: 6px 0 var(--sp-6);
+}
+.login-foot { color: var(--c-muted); font-size: var(--fs-sm); }
 .login-build {
   color: var(--c-muted);
   font-size: var(--fs-xs);
-  text-align: center;
-  margin: var(--sp-4) 0 0;
-  font-variant-numeric: tabular-nums;
+  margin: var(--sp-5) 0 0;
+  font-family: var(--font-mono);
 }
-.login-theme {
-  position: fixed;
-  top: var(--sp-4);
-  right: var(--sp-4);
+.login-hero {
+  background: var(--c-surface);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--sp-8) 64px;
+}
+.login-hero-inner { max-width: 480px; }
+.login-hero h2 { font-size: var(--fs-2xl); font-weight: 700; line-height: 1.25; margin: 0; }
+.login-hero p { color: var(--c-muted); margin: var(--sp-3) 0 0; }
+.login-hero .stat-grid { margin: var(--sp-6) 0 0; }
+.login-feats { list-style: none; margin: var(--sp-6) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-3); }
+.login-feats li { display: flex; gap: 10px; align-items: flex-start; font-size: var(--fs-md); }
+.login-feats .arrow { color: var(--c-accent); font-family: var(--font-mono); flex: none; }
+.login-theme { position: fixed; top: var(--sp-4); right: var(--sp-4); }
+
+@media (max-width: 860px) {
+  .login { grid-template-columns: minmax(0, 1fr); }
+  .login-hero { display: none; }
+  .login-aside { border-right: 0; padding: var(--sp-7) var(--sp-5); }
 }
 
 /* === responsive ========================================================== */

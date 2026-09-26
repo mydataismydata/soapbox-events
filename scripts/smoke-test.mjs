@@ -209,14 +209,14 @@ const deadline = new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)
   check('create event', r.status === 201 && eventId > 0 && /^[a-z0-9]{10}$/.test(eventSlug || ''));
 
   const upd = await A.api('PUT', `/api/events/${eventId}`, {
-    flyer: { style: 'blue', font: 'sans', scale: 'l', eyebrow: 'Save the date', tagline: 'Dinner & dancing',
+    flyer: { style: 'red', font: 'sans', scale: 'l', eyebrow: 'Save the date', tagline: 'Dinner & dancing',
       contact: 'Questions? Call Jane', showAddress: true,
       imageColumns: 3, imageTokens: ['imgAAAAAA', 'imgBBBBBB', 'imgCCCCCC'], imageCaptions: ['Ada Speaker', 'Grace Speaker', 'Alan Speaker'] },
     email_subject: "You're invited: {{event_title}}",
     email_body: 'Hi {{first_name}},\n\nJoin us at {{venue_name}} on {{event_date}}.\n\nRSVP: {{rsvp_link}}',
   });
   const uflyer = upd.data?.event?.flyer || {};
-  check('update event + flyer', upd.status === 200 && uflyer.style === 'blue');
+  check('update event + flyer', upd.status === 200 && uflyer.style === 'red');
   check('flyer stores 3 image columns', uflyer.imageColumns === 3 && Array.isArray(uflyer.imageTokens) && uflyer.imageTokens.length === 3);
   check('flyer image tokens + captions stored', uflyer.imageTokens?.[2] === 'imgCCCCCC' && uflyer.imageCaptions?.[1] === 'Grace Speaker');
   check('flyer mirrors first image for legacy readers', uflyer.imageToken === 'imgAAAAAA' && uflyer.imageCaption === 'Ada Speaker');
@@ -414,7 +414,7 @@ let guests = [];
 
   const fp = await A.raw('POST', '/api/flyer/preview', {
     body: { event: { title: 'Preview Party', date: future },
-      flyer: { style: 'white', imageColumns: 2, imageTokens: ['prevIMGone', 'prevIMGtwo'], imageCaptions: ['One', 'Two'] } },
+      flyer: { style: 'classic', imageColumns: 2, imageTokens: ['prevIMGone', 'prevIMGtwo'], imageCaptions: ['One', 'Two'] } },
   });
   const fpHtml = await fp.text();
   check('flyer preview renders', fp.status === 200 && fpHtml.includes('Preview Party'));
@@ -423,10 +423,26 @@ let guests = [];
 
   const pres = await A.api('GET', '/api/flyer/presets');
   const ids = (pres.data?.styles || []).map((s) => s.id);
-  check('seven templates, five portrait then two wide',
-    ids.join(',') === 'classic,blue,white,red,retro,spotlight,panel', ids.join(','));
+  check('six templates, four portrait then two wide',
+    ids.join(',') === 'classic,dark,red,retro,spotlight,panel', ids.join(','));
   const wideIds = (pres.data?.styles || []).filter((s) => s.landscape).map((s) => s.id);
   check('wide templates flagged for the designer', wideIds.join(',') === 'spotlight,panel', wideIds.join(','));
+
+  // The Dark template paints an uploaded photo as a full-bleed background under
+  // a legibility scrim; with no image it falls back to a gradient ground.
+  const darkBg = await A.raw('POST', '/api/flyer/preview', {
+    body: { event: { title: 'Gala Evening', date: future },
+      flyer: { style: 'dark', bgToken: 'bgIMGxxxx', eyebrow: 'You are invited' } },
+  });
+  const darkBgHtml = await darkBg.text();
+  check('dark flyer paints its background image under a scrim',
+    darkBgHtml.includes('/files/bgIMGxxxx') && darkBgHtml.includes('linear-gradient'));
+  const darkPlain = await A.raw('POST', '/api/flyer/preview', {
+    body: { event: { title: 'Gala Evening', date: future }, flyer: { style: 'dark' } },
+  });
+  const darkPlainHtml = await darkPlain.text();
+  check('dark flyer with no image uses a gradient ground',
+    darkPlain.status === 200 && !darkPlainHtml.includes('/files/') && darkPlainHtml.includes('radial-gradient'));
 
   // A long tagline must shrink and wrap rather than run off the flyer's edge.
   const longTag = 'Doors open early for coffee, live music, and a neighbourhood potluck supper';

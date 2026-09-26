@@ -79,7 +79,7 @@ setSetting(db, 'sender_email', 'invites@example.org');
 
 // --- event 1: published picnic with responses ------------------------------
 const picnicFlyer = JSON.stringify({
-  style: 'white', font: 'sans', scale: 'm',
+  style: 'classic', font: 'sans', scale: 'm',
   eyebrow: "You're invited", tagline: 'Bring a dish, bring a friend!',
   note: 'Rain location: the community hall', showHost: true,
 });
@@ -150,7 +150,7 @@ db.prepare(`
   'Clubhouse',
   '12 Main Street, Springfield',
   daysFromNow(35), '17:00', '20:00',
-  JSON.stringify({ style: 'white', font: 'sans', scale: 'm', eyebrow: 'Open house', tagline: 'Everyone welcome', note: '', showHost: false })
+  JSON.stringify({ style: 'classic', font: 'sans', scale: 'm', eyebrow: 'Open house', tagline: 'Everyone welcome', note: '', showHost: false })
 );
 
 // --- event 3: a draft the wizard can pick up -------------------------------

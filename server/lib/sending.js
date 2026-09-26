@@ -55,6 +55,13 @@ export function flyerImageUrls(orgSlug, flyer) {
   return normalizeFlyer(flyer).imageTokens.map((t) => (t ? publicUrl(orgSlug, `/files/${t}`) : ''));
 }
 
+// URL of the Dark template's full-bleed background image, empty when none is
+// set. Passed to renderFlyer as bgUrl.
+export function flyerBgUrl(orgSlug, flyer) {
+  const t = normalizeFlyer(flyer).bgToken;
+  return t ? publicUrl(orgSlug, `/files/${t}`) : '';
+}
+
 // URL of the picture-of-the-flyer that goes at the foot of the invitation
 // email — empty unless the host turned the option on and the designer has
 // rendered one.

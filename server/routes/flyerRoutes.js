@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { wrap } from '../lib/validate.js';
 import { flyerPresets, renderFlyerDocument } from '../lib/flyer.js';
-import { flyerImageUrls } from '../lib/sending.js';
+import { flyerImageUrls, flyerBgUrl } from '../lib/sending.js';
 
 export const flyerRouter = Router();
 
@@ -26,9 +26,10 @@ flyerRouter.post('/flyer/preview', wrap(async (req, res) => {
   };
   const flyer = req.body.flyer || {};
   const imageUrls = flyerImageUrls(req.org.slug, flyer);
+  const bgUrl = flyerBgUrl(req.org.slug, flyer);
   const hideEventMeta = req.body.mode === 'broadcast';
   // The designer asks for `snapshot` when it is about to rasterize the flyer
   // into the JPEG that goes in the invitation email.
   const snapshot = req.body.snapshot === true;
-  res.type('html').send(renderFlyerDocument({ event, flyer, imageUrls, hideEventMeta, snapshot }));
+  res.type('html').send(renderFlyerDocument({ event, flyer, imageUrls, bgUrl, hideEventMeta, snapshot }));
 }));

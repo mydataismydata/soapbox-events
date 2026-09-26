@@ -12,9 +12,11 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
   const [srcdoc, setSrcdoc] = useState('');
   const [previewHeight, setPreviewHeight] = useState(640);
   const [uploadingSlot, setUploadingSlot] = useState(-1);
+  const [uploadingBg, setUploadingBg] = useState(false);
   const toast = useToast();
   const timer = useRef(null);
   const fileRef = useRef(null);
+  const bgFileRef = useRef(null);
   const frameRef = useRef(null);
   const pendingSlot = useRef(0);
 
@@ -122,6 +124,31 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
     }
   }
 
+  // The Dark template's full-bleed background photo. It uploads through the same
+  // endpoint as featured images but lives in its own token (flyer.bgToken); the
+  // renderer lays a gradient scrim over it so the text stays legible.
+  async function uploadBg(file) {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { toast('Images must be 5 MB or smaller', 'bad'); return; }
+    setUploadingBg(true);
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const up = await api.post('/api/uploads', { name: file.name, data: dataUrl });
+      set({ bgToken: up.token });
+      toast('Background image added');
+    } catch (err) {
+      toast(err.message, 'bad');
+    } finally {
+      setUploadingBg(false);
+      if (bgFileRef.current) bgFileRef.current.value = '';
+    }
+  }
+
   // Read the current featured-image state as fixed slots — three normally, one
   // on a wide template. Older flyers stored a single imageToken/imageCaption,
   // so fold those into slot 0.
@@ -151,7 +178,7 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
   const captions = captionSlots();
 
   const templates = (
-    <Field label="Template" hint="Each template has its own fixed patriotic colors.">
+    <Field label="Template" hint="Each template has its own fixed colors and layout.">
       <div className="style-grid" role="radiogroup" aria-label="Flyer template">
         {presets.styles.map((s) => (
           <button key={s.id} type="button"
@@ -214,6 +241,33 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
       </div>
     </Field>
   );
+
+  // The Dark template paints an uploaded photo across the whole flyer. Only that
+  // template uses it, so the field appears when Dark is selected.
+  const background = flyer.style === 'dark' ? (
+    <Field label="Background image"
+      hint="Fills the whole flyer behind the text. It’s automatically darkened with a gradient so the words stay readable. Tall/portrait photos work best. JPEG/PNG/GIF/WebP up to 5 MB.">
+      <input ref={bgFileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
+        style={{ display: 'none' }} onChange={(e) => uploadBg(e.target.files?.[0])} />
+      <div className="row">
+        <button type="button" className="btn btn-sm" disabled={uploadingBg}
+          onClick={() => bgFileRef.current?.click()}>
+          <Icon name={flyer.bgToken ? 'refresh' : 'image'} size={14} />
+          {uploadingBg ? 'Uploading…' : flyer.bgToken ? 'Replace background' : 'Add background image'}
+        </button>
+        {flyer.bgToken ? (
+          <button type="button" className="btn btn-sm btn-ghost" onClick={() => set({ bgToken: '' })}>
+            Remove
+          </button>
+        ) : null}
+      </div>
+      {!flyer.bgToken ? (
+        <p className="small muted" style={{ marginTop: 8 }}>
+          No image yet — the flyer shows a deep navy gradient until you add one.
+        </p>
+      ) : null}
+    </Field>
+  ) : null;
 
   const fields = (
     <div className={wide ? 'field-cols' : ''}>
@@ -278,6 +332,7 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
         {templates}
         {preview}
         <div style={{ marginTop: 16 }}>{fields}</div>
+        {background}
         {images}
       </div>
     );
@@ -290,6 +345,7 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
         {fields}
         {preview}
       </div>
+      {background}
       {images}
     </div>
   );

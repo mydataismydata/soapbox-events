@@ -30,9 +30,9 @@ Write your message here.
 const BLANK = {
   title: '', subject: '', body: plainToHtml(DEFAULT_BODY), web_version: true,
   flyer: {
-    style: 'blue', font: 'sans', scale: 'm',
+    style: 'classic', font: 'sans', scale: 'm',
     eyebrow: '', tagline: '', note: '', contact: '', showHost: false, showAddress: false,
-    imageColumns: 1, imageTokens: [], imageCaptions: [], imageToken: '', imageCaption: '',
+    imageColumns: 1, imageTokens: [], imageCaptions: [], imageToken: '', imageCaption: '', bgToken: '',
   },
 };
 

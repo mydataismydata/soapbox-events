@@ -1,9 +1,10 @@
 // The flyer engine. A flyer is described by a small JSON object (style, fonts,
 // size scale, short text slots, optional featured images) and rendered to
 // self-contained HTML with inline styles only. Each style is a self-contained
-// patriotic template with its own fixed colours — there is no separate palette
-// to pick. The same renderer backs the designer's live preview and the public
-// event landing page, so what you design is exactly what guests see.
+// template with its own fixed colours — there is no separate palette to pick.
+// The Dark style additionally takes an uploaded background photo. The same
+// renderer backs the designer's live preview and the public event landing page,
+// so what you design is exactly what guests see.
 import { esc } from './html.js';
 import { formatDate, formatTimeRange } from './format.js';
 
@@ -12,8 +13,7 @@ import { formatDate, formatTimeRange } from './format.js';
 // instead of three and render on a wider card.
 export const STYLES = [
   { id: 'classic', label: 'Classic', description: 'Ivory card in a fine gold double-frame — a star emblem, a large title-case headline and small-caps details. Formal and understated.' },
-  { id: 'blue', label: 'Blue', description: 'Navy field with a flag waving in from the top-right; tagline on a light-blue ribbon.' },
-  { id: 'white', label: 'White', description: 'Cream between waving red stripes on top and a star-spangled flag below; navy ribbon.' },
+  { id: 'dark', label: 'Dark', description: 'A full-bleed background photo under a dark gradient, with bright type and a gold accent. Add a background image below. Dramatic and modern.' },
   { id: 'red', label: 'Red', description: 'Bold red inside a starred white border, a small waving flag, tagline on a straight ribbon.' },
   { id: 'retro', label: 'Retro', description: 'Vintage navy, red and parchment stripes. All type — no photo needed.' },
   { id: 'spotlight', label: 'Spotlight', landscape: true, description: 'Wide. Bright-blue-to-midnight gradient, details on a white card, your photo standing at the right.' },
@@ -31,8 +31,13 @@ const THEMES = {
   // emblem); `goldText` is the darker gold that passes AA on ivory for the
   // small-caps eyebrow and host line.
   classic: { bg: '#f6f1e6', ink: '#1a2a4f', accent: '#1a2a4f', accent2: '#b0873a', red: '#9c2b2e', navy: '#1a2a4f', gold: '#b0873a', goldSoft: '#d8c49a', goldText: '#836326' },
-  blue: { bg: '#0e1f44', ink: '#ffffff', accent: '#142a56', accent2: '#c02c39', red: '#c02c39', ribbon: '#5f8fd6', ribbonInk: '#ffffff', ribbonDark: '#3f6cb0' },
-  white: { bg: '#ffffff', ink: '#17274e', accent: '#17274e', accent2: '#b0202f', red: '#c02c34', navy: '#17274e', ribbon: '#17274e', ribbonInk: '#ffffff', ribbonDark: '#0f1c39' },
+  // Deep near-black ground under an uploaded photo. `ground` is the no-photo
+  // fallback; the renderer lays a `scrim` gradient over any image so the text
+  // stays legible. `gold` is the accent for the eyebrow, emblem, RSVP outline
+  // and host line.
+  dark: { bg: '#0b0f1a', ink: '#f6f8fc', accent: '#c8a24a', accent2: '#c8a24a', red: '#c8a24a', navy: '#0b0f1a',
+    gold: '#d3b063', muted: 'rgba(246,248,252,0.76)', faint: 'rgba(246,248,252,0.58)',
+    ground: 'radial-gradient(120% 85% at 50% 0%, #1c2745 0%, #0b0f1a 58%, #05070d 100%)' },
   red: { bg: '#bb392c', ink: '#ffffff', accent: '#bb392c', accent2: '#16264c', red: '#bb392c', navy: '#16264c', ribbon: '#16264c', ribbonInk: '#ffffff' },
   retro: { bg: '#1e3a5f', ink: '#ece3cb', accent: '#1e3a5f', accent2: '#c0432f', red: '#c0432f', navy: '#1e3a5f', parchment: '#ddd2b4' },
   spotlight: { bg: '#0a1440', ink: '#ffffff', accent: '#12307f', accent2: '#e4f065', red: '#c02c39', navy: '#0a1440',
@@ -57,7 +62,7 @@ export const SCALES = [
 ];
 
 export const DEFAULT_FLYER = {
-  style: 'blue',
+  style: 'classic',
   font: 'sans',
   scale: 'm',
   eyebrow: "You're invited",
@@ -73,11 +78,12 @@ export const DEFAULT_FLYER = {
   imageCaption: '', // legacy mirror of imageCaptions[0]
   includeFlyerImage: false, // show a picture of the flyer in the invitation email
   flyerImageToken: '', // upload token of that picture, rendered by the designer
+  bgToken: '', // full-bleed background image, used by the Dark template
 };
 
 export function normalizeFlyer(raw) {
   const f = { ...DEFAULT_FLYER, ...(raw && typeof raw === 'object' ? raw : {}) };
-  if (!STYLES.some((s) => s.id === f.style)) f.style = 'blue';
+  if (!STYLES.some((s) => s.id === f.style)) f.style = 'classic';
   if (!FONTS.some((s) => s.id === f.font)) f.font = 'sans';
   if (!SCALES.some((s) => s.id === f.scale)) f.scale = 'm';
   // Colours are fixed per style now — drop any legacy palette selection so it
@@ -109,11 +115,12 @@ export function normalizeFlyer(raw) {
   f.imageCaption = f.imageCaptions[0] || '';
   f.includeFlyerImage = Boolean(f.includeFlyerImage);
   f.flyerImageToken = validToken(f.flyerImageToken);
+  f.bgToken = validToken(f.bgToken);
   return f;
 }
 
 export function flyerColors(flyer) {
-  return THEMES[flyer && flyer.style] || THEMES.blue;
+  return THEMES[flyer && flyer.style] || THEMES.classic;
 }
 
 // --- color math ------------------------------------------------------------
@@ -229,55 +236,6 @@ function lineStarDivider({ color, bg, scale, full = false, marginTop = 14 }) {
     <div style="height:1.5px; width:${px(56 * scale)}; background:${color};"></div></div>`;
 }
 
-// Points along a horizontal wavy edge y = baseY + amp·sin(x·k + phase), x in
-// [0,w] (or w→0 when reverse). The phase is absolute in x, so two edges at
-// different baseY stay parallel — giving constant-thickness wavy stripes.
-function wavyEdge(baseY, w, { amp = 8, period = 150, phase = 0, steps = 30 } = {}, reverse = false) {
-  let out = '';
-  for (let i = 0; i <= steps; i++) {
-    const idx = reverse ? steps - i : i;
-    const x = (w * idx) / steps;
-    const y = baseY + amp * Math.sin((x / period) * 2 * Math.PI + phase);
-    out += `L${x.toFixed(1)} ${y.toFixed(1)} `;
-  }
-  return out.trim();
-}
-
-// A rectangular "waving flag" of horizontal stripes with rippling edges,
-// optionally with a star canton in the upper-left. Returns an <svg> the caller
-// positions via `style`. Setting `white` to the page colour yields bare red
-// waving stripes on that background.
-function wavyStripeFlag({ vw = 320, vh = 160, stripes = 7, red = '#c02c39', white = '#ffffff',
-  amp = 8, period = 150, phase = 0, canton = false, cantonColor = '#17274e', id = 'wf', style = '', stretch = false }) {
-  const sh = vh / stripes;
-  let bands = '';
-  for (let i = 0; i < stripes; i++) {
-    const y0 = i * sh;
-    const y1 = (i + 1) * sh;
-    const startY = (y0 + amp * Math.sin(phase)).toFixed(1);
-    const top = wavyEdge(y0, vw, { amp, period, phase });
-    const bot = wavyEdge(y1, vw, { amp, period, phase }, true);
-    bands += `<path d="M0 ${startY} ${top} ${bot} Z" fill="${i % 2 ? white : red}"/>`;
-  }
-  let cant = '';
-  let starPat = '';
-  if (canton) {
-    const cw = +(vw * 0.42).toFixed(1);
-    const ch = +(sh * Math.max(3, Math.round(stripes * 0.55))).toFixed(1);
-    const top0 = (amp * Math.sin(phase)).toFixed(1);
-    const topEdge = wavyEdge(0, cw, { amp, period, phase });
-    const botEdge = wavyEdge(ch, cw, { amp, period, phase }, true);
-    starPat = `<pattern id="${id}st" width="${(vw * 0.09).toFixed(1)}" height="${(sh * 0.95).toFixed(1)}" patternUnits="userSpaceOnUse">
-      <text x="1" y="${(sh * 0.72).toFixed(1)}" font-size="${(sh * 0.55).toFixed(1)}" fill="#ffffff">&#9733;</text></pattern>`;
-    cant = `<clipPath id="${id}cc"><path d="M0 ${top0} ${topEdge} L${cw} ${(ch + Number(top0)).toFixed(1)} ${botEdge} Z"/></clipPath>
-      <g clip-path="url(#${id}cc)">
-        <rect x="-2" y="-2" width="${cw + 4}" height="${(ch + amp + 4).toFixed(1)}" fill="${cantonColor}"/>
-        <rect x="-2" y="-2" width="${cw + 4}" height="${(ch + amp + 4).toFixed(1)}" fill="url(#${id}st)"/>
-      </g>`;
-  }
-  return `<svg viewBox="0 0 ${vw} ${vh}" preserveAspectRatio="${stretch ? 'none' : 'xMidYMid meet'}" xmlns="http://www.w3.org/2000/svg" style="${style}"><defs>${starPat}</defs>${bands}${cant}</svg>`;
-}
-
 function starRow(count, { size, color, gap = 0.4 }) {
   let s = '';
   for (let i = 0; i < count; i++) s += '&#9733;';
@@ -302,26 +260,10 @@ function rsvpBadge(scale, { bg, ink, marginTop = 0 }) {
     padding:${px(6 * scale)} ${px(16 * scale)}; border-radius:999px;">RSVP Requested</span></div>`;
 }
 
-// A centred banner for the tagline. `folded` has 3-D end tails tucking behind
-// the face; `straight` is a flat bar with flag-notched ends. Both cap their
-// width and wrap — a long tagline shrinks and then runs onto a second line
+// A centred banner for the tagline: a flat bar with flag-notched ends. It caps
+// its width and wraps — a long tagline shrinks and then runs onto a second line
 // rather than pushing out past the flyer's edge.
 const RIBBON_MAX = 400;
-
-function foldedRibbon(text, { bandColor, ink, dark, scale, font }) {
-  if (!text) return '';
-  const h = 38 * scale;
-  const tw = 22 * scale;
-  const drop = 10 * scale;
-  const tail = (side) => `<span style="position:absolute; top:${px(drop)}; ${side}:${px(-tw + 4)};
-    width:${px(tw)}; height:${px(h)}; background:${dark}; z-index:1;
-    clip-path:polygon(${side === 'left' ? '0 0, 100% 0, 100% 100%, 0 100%, 24% 50%' : '0 0, 100% 0, 76% 50%, 100% 100%, 0 100%'});"></span>`;
-  const band = `<span style="position:relative; z-index:2; display:inline-block; max-width:${px(RIBBON_MAX * scale)};
-    background:${bandColor}; color:${ink}; font-family:${font.heading}; font-weight:800;
-    font-size:${px(fitSize(text, 14.5 * scale, 34, { min: 0.62 }))}; letter-spacing:0.08em; line-height:1.3;
-    text-transform:uppercase; text-align:center; padding:${px(9 * scale)} ${px(26 * scale)};">${esc(text)}</span>`;
-  return `<span style="position:relative; display:inline-block; max-width:100%; margin-top:${px(20 * scale)};">${tail('left')}${tail('right')}${band}</span>`;
-}
 
 function straightRibbon(text, { bandColor, ink, scale, font }) {
   if (!text) return '';
@@ -403,82 +345,6 @@ function bigDateParts(iso) {
 }
 
 // --- templates -------------------------------------------------------------
-
-function renderBlue({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta }) {
-  const c = colors;
-  const w = whenParts(event);
-  const vb = venueTimeBits(event, flyer);
-  // Waving red stripes across the very top (navy shows between them), matching
-  // the White template's crest.
-  const flag = wavyStripeFlag({
-    vw: 360, vh: 74, stripes: 4, red: c.red, white: c.bg, amp: 7, period: 150, phase: 0, id: 'blf', stretch: true,
-    style: 'position:absolute; top:-6px; left:-12px; width:106%; height:98px; z-index:0;',
-  });
-  const img = featuredImages(images, { scale, colors: c, frame: imageFrame('#ffffff', '#ffffff'), captionColor: 'rgba(255,255,255,0.78)', marginTop: 22 });
-  const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp' ? rsvpBadge(scale, { bg: c.red, ink: '#ffffff', marginTop: 24 }) : '';
-  const meta = hideEventMeta ? '' : `
-    <div style="margin-top:${px(24 * scale)}; display:flex; justify-content:center; align-items:center; gap:${px(20 * scale)};">
-      ${w.date ? `<div style="font-size:${px(16 * scale)}; font-weight:700; letter-spacing:0.03em;">${esc(w.date)}</div>` : ''}
-      ${w.date && w.time ? `<div style="width:1px; height:${px(24 * scale)}; background:rgba(255,255,255,0.5);"></div>` : ''}
-      ${w.time ? `<div style="font-size:${px(16 * scale)}; font-weight:700;">${esc(w.time)}</div>` : ''}
-    </div>
-    ${w.date || w.time ? `<div style="height:3px; width:58%; background:${c.red}; margin:${px(14 * scale)} auto 0; border-radius:2px;"></div>` : ''}
-    ${vb.venue ? `<div style="font-size:${px(15 * scale)}; font-weight:700; margin-top:${px(14 * scale)}; letter-spacing:0.03em;">${esc(vb.venue)}</div>` : ''}
-    ${hostLine ? `<div style="font-size:${px(11.5 * scale)}; margin-top:${px(12 * scale)}; text-transform:uppercase; letter-spacing:0.16em; color:rgba(255,255,255,0.75);">${esc(hostLine)}</div>` : ''}
-    ${flyer.contact ? `<div style="font-size:${px(12.5 * scale)}; margin-top:${px(8 * scale)}; color:rgba(255,255,255,0.8);">${esc(flyer.contact)}</div>` : ''}`;
-  const inner = `
-    <div style="position:relative; overflow:hidden; background:${c.bg}; color:${c.ink};
-         font-family:${font.body}; padding:${px(108 * scale)} ${px(34 * scale)} ${px(30 * scale)};">
-      ${flag}
-      <div style="position:relative; z-index:1; text-align:center;">
-        ${flyer.eyebrow ? `<div style="color:${c.red}; font-family:${font.heading}; font-weight:800;
-          font-size:${px(fitSize(flyer.eyebrow, 26 * scale, 26))}; letter-spacing:0.04em; text-transform:uppercase;">${esc(flyer.eyebrow)}</div>` : ''}
-        <div style="font-family:${font.heading}; font-weight:800; font-size:${px(fitSize(event.title, 54 * scale, 15))}; line-height:1.02;
-          text-transform:uppercase; margin-top:${px(6 * scale)};">${esc(event.title || 'Untitled event')}</div>
-        ${foldedRibbon(flyer.tagline, { bandColor: c.ribbon, ink: c.ribbonInk, dark: c.ribbonDark, scale, font })}
-        ${img}
-        ${rsvp}
-        ${meta}
-        ${flyer.note ? `<div style="margin-top:${px(16 * scale)}; font-size:${px(fitSize(flyer.note, 13 * scale, 60))}; color:rgba(255,255,255,0.8);">${esc(flyer.note)}</div>` : ''}
-      </div>
-    </div>`;
-  return `<div style="background:#ffffff; padding:9px;">
-    ${inner}
-    <div style="height:13px; background:${c.red}; margin-top:9px; border-radius:2px;"></div>
-  </div>`;
-}
-
-function renderWhite({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta }) {
-  const c = colors;
-  const topStripes = wavyStripeFlag({
-    vw: 360, vh: 70, stripes: 4, red: c.red, white: c.bg, amp: 7, period: 150, phase: 0, id: 'wht',
-    style: 'position:absolute; top:-10px; left:-12px; width:106%; z-index:0;',
-  });
-  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.navy, '#ffffff'), marginTop: 20 });
-  const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp' ? rsvpBadge(scale, { bg: c.navy, ink: '#ffffff', marginTop: 20 }) : '';
-  const meta = hideEventMeta ? '' : metaStacked({ event, flyer, hostLine, scale, ink: c.navy, sub: tint(c.navy, 0.7) });
-  // Full-width navy line + star closes off the bottom in place of a flag; the
-  // negative side margins let it bleed to the card's edges.
-  const bottomDivider = hideEventMeta ? '' : `<div style="margin:${px(30 * scale)} ${px(-36 * scale)} 0;">${lineStarDivider({ color: c.navy, bg: c.bg, scale, full: true, marginTop: 0 })}</div>`;
-  return `
-    <div style="position:relative; overflow:hidden; background:${c.bg}; color:${c.navy};
-         font-family:${font.body}; padding:${px(70 * scale)} ${px(36 * scale)} ${px(34 * scale)}; text-align:center;">
-      ${topStripes}
-      <div style="position:relative; z-index:1;">
-        ${flyer.eyebrow ? `<div style="font-family:${font.heading}; font-weight:800; font-size:${px(fitSize(flyer.eyebrow, 30 * scale, 22))};
-          text-transform:uppercase; letter-spacing:0.02em;">${esc(flyer.eyebrow)}</div>` : ''}
-        <div style="font-family:${font.heading}; font-weight:800; font-size:${px(fitSize(event.title, 48 * scale, 17))}; line-height:1.02;
-          text-transform:uppercase; color:${c.red}; margin-top:${px(6 * scale)};">${esc(event.title || 'Untitled event')}</div>
-        ${foldedRibbon(flyer.tagline, { bandColor: c.ribbon, ink: c.ribbonInk, dark: c.ribbonDark, scale, font })}
-        ${img}
-        ${rsvp}
-        ${flyer.note ? `<div style="margin-top:${px(18 * scale)}; font-family:${font.heading}; font-weight:800;
-          font-size:${px(fitSize(flyer.note, 15 * scale, 40))}; letter-spacing:0.04em; text-transform:uppercase; color:${c.navy};">${esc(flyer.note)}</div>${lineStarDivider({ color: c.red, bg: c.bg, scale, marginTop: 14 })}` : ''}
-        ${meta}
-        ${bottomDivider}
-      </div>
-    </div>`;
-}
 
 function renderRed({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta }) {
   const c = colors;
@@ -747,9 +613,86 @@ function renderClassic({ event, flyer, colors, font, scale, images, hostLine, hi
   </div>`;
 }
 
+// A dramatic dark invitation. An uploaded photo (the flyer's Background image)
+// fills the card behind a strong top-and-bottom scrim — an "inverse vignette"
+// that never lets the middle get lighter than ~0.55 opacity — and every line of
+// type carries a soft shadow, so the words stay legible over any photo. With no
+// photo it falls back to a rich radial navy ground, so the style still looks
+// intentional on its own.
+function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, bgUrl }) {
+  const c = colors;
+  const w = whenParts(event);
+  const vb = venueTimeBits(event, flyer);
+  const bright = c.ink;
+
+  // The scrim sits over the photo: darkest at the top (eyebrow + title) and the
+  // bottom (details), and held at ~0.55 through the middle so mid-card text
+  // stays readable even over a bright picture.
+  const scrim = 'linear-gradient(180deg, rgba(6,9,16,0.84) 0%, rgba(6,9,16,0.55) 30%, rgba(6,9,16,0.55) 62%, rgba(6,9,16,0.92) 100%)';
+  // The url() sits inside a double-quoted style="" attribute, so it uses single
+  // quotes internally. bgUrl is a server-built /files/<token> URL (token is
+  // alphanumeric), so it carries no quotes of its own.
+  const bgLayers = bgUrl
+    ? `background-color:${c.bg}; background-image:${scrim}, url('${esc(bgUrl)}'); background-size:cover; background-position:center; background-repeat:no-repeat;`
+    : `background-color:${c.bg}; background-image:${c.ground};`;
+
+  const emblem = `<div style="width:${px(52 * scale)}; height:${px(52 * scale)}; margin:0 auto ${px(18 * scale)};
+    border:1.5px solid ${c.gold}; border-radius:999px; display:flex; align-items:center; justify-content:center;">
+    <span style="color:${c.gold}; font-size:${px(22 * scale)}; line-height:1;">&#9733;</span></div>`;
+
+  const divider = `<div style="display:flex; align-items:center; justify-content:center; gap:${px(12 * scale)}; margin-top:${px(20 * scale)};">
+    <div style="height:1px; width:${px(66 * scale)}; background:${c.gold};"></div>
+    <span style="color:${c.gold}; font-size:${px(10 * scale)}; line-height:1;">&#9670;</span>
+    <div style="height:1px; width:${px(66 * scale)}; background:${c.gold};"></div></div>`;
+
+  // Featured images get a translucent-white frame so they read as part of the
+  // photo rather than a hard white block.
+  const img = featuredImages(images, { scale, colors: c, frame: imageFrame('rgba(255,255,255,0.85)', 'rgba(255,255,255,0.08)'), captionColor: c.muted, marginTop: 22 });
+
+  const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp'
+    ? `<div style="margin-top:${px(20 * scale)};"><span style="display:inline-block; border:1.5px solid ${c.gold}; color:${bright};
+        font-family:${font.heading}; font-weight:700; font-size:${px(11 * scale)}; letter-spacing:0.2em; text-transform:uppercase;
+        padding:${px(7 * scale)} ${px(20 * scale)}; border-radius:999px;">RSVP Requested</span></div>`
+    : '';
+
+  const meta = [];
+  if (!hideEventMeta) {
+    if (w.date) meta.push(`<div style="font-family:${font.heading}; font-weight:800; font-size:${px(17 * scale)}; letter-spacing:0.02em; color:${bright};">${esc(w.date)}</div>`);
+    if (w.time) meta.push(`<div style="font-size:${px(14 * scale)}; margin-top:${px(3 * scale)}; color:${c.muted};">${esc(w.time)}</div>`);
+    if (vb.venue) meta.push(`<div style="font-size:${px(15 * scale)}; margin-top:${px(10 * scale)}; font-weight:700; color:${bright};">${esc(vb.venue)}</div>`);
+    if (hostLine) meta.push(`<div style="font-family:${font.heading}; font-weight:700; font-size:${px(11 * scale)}; margin-top:${px(14 * scale)};
+      letter-spacing:0.18em; text-transform:uppercase; color:${c.gold};">${esc(hostLine)}</div>`);
+    if (flyer.contact) meta.push(`<div style="font-size:${px(12.5 * scale)}; margin-top:${px(8 * scale)}; color:${c.muted};">${esc(flyer.contact)}</div>`);
+  }
+  const metaBlock = meta.length ? `<div style="margin-top:${px(20 * scale)};">${meta.join('')}</div>` : '';
+  const showDivider = !hideEventMeta && (meta.length || rsvp);
+
+  const content = `
+    <div style="position:relative; z-index:1; text-align:center; text-shadow:0 1px 3px rgba(0,0,0,0.55);">
+      ${emblem}
+      ${flyer.eyebrow ? `<div style="font-family:${font.heading}; font-weight:700; font-size:${px(fitSize(flyer.eyebrow, 14 * scale, 34))};
+        letter-spacing:0.24em; text-transform:uppercase; color:${c.gold};">${esc(flyer.eyebrow)}</div>` : ''}
+      <div style="font-family:${font.heading}; font-weight:800; font-size:${px(fitSize(event.title, 46 * scale, 15))}; line-height:1.06;
+        color:${bright}; margin-top:${px(10 * scale)};">${esc(event.title || 'Untitled event')}</div>
+      ${flyer.tagline ? `<div style="font-size:${px(fitSize(flyer.tagline, 16.5 * scale, 48, { min: 0.7 }))}; font-style:italic; line-height:1.4;
+        color:${c.muted}; margin:${px(10 * scale)} auto 0; max-width:${px(440 * scale)};">${esc(flyer.tagline)}</div>` : ''}
+      ${img}
+      ${showDivider ? divider : ''}
+      ${rsvp}
+      ${metaBlock}
+      ${flyer.note ? `<div style="margin-top:${px(16 * scale)}; font-size:${px(fitSize(flyer.note, 12.5 * scale, 64, { min: 0.75 }))};
+        color:${c.faint};">${esc(flyer.note)}</div>` : ''}
+    </div>`;
+
+  return `<div style="position:relative; overflow:hidden; ${bgLayers} color:${bright}; font-family:${font.body};
+    padding:${px(52 * scale)} ${px(38 * scale)} ${px(46 * scale)}; min-height:${px(430 * scale)};">
+    ${content}
+  </div>`;
+}
+
 const RENDERERS = {
-  classic: renderClassic,
-  blue: renderBlue, white: renderWhite, red: renderRed, retro: renderRetro,
+  classic: renderClassic, dark: renderDark,
+  red: renderRed, retro: renderRetro,
   spotlight: renderSpotlight, panel: renderPanel,
 };
 
@@ -759,7 +702,7 @@ const RENDERERS = {
 // `snapshot` renders the card for the designer's picture-of-the-flyer capture:
 // a plain rectangle at a fixed width, with no page breakout, rounded corners or
 // shadow — those only make sense against a page, not inside a JPEG.
-export function renderFlyer({ event, flyer: rawFlyer, imageUrl = '', imageUrls = null, hideEventMeta = false, snapshot = false }) {
+export function renderFlyer({ event, flyer: rawFlyer, imageUrl = '', imageUrls = null, bgUrl = '', hideEventMeta = false, snapshot = false }) {
   const flyer = normalizeFlyer(rawFlyer);
   const colors = flyerColors(flyer);
   const font = fontOf(flyer);
@@ -770,7 +713,7 @@ export function renderFlyer({ event, flyer: rawFlyer, imageUrl = '', imageUrls =
   const resolved = Array.isArray(imageUrls) ? imageUrls : (imageUrl ? [imageUrl] : []);
   const images = [];
   resolved.forEach((u, i) => { if (u) images.push({ url: String(u), caption: flyer.imageCaptions[i] || '' }); });
-  const inner = (RENDERERS[flyer.style] || renderBlue)({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta });
+  const inner = (RENDERERS[flyer.style] || renderClassic)({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, bgUrl });
   // The wide templates need more room than the 640px portrait card, and more
   // than the public page's text column: they break out of it and centre on the
   // viewport instead. On a phone the card simply fills the screen and its two
@@ -800,9 +743,9 @@ export function snapshotWidth(flyer) {
 // Standalone document for the designer's live preview iframe. In `snapshot`
 // mode the page furniture goes away so the document is exactly the flyer,
 // ready to be drawn onto a canvas.
-export function renderFlyerDocument({ event, flyer, imageUrl, imageUrls, hideEventMeta = false, snapshot = false }) {
+export function renderFlyerDocument({ event, flyer, imageUrl, imageUrls, bgUrl = '', hideEventMeta = false, snapshot = false }) {
   const colors = flyerColors(normalizeFlyer(flyer));
-  const html = renderFlyer({ event, flyer, imageUrl, imageUrls, hideEventMeta, snapshot });
+  const html = renderFlyer({ event, flyer, imageUrl, imageUrls, bgUrl, hideEventMeta, snapshot });
   const body = snapshot
     ? 'margin:0; padding:0; background:#ffffff; color-scheme: light;'
     : `margin:0; padding:22px 10px; background:${mixWithWhite(colors.ink, 0.07)}; color-scheme: light;`;

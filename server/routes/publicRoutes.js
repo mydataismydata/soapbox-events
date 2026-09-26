@@ -14,7 +14,7 @@ import { resolveSession } from '../lib/auth.js';
 import { esc, textToHtml, publicPage, expandImageMarkers } from '../lib/html.js';
 import { renderFlyer, flyerColors, mixWithWhite } from '../lib/flyer.js';
 import {
-  parseFlyer, publicUrl, flyerImageUrls, verifyContactToken, orgImageUrl, PREVIEW_UNSUB,
+  parseFlyer, publicUrl, flyerImageUrls, flyerBgUrl, verifyContactToken, orgImageUrl, PREVIEW_UNSUB,
 } from '../lib/sending.js';
 import { buildBroadcastTagContext, renderTags } from '../lib/mergeTags.js';
 import { sanitizeRichText, looksLikeHtml } from '../lib/sanitizeHtml.js';
@@ -95,7 +95,8 @@ function pageBgFor(event) {
 function flyerHtmlFor(req, event) {
   const flyer = parseFlyer(event);
   const imageUrls = flyerImageUrls(req.pub.org.slug, flyer);
-  return renderFlyer({ event, flyer, imageUrls });
+  const bgUrl = flyerBgUrl(req.pub.org.slug, flyer);
+  return renderFlyer({ event, flyer, imageUrls, bgUrl });
 }
 
 function calendarButtons(req, event, icsPath) {
@@ -543,7 +544,8 @@ publicRouter.get('/b/:slug', (req, res) => {
 
   const flyer = parseFlyer(b);
   const imageUrls = flyerImageUrls(req.pub.org.slug, flyer);
-  const flyerHtml = renderFlyer({ event: { title: b.title }, flyer, imageUrls, hideEventMeta: true });
+  const bgUrl = flyerBgUrl(req.pub.org.slug, flyer);
+  const flyerHtml = renderFlyer({ event: { title: b.title }, flyer, imageUrls, bgUrl, hideEventMeta: true });
   const ctx = buildBroadcastTagContext({ org: req.pub.org, recipientName: '' });
   const bodyText = renderTags(b.body || '', ctx);
 

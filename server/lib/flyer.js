@@ -11,6 +11,7 @@ import { formatDate, formatTimeRange } from './format.js';
 // on the left and a single tall photo down the right, so they take one image
 // instead of three and render on a wider card.
 export const STYLES = [
+  { id: 'classic', label: 'Classic', description: 'Ivory card in a fine gold double-frame — a star emblem, a large title-case headline and small-caps details. Formal and understated.' },
   { id: 'blue', label: 'Blue', description: 'Navy field with a flag waving in from the top-right; tagline on a light-blue ribbon.' },
   { id: 'white', label: 'White', description: 'Cream between waving red stripes on top and a star-spangled flag below; navy ribbon.' },
   { id: 'red', label: 'Red', description: 'Bold red inside a starred white border, a small waving flag, tagline on a straight ribbon.' },
@@ -26,6 +27,10 @@ export function isLandscape(style) {
 // Each style carries its own fixed colours. `accent` is what the invitation
 // email header and the public page furniture use; the rest are template-specific.
 const THEMES = {
+  // Ivory ground, navy ink, gold hairlines. `gold` is decorative (rules,
+  // emblem); `goldText` is the darker gold that passes AA on ivory for the
+  // small-caps eyebrow and host line.
+  classic: { bg: '#f6f1e6', ink: '#1a2a4f', accent: '#1a2a4f', accent2: '#b0873a', red: '#9c2b2e', navy: '#1a2a4f', gold: '#b0873a', goldSoft: '#d8c49a', goldText: '#836326' },
   blue: { bg: '#0e1f44', ink: '#ffffff', accent: '#142a56', accent2: '#c02c39', red: '#c02c39', ribbon: '#5f8fd6', ribbonInk: '#ffffff', ribbonDark: '#3f6cb0' },
   white: { bg: '#ffffff', ink: '#17274e', accent: '#17274e', accent2: '#b0202f', red: '#c02c34', navy: '#17274e', ribbon: '#17274e', ribbonInk: '#ffffff', ribbonDark: '#0f1c39' },
   red: { bg: '#bb392c', ink: '#ffffff', accent: '#bb392c', accent2: '#16264c', red: '#bb392c', navy: '#16264c', ribbon: '#16264c', ribbonInk: '#ffffff' },
@@ -674,7 +679,76 @@ function renderPanel({ event, flyer, colors, font, scale, images, hostLine, hide
     display:flex; flex-wrap:wrap; align-items:stretch;">${left}${photo}</div>`;
 }
 
+// A formal invitation: ivory card inside a fine gold double-frame, a restrained
+// star emblem, an elegant title-case headline (not shouted in all-caps like the
+// patriotic templates), an italic tagline, and small-caps details under a
+// hairline gold rule.
+function renderClassic({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta }) {
+  const c = colors;
+  const w = whenParts(event);
+  const vb = venueTimeBits(event, flyer);
+
+  // A thin gold ring holding a small star — a quiet emblem in place of a flag.
+  const emblem = `<div style="width:${px(56 * scale)}; height:${px(56 * scale)}; margin:0 auto ${px(20 * scale)};
+    border:1.5px solid ${c.gold}; border-radius:999px; display:flex; align-items:center; justify-content:center;">
+    <span style="color:${c.ink}; font-size:${px(24 * scale)}; line-height:1;">&#9733;</span></div>`;
+
+  // A hairline gold rule broken by a small diamond, between the message and the
+  // event details.
+  const divider = `<div style="display:flex; align-items:center; justify-content:center; gap:${px(12 * scale)}; margin-top:${px(20 * scale)};">
+    <div style="height:1px; width:${px(66 * scale)}; background:${c.gold};"></div>
+    <span style="color:${c.gold}; font-size:${px(10 * scale)}; line-height:1;">&#9670;</span>
+    <div style="height:1px; width:${px(66 * scale)}; background:${c.gold};"></div></div>`;
+
+  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.gold, '#ffffff'), captionColor: tint(c.ink, 0.7), marginTop: 22 });
+
+  const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp'
+    ? `<div style="margin-top:${px(20 * scale)};"><span style="display:inline-block; border:1.5px solid ${c.gold}; color:${c.ink};
+        font-family:${font.heading}; font-weight:700; font-size:${px(11 * scale)}; letter-spacing:0.2em; text-transform:uppercase;
+        padding:${px(7 * scale)} ${px(20 * scale)}; border-radius:999px;">RSVP Requested</span></div>`
+    : '';
+
+  const meta = [];
+  if (!hideEventMeta) {
+    const dt = [w.date, w.time].filter(Boolean).join('  ·  ');
+    if (dt) meta.push(`<div style="font-family:${font.heading}; font-weight:700; font-size:${px(14.5 * scale)};
+      letter-spacing:0.14em; text-transform:uppercase; color:${c.ink};">${esc(dt)}</div>`);
+    if (vb.venue) meta.push(`<div style="font-size:${px(15 * scale)}; margin-top:${px(10 * scale)}; color:${c.ink};">${esc(vb.venue)}</div>`);
+    if (hostLine) meta.push(`<div style="font-family:${font.heading}; font-weight:700; font-size:${px(11 * scale)}; margin-top:${px(15 * scale)};
+      letter-spacing:0.18em; text-transform:uppercase; color:${c.goldText};">${esc(hostLine)}</div>`);
+    if (flyer.contact) meta.push(`<div style="font-size:${px(12.5 * scale)}; margin-top:${px(8 * scale)}; color:${tint(c.ink, 0.7)};">${esc(flyer.contact)}</div>`);
+  }
+  const metaBlock = meta.length ? `<div style="margin-top:${px(20 * scale)};">${meta.join('')}</div>` : '';
+  const showDivider = !hideEventMeta && (meta.length || rsvp);
+
+  const content = `
+    <div style="text-align:center;">
+      ${emblem}
+      ${flyer.eyebrow ? `<div style="font-family:${font.heading}; font-weight:700; font-size:${px(fitSize(flyer.eyebrow, 14 * scale, 34))};
+        letter-spacing:0.24em; text-transform:uppercase; color:${c.goldText};">${esc(flyer.eyebrow)}</div>` : ''}
+      <div style="font-family:${font.heading}; font-weight:800; font-size:${px(fitSize(event.title, 44 * scale, 15))}; line-height:1.08;
+        color:${c.ink}; margin-top:${px(10 * scale)};">${esc(event.title || 'Untitled event')}</div>
+      ${flyer.tagline ? `<div style="font-size:${px(fitSize(flyer.tagline, 16.5 * scale, 48, { min: 0.7 }))}; font-style:italic; line-height:1.4;
+        color:${tint(c.ink, 0.78)}; margin:${px(10 * scale)} auto 0; max-width:${px(440 * scale)};">${esc(flyer.tagline)}</div>` : ''}
+      ${img}
+      ${showDivider ? divider : ''}
+      ${rsvp}
+      ${metaBlock}
+      ${flyer.note ? `<div style="margin-top:${px(16 * scale)}; font-size:${px(fitSize(flyer.note, 12.5 * scale, 64, { min: 0.75 }))};
+        font-style:italic; color:${tint(c.ink, 0.62)};">${esc(flyer.note)}</div>` : ''}
+    </div>`;
+
+  return `<div style="background:${c.bg}; padding:${px(12 * scale)}; font-family:${font.body};">
+    <div style="border:2px solid ${c.gold};">
+      <div style="border:1px solid ${c.goldSoft}; margin:${px(4 * scale)}; padding:${px(42 * scale)} ${px(30 * scale)} ${px(38 * scale)};">
+        ${content}
+      </div>
+    </div>
+  </div>`;
+}
+
 const RENDERERS = {
+  classic: renderClassic,
   blue: renderBlue, white: renderWhite, red: renderRed, retro: renderRetro,
   spotlight: renderSpotlight, panel: renderPanel,
 };

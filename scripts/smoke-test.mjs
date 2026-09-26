@@ -423,8 +423,8 @@ let guests = [];
 
   const pres = await A.api('GET', '/api/flyer/presets');
   const ids = (pres.data?.styles || []).map((s) => s.id);
-  check('six templates, four portrait then two wide',
-    ids.join(',') === 'blue,white,red,retro,spotlight,panel', ids.join(','));
+  check('seven templates, five portrait then two wide',
+    ids.join(',') === 'classic,blue,white,red,retro,spotlight,panel', ids.join(','));
   const wideIds = (pres.data?.styles || []).filter((s) => s.landscape).map((s) => s.id);
   check('wide templates flagged for the designer', wideIds.join(',') === 'spotlight,panel', wideIds.join(','));
 

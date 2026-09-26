@@ -436,7 +436,7 @@ let guests = [];
   });
   const darkBgHtml = await darkBg.text();
   check('dark flyer paints its background image under a reverse vignette',
-    darkBgHtml.includes('/files/bgIMGxxxx') && darkBgHtml.includes('radial-gradient'));
+    darkBgHtml.includes('/files/bgIMGxxxx') && darkBgHtml.includes('rgba(6,9,16,1)'));
   const darkPlain = await A.raw('POST', '/api/flyer/preview', {
     body: { event: { title: 'Gala Evening', date: future }, flyer: { style: 'dark' } },
   });

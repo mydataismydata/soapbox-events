@@ -37,6 +37,22 @@ async function inlineImages(root) {
   }));
 }
 
+// The Dark template paints its photo as a CSS background-image, which the SVG
+// image sandbox will not fetch either — so inline those the same way. Only
+// touches inline styles that carry a real url() (gradients are left alone).
+async function inlineBgImages(root) {
+  const els = [...root.querySelectorAll('[style*="background-image"]')];
+  await Promise.all(els.map(async (el) => {
+    const style = el.getAttribute('style') || '';
+    const m = style.match(/url\((['"]?)([^'")]+)\1\)/i);
+    if (!m || m[2].startsWith('data:')) return;
+    const res = await fetch(m[2], { credentials: 'same-origin' });
+    if (!res.ok) throw new Error(`Could not read the flyer background (${res.status})`);
+    const dataUrl = await dataUrlFor(await res.blob());
+    el.setAttribute('style', style.replace(m[0], `url('${dataUrl}')`));
+  }));
+}
+
 function openFrame(srcdoc, width) {
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
@@ -113,6 +129,7 @@ export async function flyerToJpeg(srcdoc) {
     holder.innerHTML = RESET;
     holder.appendChild(card.cloneNode(true));
     await inlineImages(holder);
+    await inlineBgImages(holder);
 
     // XMLSerializer, not innerHTML: <foreignObject> content is parsed as XML,
     // so void elements have to come out self-closed.

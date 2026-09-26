@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import { getOrg, orgDb, uploadsDir, insertId } from '../lib/db.js';
 import { resolveSession } from '../lib/auth.js';
 import { esc, textToHtml, publicPage, expandImageMarkers } from '../lib/html.js';
-import { renderFlyer, flyerColors, mixWithWhite } from '../lib/flyer.js';
+import { renderFlyer } from '../lib/flyer.js';
 import {
   parseFlyer, publicUrl, flyerImageUrls, flyerBgUrl, verifyContactToken, orgImageUrl, PREVIEW_UNSUB,
 } from '../lib/sending.js';
@@ -85,11 +85,6 @@ function acceptedSeats(db, eventId, excludeInviteId = null) {
 function seatsLeft(db, event, excludeInviteId = null) {
   if (!event.capacity) return null;
   return Math.max(0, event.capacity - acceptedSeats(db, event.id, excludeInviteId));
-}
-
-function pageBgFor(event) {
-  const colors = flyerColors(parseFlyer(event));
-  return mixWithWhite(colors.ink, 0.07);
 }
 
 function flyerHtmlFor(req, event) {
@@ -241,7 +236,6 @@ publicRouter.get('/e/:slug', (req, res) => {
 
   res.send(publicPage({
     title: event.title,
-    pageBg: pageBgFor(event),
     bodyHtml: `
       ${previewBanner}
       ${cancelled ? statusBanner('This event has been cancelled.', 'no') : ''}
@@ -298,7 +292,7 @@ publicRouter.post('/e/:slug/rsvp', (req, res) => {
     const left = seatsLeft(db, event, invite?.id ?? null);
     if (left !== null && party > left) {
       return res.send(publicPage({
-        title: 'Event is full', pageBg: pageBgFor(event),
+        title: 'Event is full',
         bodyHtml: `${flyerHtmlFor(req, event)}
           <div class="pub-card"><h2>Not enough places left</h2>
           <p class="pub-muted">${left === 0 ? 'The event has filled up.' : `Only ${left} place${left === 1 ? '' : 's'} remain${left === 1 ? 's' : ''}.`}
@@ -360,7 +354,7 @@ function respondCard(req, event, invite) {
     <h2>${invite.response === null ? 'Will you be there?' : 'Change your response'}</h2>
     <div class="pub-actions">
       ${yesDisabled
-        ? `<span class="pub-btn" style="background:#e5e7eb; color:#9ca3af;">Event is full</span>`
+        ? `<span class="pub-btn pub-btn-off">Event is full</span>`
         : `<a class="pub-btn pub-btn-yes" href="${base}/accept">&#10003;&nbsp; ${invite.response === 'yes' ? "I'm still coming" : "I'll be there"}</a>`}
       <a class="pub-btn pub-btn-no" href="${base}/decline">&#10007;&nbsp; ${invite.response === 'no' ? 'Still can’t make it' : 'Can’t make it'}</a>
     </div>
@@ -390,7 +384,6 @@ publicRouter.get('/i/:token', (req, res) => {
 
   res.send(publicPage({
     title: event.title,
-    pageBg: pageBgFor(event),
     bodyHtml: `
       ${banner}
       ${flyerHtmlFor(req, event)}
@@ -551,7 +544,6 @@ publicRouter.get('/b/:slug', (req, res) => {
 
   res.send(publicPage({
     title: b.title,
-    pageBg: mixWithWhite(flyerColors(flyer).ink, 0.07),
     bodyHtml: `
       ${b.status === 'draft' ? statusBanner('Draft preview — this broadcast has not been sent yet.', 'warn') : ''}
       ${flyerHtml}

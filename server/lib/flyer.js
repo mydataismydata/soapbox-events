@@ -158,14 +158,6 @@ export function tint(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-// Opaque pastel derived from a color — used for page backgrounds so they
-// render identically regardless of the viewer's light/dark preference.
-export function mixWithWhite(hex, ratio) {
-  const { r, g, b } = hexToRgb(hex);
-  const mix = (c) => Math.round(255 + (c - 255) * ratio).toString(16).padStart(2, '0');
-  return `#${mix(r)}${mix(g)}${mix(b)}`;
-}
-
 // --- rendering helpers ------------------------------------------------------
 
 function fontOf(flyer) {
@@ -779,9 +771,11 @@ export function renderFlyer({ event, flyer: rawFlyer, imageUrl = '', imageUrls =
   if (snapshot) box = `width:100%; max-width:${wide ? SNAPSHOT_WIDE : SNAPSHOT_WIDTH}px; margin:0 auto;`;
   else if (wide) box = 'width:min(920px, calc(100vw - 32px)); margin-left:50%; transform:translateX(-50%);';
   else box = 'max-width:640px; margin:0 auto;';
+  // On a page the card matches the rest of the page: square, with a hairline
+  // border and only the faintest lift (the "Clean light grids" card).
   const chrome = snapshot
     ? ''
-    : 'border-radius:12px; box-shadow:0 2px 8px rgba(10,10,15,0.12), 0 12px 40px rgba(10,10,15,0.12);';
+    : 'border:1px solid #e0e6ee; box-shadow:0 1px 2px rgba(23,35,52,0.06);';
   // overflow-wrap is inherited, so one declaration here keeps a single very
   // long word (a URL, say) inside every template.
   return `<div style="${box} overflow:hidden; overflow-wrap:break-word; ${chrome}">${inner}</div>`;
@@ -800,11 +794,12 @@ export function snapshotWidth(flyer) {
 // mode the page furniture goes away so the document is exactly the flyer,
 // ready to be drawn onto a canvas.
 export function renderFlyerDocument({ event, flyer, imageUrl, imageUrls, bgUrl = '', hideEventMeta = false, snapshot = false }) {
-  const colors = flyerColors(normalizeFlyer(flyer));
   const html = renderFlyer({ event, flyer, imageUrl, imageUrls, bgUrl, hideEventMeta, snapshot });
+  // The same pale blue-gray canvas the guest pages sit on, so the preview is
+  // the page as guests see it.
   const body = snapshot
     ? 'margin:0; padding:0; background:#ffffff; color-scheme: light;'
-    : `margin:0; padding:22px 10px; background:${mixWithWhite(colors.ink, 0.07)}; color-scheme: light;`;
+    : 'margin:0; padding:22px 10px; background:#eff3f8; color-scheme: light;';
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <style>*, *::before, *::after { box-sizing: border-box; }

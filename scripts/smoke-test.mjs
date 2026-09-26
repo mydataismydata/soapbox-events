@@ -507,6 +507,12 @@ let guests = [];
   check('landing page shows venue phone + directions link', landing.status === 200
     && html.includes('(555) 100-2000') && html.includes('Get directions')
     && html.includes('https://maps.example.com/grandhall'));
+  // The guest pages wear the admin app's look, typeface included.
+  check('guest pages use the app typeface', html.includes("font-family: 'IBM Plex Sans'")
+    && html.includes('/fonts/ibm-plex-sans/ibm-plex-sans-latin-400-normal.woff2'));
+  const font = await fetch(`${BASE}/fonts/ibm-plex-mono/ibm-plex-mono-latin-500-normal.woff2`);
+  check('the typeface is served from /fonts', font.status === 200
+    && /font\/woff2/.test(font.headers.get('content-type') || ''));
   const ics = await fetch(`${BASE}/o/alpha/e/${eventSlug}/ics`);
   const icsText = await ics.text();
   check('ICS download works', ics.status === 200 && icsText.includes('BEGIN:VCALENDAR') && icsText.includes('SUMMARY:Test Gala'));

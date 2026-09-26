@@ -80,6 +80,14 @@ app.use('/api', api);
 
 app.use('/o/:orgSlug', publicRouter);
 
+// The admin app bundles IBM Plex through Vite; the server-rendered guest pages
+// load the same font files from here, straight out of the @fontsource packages,
+// so both halves of the product share one typeface.
+for (const pkg of ['ibm-plex-sans', 'ibm-plex-mono']) {
+  app.use(`/fonts/${pkg}`, express.static(path.join(config.root, 'node_modules', '@fontsource', pkg, 'files'),
+    { index: false, maxAge: '365d', immutable: true }));
+}
+
 // --- admin SPA -------------------------------------------------------------
 
 const appDir = path.join(config.root, 'server', 'public', 'app');

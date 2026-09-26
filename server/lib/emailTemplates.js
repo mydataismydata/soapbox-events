@@ -1,6 +1,13 @@
 // HTML email rendering. Emails use table layout and inline styles for broad
 // client compatibility, and always include a plain-text alternative.
 //
+// The look follows the guest pages and the admin app ("Clean light grids"):
+// a square white card with a hairline border on a pale blue-gray page,
+// 3px-rounded buttons, and small monospace uppercase labels. Inboxes rarely
+// load web fonts, so the stacks lead with IBM Plex for the readers who have it
+// and fall back to the system font; monospace fallbacks exist everywhere, so
+// the labels keep their look.
+//
 // The Accept / Decline buttons are deliberately rendered in fixed, high-
 // contrast colors (green / red) regardless of the flyer palette so they are
 // instantly identifiable in every invitation.
@@ -9,49 +16,54 @@ import { sanitizeRichText, looksLikeHtml, stripHtml } from './sanitizeHtml.js';
 import { formatDate, formatTimeRange, formatWhen } from './format.js';
 import { contrastOn } from './flyer.js';
 
-const ACCEPT_COLOR = '#16a34a';
+const FONT = "'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const MONO = "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace";
+const ACCEPT_COLOR = '#1f7a45';
+const DECLINE_COLOR = '#a33d2a';
 // Email has no stylesheet to lean on, so links carry their own colour.
-const EMAIL_LINK_STYLE = 'color:#4f46e5;';
-const DECLINE_COLOR = '#dc2626';
+const LINK_COLOR = '#1f5fbf';
+const EMAIL_LINK_STYLE = `color:${LINK_COLOR};`;
 
 function button(href, label, bg, color = '#ffffff') {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="display:inline-table;"><tr>
-    <td bgcolor="${bg}" style="border-radius:9px;">
+    <td bgcolor="${bg}" style="border-radius:3px;">
       <a href="${esc(href)}" target="_blank"
-         style="display:inline-block; padding:14px 32px; font-size:16px; font-weight:700;
-                color:${color}; text-decoration:none; border-radius:9px;">${label}</a>
+         style="display:inline-block; padding:13px 28px; font-family:${FONT}; font-size:15px; font-weight:600;
+                color:${color}; text-decoration:none; border-radius:3px;">${label}</a>
     </td></tr></table>`;
 }
 
-function detailRow(label, value) {
-  if (!value) return '';
+// One labelled line of the details box: a small monospace uppercase label,
+// then the value. Every row after the first gets a hairline above it — the
+// grid look of the guest pages' details card.
+function detailRow(label, value, first) {
+  const rule = first ? '' : ' border-top:1px solid #e0e6ee;';
   return `<tr>
-    <td style="padding:7px 14px 7px 0; font-size:12px; text-transform:uppercase; letter-spacing:0.08em;
-        color:#6b7280; vertical-align:top; white-space:nowrap;">${esc(label)}</td>
-    <td style="padding:7px 0; font-size:15px; color:#1f2937;">${esc(value)}</td>
+    <td style="padding:12px 16px 9px 0;${rule} font-family:${MONO}; font-size:11px; font-weight:500;
+        text-transform:uppercase; letter-spacing:0.08em; color:#566276; vertical-align:top; white-space:nowrap;">${esc(label)}</td>
+    <td style="padding:9px 0;${rule} font-size:15px; color:#172334;">${esc(value)}</td>
   </tr>`;
 }
 
 function detailsBox({ event, links }) {
   const rows = [
-    detailRow('When', formatWhen(event)),
-    detailRow('Where', [event.venue_name, event.venue_address].filter(Boolean).join(' — ')),
-    detailRow('Phone', event.venue_phone || ''),
-    detailRow('Host', event.host_name || ''),
-    event.rsvp_mode === 'rsvp' && event.rsvp_deadline
-      ? detailRow('RSVP by', formatDate(event.rsvp_deadline)) : '',
-  ].filter(Boolean).join('');
+    ['When', formatWhen(event)],
+    ['Where', [event.venue_name, event.venue_address].filter(Boolean).join(' — ')],
+    ['Phone', event.venue_phone || ''],
+    ['Host', event.host_name || ''],
+    event.rsvp_mode === 'rsvp' && event.rsvp_deadline ? ['RSVP by', formatDate(event.rsvp_deadline)] : null,
+  ].filter((r) => r && r[1]).map(([k, v], i) => detailRow(k, v, i === 0)).join('');
   if (!rows) return '';
   const eventLink = links?.event
-    ? `<a href="${esc(links.event)}" style="color:#4f46e5;">Open the event page</a>` : '';
+    ? `<a href="${esc(links.event)}" style="${EMAIL_LINK_STYLE}">Open the event page</a>` : '';
   const directions = event.venue_map_url
-    ? `<a href="${esc(event.venue_map_url)}" style="color:#4f46e5;">Get directions</a>` : '';
+    ? `<a href="${esc(event.venue_map_url)}" style="${EMAIL_LINK_STYLE}">Get directions</a>` : '';
   const linkLine = [eventLink, directions].filter(Boolean).join(' &nbsp;·&nbsp; ');
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-    style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; margin:22px 0 6px;">
-    <tr><td style="padding:16px 20px;">
-      <table role="presentation" cellpadding="0" cellspacing="0">${rows}</table>
-      ${linkLine ? `<div style="padding-top:10px; font-size:13.5px;">${linkLine}</div>` : ''}
+    style="background:#f6f8fb; border:1px solid #e0e6ee; margin:22px 0 6px;">
+    <tr><td style="padding:8px 20px 12px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+      ${linkLine ? `<div style="padding-top:12px; border-top:1px solid #e0e6ee; font-size:13.5px;">${linkLine}</div>` : ''}
     </td></tr></table>`;
 }
 
@@ -63,17 +75,16 @@ function shell({ preheader, contentHtml, footerHtml }) {
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="X-UA-Compatible" content="IE=edge"></head>
-<body style="margin:0; padding:0; background:#eef0f3;
-  font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+<body style="margin:0; padding:0; background:#eff3f8; font-family:${FONT};">
 <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">${esc(preheader || '')}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#eef0f3">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#eff3f8">
 <tr><td align="center" style="padding:26px 12px;">
   <table role="presentation" width="600" cellpadding="0" cellspacing="0"
-    style="max-width:600px; width:100%; background:#ffffff; border-radius:14px; overflow:hidden;">
-    <tr><td style="padding:30px 36px;">${contentHtml}</td></tr>
+    style="max-width:600px; width:100%; background:#ffffff; border:1px solid #e0e6ee;">
+    <tr><td style="padding:30px 36px; font-family:${FONT};">${contentHtml}</td></tr>
   </table>
   <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%;">
-    <tr><td align="center" style="padding:18px 24px; font-size:12px; line-height:1.6; color:#9ca3af;">
+    <tr><td align="center" style="padding:18px 24px; font-family:${FONT}; font-size:12px; line-height:1.6; color:#6f7a8c;">
       ${footerHtml}
     </td></tr>
   </table>
@@ -91,7 +102,7 @@ function bodyBlock(bodyText, imageUrl) {
     ? expandImageMarkers(sanitizeRichText(bodyText, { mode: 'email', maxLength: 60000 }), imageUrl)
     : textToHtml(bodyText, { imageUrl, linkStyle: EMAIL_LINK_STYLE });
   if (!html) return '';
-  return `<div style="font-size:15.5px; line-height:1.65; color:#374151;">${html}</div>`;
+  return `<div style="font-size:15.5px; line-height:1.65; color:#172334;">${html}</div>`;
 }
 
 // The plain-text alternative of whichever body shape came in.
@@ -115,23 +126,23 @@ function textBlocks(...blocks) {
 function footer({ orgName, toEmail, unsubUrl, note, viewUrl }) {
   return [
     note ? esc(note) : '',
-    viewUrl ? `<a href="${esc(viewUrl)}" style="color:#9ca3af;">View this email online</a>` : '',
+    viewUrl ? `<a href="${esc(viewUrl)}" style="color:#6f7a8c;">View this email online</a>` : '',
     `This email was sent to ${esc(toEmail)} by ${esc(orgName)}.`,
-    unsubUrl ? `<a href="${esc(unsubUrl)}" style="color:#9ca3af;">Stop receiving emails from ${esc(orgName)}</a>` : '',
+    unsubUrl ? `<a href="${esc(unsubUrl)}" style="color:#6f7a8c;">Stop receiving emails from ${esc(orgName)}</a>` : '',
   ].filter(Boolean).join('<br>');
 }
 
 function rsvpButtons(links) {
   return `
   <div style="text-align:center; padding:10px 0 4px;">
-    <div style="font-size:17px; font-weight:700; color:#1f2937; padding-bottom:14px;">Will you be there?</div>
+    <div style="font-size:17px; font-weight:600; color:#172334; padding-bottom:14px;">Will you be there?</div>
     <table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr>
       <td>${button(links.accept, '&#10003;&nbsp; Accept', ACCEPT_COLOR)}</td>
-      <td style="width:18px;">&nbsp;</td>
+      <td style="width:12px;">&nbsp;</td>
       <td>${button(links.decline, '&#10007;&nbsp; Decline', DECLINE_COLOR)}</td>
     </tr></table>
-    <div style="padding-top:14px; font-size:13px; color:#6b7280;">
-      Buttons not working? <a href="${esc(links.rsvp)}" style="color:#4f46e5;">Open your RSVP page</a>
+    <div style="padding-top:14px; font-size:13px; color:#566276;">
+      Buttons not working? <a href="${esc(links.rsvp)}" style="${EMAIL_LINK_STYLE}">Open your RSVP page</a>
     </div>
   </div>`;
 }
@@ -142,7 +153,7 @@ function rsvpButtons(links) {
 function flyerPicture(url, links) {
   if (!url) return '';
   const img = `<img src="${esc(url)}" alt="Event flyer" width="600"
-    style="width:100%; max-width:600px; display:block; border:0; border-radius:10px;">`;
+    style="width:100%; max-width:600px; display:block; border:0;">`;
   const wrapped = links?.event
     ? `<a href="${esc(links.event)}" target="_blank" style="text-decoration:none;">${img}</a>` : img;
   return `<div style="padding:26px 0 2px; line-height:0;">${wrapped}</div>`;
@@ -159,7 +170,7 @@ export function renderInvitationEmail({ org, event, accent, toName, toEmail, bod
     ${isRsvp ? rsvpButtons(links) : `
       <div style="text-align:center; padding:16px 0 4px;">
         ${button(links.event, 'View event details', accent, contrastOn(accent))}
-        <div style="padding-top:12px; font-size:13px; color:#6b7280;">No RSVP needed — this is an open event.</div>
+        <div style="padding-top:12px; font-size:13px; color:#566276;">No RSVP needed — this is an open event.</div>
       </div>`}
     ${flyerPicture(flyerImageUrl, links)}
   `;

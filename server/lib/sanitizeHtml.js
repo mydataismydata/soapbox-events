@@ -27,7 +27,7 @@ const EMAIL_STYLES = {
   'rt-fs-lg': 'font-size:19px;',
   'rt-fs-xl': 'font-size:25px;',
 };
-const EMAIL_LINK_STYLE = 'color:#4f46e5;';
+const EMAIL_LINK_STYLE = 'color:#1f5fbf;';
 // Widths mirror the marker syntax: the body column is 600px.
 const IMAGE_WIDTHS = { 'rt-img-small': 200, 'rt-img-half': 300 };
 
@@ -86,7 +86,7 @@ function imageHtml(src, cls, email) {
   if (!email) return `<img src="${attrEscape(src)}" alt=""${cls ? ` class="${cls}"` : ''}>`;
   const centre = width < 600 ? ' margin-left:auto; margin-right:auto;' : '';
   return `<img src="${attrEscape(src)}" alt="" width="${width}" style="width:100%;`
-    + ` max-width:${width}px; height:auto; display:block; border:0; border-radius:8px;${centre}">`;
+    + ` max-width:${width}px; height:auto; display:block; border:0;${centre}">`;
 }
 
 // `mode: 'email'` swaps the stylesheet's classes for inline styles, which is

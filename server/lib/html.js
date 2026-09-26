@@ -33,7 +33,7 @@ function imageTag(url, size) {
   const w = IMAGE_WIDTHS[size] || IMAGE_WIDTHS.full;
   const centre = w < IMAGE_WIDTHS.full ? ' margin-left:auto; margin-right:auto;' : '';
   return `<img src="${esc(url)}" alt="" width="${w}" style="width:100%; max-width:${w}px;`
-    + ` height:auto; display:block; border:0; border-radius:8px;${centre}">`;
+    + ` height:auto; display:block; border:0;${centre}">`;
 }
 
 // Replaces markers with <img>, or removes them when there is no way to build
@@ -123,58 +123,90 @@ export function textToHtml(text, { imageUrl, linkStyle } = {}) {
     .join('\n');
 }
 
+// The guest pages wear the admin app's "Clean light grids" look: white square
+// cards with hairline borders on a pale blue-gray page, 3px-rounded controls,
+// IBM Plex Sans for words and IBM Plex Mono for small uppercase labels. The
+// values mirror web/src/styles/tokens.css; the fonts are the same files the
+// app bundles, served from /fonts (see server/index.js).
+const fontFace = (family, pkg, weight) => `@font-face { font-family: '${family}'; font-style: normal;
+    font-weight: ${weight}; font-display: swap; src: url('/fonts/${pkg}/${pkg}-latin-${weight}-normal.woff2') format('woff2'); }`;
+const FONT_FACES = [
+  ...[400, 500, 600, 700].map((w) => fontFace('IBM Plex Sans', 'ibm-plex-sans', w)),
+  ...[400, 500, 600].map((w) => fontFace('IBM Plex Mono', 'ibm-plex-mono', w)),
+].join('\n  ');
+
 const PUBLIC_CSS = `
+  ${FONT_FACES}
+  :root {
+    --canvas: #eff3f8; --surface: #ffffff; --surface-2: #f6f8fb; --surface-3: #eaeff5;
+    --line: #e0e6ee; --line-strong: #cbd4e1;
+    --ink: #172334; --ink-2: #566276; --faint: #6f7a8c;
+    --accent: #1f5fbf; --accent-hover: #174a96;
+    --ok: #1f7a45; --ok-hover: #19663a; --ok-soft: #e9f5ee; --ok-line: #c4e2d0;
+    --bad: #a33d2a; --bad-soft: #fdf1ee; --bad-line: #dba396;
+    --warn: #8a6400; --warn-soft: #fdf6e3; --warn-line: #ecdcb0;
+    --font: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { color-scheme: light; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    color: #26272b; line-height: 1.55; -webkit-font-smoothing: antialiased;
+    font-family: var(--font); font-size: 15px; color: var(--ink); background: var(--canvas);
+    line-height: 1.55; -webkit-font-smoothing: antialiased;
   }
+  a { color: var(--accent); }
   .pub-wrap { max-width: 700px; margin: 0 auto; padding: 28px 16px 64px; }
   .pub-card {
-    background: #ffffff; border-radius: 14px; padding: 28px;
-    box-shadow: 0 1px 3px rgba(15, 15, 20, 0.09), 0 8px 28px rgba(15, 15, 20, 0.07);
-    margin-top: 20px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 0;
+    box-shadow: 0 1px 2px rgba(23, 35, 52, 0.05); padding: 24px 28px; margin-top: 16px;
   }
-  .pub-card h2 { font-size: 19px; margin-bottom: 12px; }
-  .pub-muted { color: #6b6f76; font-size: 14px; }
-  .pub-detail { display: flex; gap: 10px; padding: 7px 0; font-size: 15.5px; }
-  .pub-detail .k { min-width: 84px; color: #6b6f76; font-size: 13px; text-transform: uppercase;
-    letter-spacing: 0.06em; padding-top: 2px; }
+  .pub-card h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 14px; }
+  .pub-muted { color: var(--ink-2); font-size: 14px; }
+  .pub-detail { display: flex; gap: 16px; padding: 10px 0; font-size: 15px; }
+  .pub-detail + .pub-detail, .rt-content + .pub-detail { border-top: 1px solid var(--line); }
+  .pub-detail .k { flex: 0 0 84px; font-family: var(--mono); font-size: 11px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); padding-top: 3px; }
   .pub-btn {
-    display: inline-block; border: 0; cursor: pointer; text-decoration: none; text-align: center;
-    font-size: 16px; font-weight: 700; padding: 13px 30px; border-radius: 9px;
-    font-family: inherit;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px;
+    border: 1px solid transparent; border-radius: 3px; cursor: pointer; text-decoration: none;
+    text-align: center; font: inherit; font-size: 15px; font-weight: 600; line-height: 1.2;
+    padding: 10px 24px; transition: background 120ms ease, border-color 120ms ease;
   }
-  .pub-btn-yes { background: #16a34a; color: #ffffff; }
-  .pub-btn-no { background: #ffffff; color: #b91c1c; border: 2px solid #dc2626; }
-  .pub-btn-plain { background: #26272b; color: #ffffff; font-weight: 600; font-size: 14.5px;
-    padding: 10px 20px; }
-  .pub-btn-ghost { background: #f1f2f4; color: #26272b; font-weight: 600; font-size: 14.5px;
-    padding: 10px 20px; }
-  .pub-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+  .pub-btn-yes { background: var(--ok); border-color: var(--ok); color: #ffffff; }
+  .pub-btn-yes:hover { background: var(--ok-hover); border-color: var(--ok-hover); }
+  .pub-btn-no { background: var(--surface); border-color: var(--bad-line); color: var(--bad); }
+  .pub-btn-no:hover { background: var(--bad-soft); }
+  .pub-btn-plain { background: var(--accent); border-color: var(--accent); color: #ffffff;
+    font-size: 14px; min-height: 40px; padding: 8px 18px; }
+  .pub-btn-plain:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .pub-btn-ghost { background: var(--surface); border-color: var(--line-strong); color: var(--ink);
+    font-size: 14px; min-height: 40px; padding: 8px 18px; }
+  .pub-btn-ghost:hover { background: var(--surface-2); }
+  .pub-btn-off { background: var(--surface-3); border-color: var(--line); color: var(--faint); cursor: default; }
+  .pub-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
   .pub-field { margin-bottom: 14px; }
-  .pub-field label { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 5px; }
+  .pub-field label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
   .pub-field input, .pub-field select, .pub-field textarea {
-    width: 100%; font-size: 15.5px; font-family: inherit; padding: 10px 12px;
-    border: 1.5px solid #d5d8dd; border-radius: 8px; background: #fff; color: inherit;
+    width: 100%; min-height: 44px; font: inherit; font-size: 15px; padding: 9px 12px;
+    border: 1px solid var(--line-strong); border-radius: 3px; background: var(--surface); color: var(--ink);
   }
   .pub-field input:focus, .pub-field select:focus, .pub-field textarea:focus {
-    outline: 2px solid #6366f1; outline-offset: 1px; border-color: #6366f1;
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(31, 95, 191, 0.22);
   }
-  .pub-banner { border-radius: 10px; padding: 12px 16px; font-size: 15px; font-weight: 600;
-    margin-top: 20px; }
-  .pub-banner-ok { background: #dcfce7; color: #14532d; }
-  .pub-banner-no { background: #fee2e2; color: #7f1d1d; }
-  .pub-banner-warn { background: #fef3c7; color: #713f12; }
-  .pub-footer { text-align: center; margin-top: 28px; font-size: 12.5px; color: #9a9ea6; }
-  .pub-footer a { color: #9a9ea6; }
-  .pub-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .pub-chip { background: #f1f2f4; border-radius: 999px; padding: 5px 14px; font-size: 13.5px; }
+  .pub-banner { border: 1px solid transparent; border-radius: 0; padding: 12px 16px;
+    font-size: 14.5px; font-weight: 600; margin: 0 0 16px; }
+  .pub-banner-ok { background: var(--ok-soft); border-color: var(--ok-line); color: var(--ok); }
+  .pub-banner-no { background: var(--bad-soft); border-color: var(--bad-line); color: var(--bad); }
+  .pub-banner-warn { background: var(--warn-soft); border-color: var(--warn-line); color: var(--warn); }
+  .pub-footer { text-align: center; margin-top: 28px; font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); }
+  .pub-footer a { color: var(--faint); }
+  .pub-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pub-chip { background: var(--surface-3); color: var(--ink-2); border-radius: 3px; padding: 4px 10px; font-size: 13px; }
   .rt-content { line-height: 1.6; }
   .rt-content p { margin: 0 0 10px; }
   .rt-content p:last-child { margin-bottom: 0; }
-  .rt-content img { display: block; max-width: 100%; height: auto; border-radius: 8px; margin: 6px 0; }
+  .rt-content img { display: block; max-width: 100%; height: auto; border-radius: 0; margin: 6px 0; }
   .rt-content img.rt-img-half { max-width: 50%; margin-left: auto; margin-right: auto; }
   .rt-content img.rt-img-small { max-width: 200px; margin-left: auto; margin-right: auto; }
   .rt-ff-serif { font-family: Georgia, 'Times New Roman', serif; }
@@ -189,7 +221,7 @@ const PUBLIC_CSS = `
   }
 `;
 
-export function publicPage({ title, bodyHtml, pageBg = '#f2f3f5', footerHtml = '' }) {
+export function publicPage({ title, bodyHtml, footerHtml = '' }) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -198,9 +230,7 @@ export function publicPage({ title, bodyHtml, pageBg = '#f2f3f5', footerHtml = '
 <meta name="robots" content="noindex">
 <title>${esc(title)}</title>
 <link rel="icon" href="data:,">
-<style>${PUBLIC_CSS}
-  body { background: ${esc(pageBg)}; }
-</style>
+<style>${PUBLIC_CSS}</style>
 </head>
 <body>
 <div class="pub-wrap">

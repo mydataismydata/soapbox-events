@@ -633,16 +633,17 @@ function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideE
   const bg = bgUrl
     ? `background-color:${c.bg}; background-image:url('${esc(bgUrl)}'); background-size:cover; background-position:center; background-repeat:no-repeat;`
     : `background-color:${c.bg}; background-image:${c.ground};`;
-  // The reverse vignette: a solid-black rectangle inset from the card edges,
-  // with two stacked same-colour box-shadows bleeding outward — a dense inner
-  // one and a soft, far-reaching outer one — so the black fades into the photo
-  // gradually over a wide band rather than at a hard edge. Rectangular, matching
-  // the card's shape rather than an ellipse. Only rendered when there is a photo
-  // to reveal; a separate element (not a background layer) so it can carry the
-  // shadows.
+  // The reverse vignette: a solid-black rounded rectangle inset from the card
+  // edges, blurred with a large radius so its edges feather in both directions
+  // and melt into the photo — no hard outline, just a soft rectangular dark
+  // field with the photo revealed at the edges. The blur radius sets how wide
+  // the feather is; the inset fixes where the transition sits. Rectangular,
+  // matching the card rather than an ellipse. Only rendered when there is a
+  // photo to reveal; a separate element (not a background layer) so it can carry
+  // the blur without touching the crisp text above it.
   const core = bgUrl
-    ? `<div style="position:absolute; inset:${px(60 * scale)}; z-index:0; background:rgba(6,9,16,1); border-radius:${px(12 * scale)};
-        box-shadow:0 0 ${px(100 * scale)} ${px(12 * scale)} rgba(6,9,16,1), 0 0 ${px(210 * scale)} ${px(40 * scale)} rgba(6,9,16,0.72);"></div>`
+    ? `<div style="position:absolute; inset:${px(56 * scale)}; z-index:0; background:rgba(6,9,16,1);
+        border-radius:${px(28 * scale)}; filter:blur(${px(72 * scale)});"></div>`
     : '';
 
   const emblem = `<div style="width:${px(52 * scale)}; height:${px(52 * scale)}; margin:0 auto ${px(18 * scale)};

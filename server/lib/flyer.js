@@ -634,16 +634,16 @@ function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideE
     ? `background-color:${c.bg}; background-image:url('${esc(bgUrl)}'); background-size:cover; background-position:center; background-repeat:no-repeat;`
     : `background-color:${c.bg}; background-image:${c.ground};`;
   // The reverse vignette: a solid-black rounded rectangle inset from the card
-  // edges, blurred with a large radius so its edges feather in both directions
-  // and melt into the photo — no hard outline, just a soft rectangular dark
-  // field with the photo revealed at the edges. The blur radius sets how wide
-  // the feather is; the inset fixes where the transition sits. Rectangular,
-  // matching the card rather than an ellipse. Only rendered when there is a
-  // photo to reveal; a separate element (not a background layer) so it can carry
-  // the blur without touching the crisp text above it.
+  // edges, blurred so its edges feather in both directions and melt into the
+  // photo — no hard outline, just a soft rectangular dark field. The blur (28)
+  // is kept to under half the inset (60) so the feather dies out before the card
+  // edge, leaving the photo clean and bright at the perimeter with no dark ring;
+  // the inset stays under the content padding (below) so every line of text
+  // sits on the solid centre. A separate element (not a background layer) so it
+  // can carry the blur without touching the crisp text above it.
   const core = bgUrl
-    ? `<div style="position:absolute; inset:${px(56 * scale)}; z-index:0; background:rgba(6,9,16,1);
-        border-radius:${px(28 * scale)}; filter:blur(${px(72 * scale)});"></div>`
+    ? `<div style="position:absolute; inset:${px(60 * scale)}; z-index:0; background:rgba(6,9,16,1);
+        border-radius:${px(26 * scale)}; filter:blur(${px(28 * scale)});"></div>`
     : '';
 
   const emblem = `<div style="width:${px(52 * scale)}; height:${px(52 * scale)}; margin:0 auto ${px(18 * scale)};
@@ -695,7 +695,7 @@ function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideE
     </div>`;
 
   return `<div style="position:relative; overflow:hidden; ${bg} color:${bright}; font-family:${font.body};
-    padding:${px(52 * scale)} ${px(46 * scale)} ${px(46 * scale)}; min-height:${px(430 * scale)};">
+    padding:${px(68 * scale)} ${px(64 * scale)} ${px(64 * scale)}; min-height:${px(430 * scale)};">
     ${core}
     ${content}
   </div>`;

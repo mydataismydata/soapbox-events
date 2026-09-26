@@ -210,7 +210,7 @@ const deadline = new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)
 
   const upd = await A.api('PUT', `/api/events/${eventId}`, {
     flyer: { style: 'red', font: 'sans', scale: 'l', eyebrow: 'Save the date', tagline: 'Dinner & dancing',
-      contact: 'Questions? Call Jane', showAddress: true,
+      contact: 'Questions? Call Jane', showAddress: true, bgTopHalf: true,
       imageColumns: 3, imageTokens: ['imgAAAAAA', 'imgBBBBBB', 'imgCCCCCC'], imageCaptions: ['Ada Speaker', 'Grace Speaker', 'Alan Speaker'] },
     email_subject: "You're invited: {{event_title}}",
     email_body: 'Hi {{first_name}},\n\nJoin us at {{venue_name}} on {{event_date}}.\n\nRSVP: {{rsvp_link}}',
@@ -221,6 +221,7 @@ const deadline = new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)
   check('flyer image tokens + captions stored', uflyer.imageTokens?.[2] === 'imgCCCCCC' && uflyer.imageCaptions?.[1] === 'Grace Speaker');
   check('flyer mirrors first image for legacy readers', uflyer.imageToken === 'imgAAAAAA' && uflyer.imageCaption === 'Ada Speaker');
   check('flyer stores contact + showAddress', uflyer.contact === 'Questions? Call Jane' && uflyer.showAddress === true);
+  check('flyer stores the top-half background option', uflyer.bgTopHalf === true);
 
   // Rich-text description is sanitized: safe tags kept, scripts + junk dropped.
   const rich = await A.api('PUT', `/api/events/${eventId}`, {
@@ -443,6 +444,19 @@ let guests = [];
   const darkPlainHtml = await darkPlain.text();
   check('dark flyer with no image uses a gradient ground',
     darkPlain.status === 200 && !darkPlainHtml.includes('/files/') && darkPlainHtml.includes('radial-gradient'));
+  // "Overlay on top half only": the photo is fitted to the width along the top
+  // (an <img> in a box capped at halfway plus the fade), not a covering
+  // background, and the vignette still sits over it.
+  const darkTop = await A.raw('POST', '/api/flyer/preview', {
+    body: { event: { title: 'Gala Evening', date: future },
+      flyer: { style: 'dark', bgToken: 'bgIMGxxxx', bgTopHalf: true } },
+  });
+  const darkTopHtml = await darkTop.text();
+  check('dark top-half fits the photo to the width and fades it out from halfway',
+    /<img src="[^"]*\/files\/bgIMGxxxx"[^>]*width:100%; height:auto/.test(darkTopHtml)
+      && darkTopHtml.includes('max-height:calc(50% + ') && darkTopHtml.includes('mask-image:linear-gradient')
+      && !darkTopHtml.includes("background-image:url('"));
+  check('dark top-half keeps the vignette over the photo', darkTopHtml.includes('filter:blur('));
 
   // A long tagline must shrink and wrap rather than run off the flyer's edge.
   const longTag = 'Doors open early for coffee, live music, and a neighbourhood potluck supper';

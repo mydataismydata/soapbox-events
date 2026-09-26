@@ -246,7 +246,7 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
   // template uses it, so the field appears when Dark is selected.
   const background = flyer.style === 'dark' ? (
     <Field label="Background image"
-      hint="Fills the whole flyer behind the text. It’s automatically darkened with a gradient so the words stay readable. Tall/portrait photos work best. JPEG/PNG/GIF/WebP up to 5 MB.">
+      hint="Sits behind the text and is darkened with a gradient so the words stay readable. Tall/portrait photos work best. JPEG/PNG/GIF/WebP up to 5 MB.">
       <input ref={bgFileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
         style={{ display: 'none' }} onChange={(e) => uploadBg(e.target.files?.[0])} />
       <div className="row">
@@ -261,11 +261,22 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
           </button>
         ) : null}
       </div>
-      {!flyer.bgToken ? (
+      {/* Wrapped in a div: as a direct child of .field the label would pick
+          up the field-label styling (block, bold) instead of .checkbox. */}
+      {flyer.bgToken ? (
+        <div>
+          <label className="checkbox">
+            <input type="checkbox" checked={!!flyer.bgTopHalf}
+              onChange={(e) => set({ bgTopHalf: e.target.checked })} />
+            <span><span className="cb-label">Overlay on top half only</span>
+              <div className="cb-sub">Fits the photo to the flyer’s width along the top and fades it into solid black from halfway down, so the lower half is plain black.</div></span>
+          </label>
+        </div>
+      ) : (
         <p className="small muted" style={{ marginTop: 8 }}>
           No image yet — the flyer shows a deep navy gradient until you add one.
         </p>
-      ) : null}
+      )}
     </Field>
   ) : null;
 

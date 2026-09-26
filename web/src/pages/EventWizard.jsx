@@ -27,7 +27,7 @@ const BLANK = {
     style: 'classic', font: 'sans', scale: 'm',
     eyebrow: "You're invited", tagline: '', note: '', contact: '', showHost: true, showAddress: false,
     imageColumns: 1, imageTokens: [], imageCaptions: [], imageToken: '', imageCaption: '',
-    includeFlyerImage: false, flyerImageToken: '', bgToken: '',
+    includeFlyerImage: false, flyerImageToken: '', bgToken: '', bgTopHalf: false,
   },
 };
 

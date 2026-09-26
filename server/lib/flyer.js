@@ -80,6 +80,7 @@ export const DEFAULT_FLYER = {
   includeFlyerImage: false, // show a picture of the flyer in the invitation email
   flyerImageToken: '', // upload token of that picture, rendered by the designer
   bgToken: '', // full-bleed background image, used by the Dark template
+  bgTopHalf: false, // Dark: fit that image to the width along the top, fading to black from halfway down
 };
 
 export function normalizeFlyer(raw) {
@@ -117,6 +118,7 @@ export function normalizeFlyer(raw) {
   f.includeFlyerImage = Boolean(f.includeFlyerImage);
   f.flyerImageToken = validToken(f.flyerImageToken);
   f.bgToken = validToken(f.bgToken);
+  f.bgTopHalf = Boolean(f.bgTopHalf);
   return f;
 }
 
@@ -614,11 +616,26 @@ function renderClassic({ event, flyer, colors, font, scale, images, hostLine, hi
   </div>`;
 }
 
+// The opacity profile of a blurred edge — the Gaussian falloff filter:blur gives
+// the Dark vignette — sampled at nine even steps and stretched to run exactly
+// 0 → 1, so a gradient built from it feathers the same way the vignette does.
+const FEATHER_STEPS = [0, 0.046, 0.142, 0.299, 0.5, 0.701, 0.858, 0.954, 1];
+
+// A mask that shows its box fully, then fades it out top-to-bottom across the
+// last `band` px, shaped like the vignette's blurred edge.
+function fadeOutMask(band) {
+  const last = FEATHER_STEPS.length - 1;
+  const stops = FEATHER_STEPS.map((a, i) => `rgba(0,0,0,${+(1 - a).toFixed(3)}) calc(100% - ${px(band * (1 - i / last))})`);
+  return `linear-gradient(to bottom, ${stops.join(', ')})`;
+}
+
 // A dramatic dark invitation. An uploaded photo (the flyer's Background image)
-// fills the card, and a rectangular "reverse vignette" — a solid-black core
-// inset from the edges with a soft shadow bleeding outward — hides the photo
-// behind the text and reveals it only in a frame around the card. Every line
-// also carries a soft shadow. With no photo it falls back to a rich radial navy
+// fills the card, and a rectangular "reverse vignette" — a blurred solid-black
+// core inset from the edges — hides the photo behind the text and reveals it
+// only in a frame around the card. With "Overlay on top half only" the photo is
+// instead fitted to the width along the top and fades to black from halfway
+// down, with the same vignette over the part it shows in. Every line also
+// carries a soft shadow. With no photo it falls back to a rich radial navy
 // ground, so the style still looks intentional on its own.
 function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, bgUrl }) {
   const c = colors;
@@ -626,24 +643,51 @@ function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideE
   const vb = venueTimeBits(event, flyer);
   const bright = c.ink;
 
-  // The photo is the card's background. The url() sits inside a double-quoted
-  // style="" attribute, so it uses single quotes internally; bgUrl is a
-  // server-built /files/<token> URL (alphanumeric token), so it carries no
-  // quotes of its own.
-  const bg = bgUrl
-    ? `background-color:${c.bg}; background-image:url('${esc(bgUrl)}'); background-size:cover; background-position:center; background-repeat:no-repeat;`
-    : `background-color:${c.bg}; background-image:${c.ground};`;
+  // `shade` is the black the vignette and the top-half fade both go to, and
+  // `feather` the vignette's blur radius — shared so the two feather alike.
+  const shade = 'rgba(6,9,16,1)';
+  const feather = 28 * scale;
+  const topHalf = Boolean(bgUrl && flyer.bgTopHalf);
+
+  // Normally the photo is the card's background, covering it. The url() sits
+  // inside a double-quoted style="" attribute, so it uses single quotes
+  // internally; bgUrl is a server-built /files/<token> URL (alphanumeric token),
+  // so it carries no quotes of its own. In top-half mode the card itself is
+  // plain `shade`, so the blacked-out lower half has no seam against it.
+  let bg;
+  if (topHalf) bg = `background-color:${shade};`;
+  else if (bgUrl) bg = `background-color:${c.bg}; background-image:url('${esc(bgUrl)}'); background-size:cover; background-position:center; background-repeat:no-repeat;`;
+  else bg = `background-color:${c.bg}; background-image:${c.ground};`;
+
+  // Top half only: the photo sits in its own box at the top, the card's full
+  // width at its natural height, and fades out over the vignette's feather —
+  // four blur radii, the visible span of a blurred edge — into the card's plain
+  // `shade`. The box is capped at halfway down plus that fade, so a tall photo
+  // starts fading exactly halfway; a short one fades out before its own bottom
+  // edge instead, so there is never a hard line where the photo ends. It is a
+  // mask rather than a black overlay: the box can end on a fraction of a pixel,
+  // and an overlay lets a sliver of the photo bleed through on that last row as
+  // a faint bright line, whereas a mask makes the photo itself transparent.
+  const band = 4 * feather;
+  const mask = fadeOutMask(band);
+  const photo = topHalf
+    ? `<div style="position:absolute; top:0; left:0; right:0; max-height:calc(50% + ${px(band)}); overflow:hidden; z-index:0;
+        -webkit-mask-image:${mask}; mask-image:${mask};">
+        <img src="${esc(bgUrl)}" alt="" style="display:block; width:100%; height:auto;"></div>`
+    : '';
+
   // The reverse vignette: a solid-black rounded rectangle inset from the card
   // edges, blurred so its edges feather in both directions and melt into the
-  // photo — no hard outline, just a soft rectangular dark field. The blur (28)
-  // is kept to under half the inset (60) so the feather dies out before the card
-  // edge, leaving the photo clean and bright at the perimeter with no dark ring;
-  // the inset stays under the content padding (below) so every line of text
-  // sits on the solid centre. A separate element (not a background layer) so it
-  // can carry the blur without touching the crisp text above it.
+  // photo — no hard outline, just a soft rectangular dark field. The blur is
+  // kept to under half the inset (28 vs 60) so the feather dies out before the
+  // card edge, leaving the photo clean and bright at the perimeter with no dark
+  // ring; the inset stays under the content padding (below) so every line of
+  // text sits on the solid centre. It applies in top-half mode too, over the
+  // part of the card the photo shows in. A separate element (not a background
+  // layer) so it can carry the blur without touching the crisp text above it.
   const core = bgUrl
-    ? `<div style="position:absolute; inset:${px(60 * scale)}; z-index:0; background:rgba(6,9,16,1);
-        border-radius:${px(26 * scale)}; filter:blur(${px(28 * scale)});"></div>`
+    ? `<div style="position:absolute; inset:${px(60 * scale)}; z-index:0; background:${shade};
+        border-radius:${px(26 * scale)}; filter:blur(${px(feather)});"></div>`
     : '';
 
   const emblem = `<div style="width:${px(52 * scale)}; height:${px(52 * scale)}; margin:0 auto ${px(18 * scale)};
@@ -696,6 +740,7 @@ function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideE
 
   return `<div style="position:relative; overflow:hidden; ${bg} color:${bright}; font-family:${font.body};
     padding:${px(68 * scale)} ${px(64 * scale)} ${px(64 * scale)}; min-height:${px(430 * scale)};">
+    ${photo}
     ${core}
     ${content}
   </div>`;

@@ -32,7 +32,7 @@ const BLANK = {
   flyer: {
     style: 'classic', font: 'sans', scale: 'm',
     eyebrow: '', tagline: '', note: '', contact: '', showHost: false, showAddress: false,
-    imageColumns: 1, imageTokens: [], imageCaptions: [], imageToken: '', imageCaption: '', bgToken: '',
+    imageColumns: 1, imageTokens: [], imageCaptions: [], imageToken: '', imageCaption: '', bgToken: '', bgTopHalf: false,
   },
 };
 

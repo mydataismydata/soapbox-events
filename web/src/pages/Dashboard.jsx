@@ -121,10 +121,10 @@ export default function Dashboard() {
             <table className="table">
               <tbody>
                 {upcoming.map((ev) => (
-                  <tr key={ev.id}>
+                  <tr key={ev.id} className="row-link">
                     <td>
                       <div className="row" style={{ gap: 7 }}>
-                        <Link to={`/events/${ev.id}`} className="t-main">{ev.title}</Link>
+                        <Link to={`/events/${ev.id}`} className="t-main row-link-target">{ev.title}</Link>
                         {ev.status === 'draft' ? <Badge tone="amber" dot>Draft</Badge> : null}
                       </div>
                       <div className="t-sub">{ev.when}{ev.venue_name ? ` · ${ev.venue_name}` : ''}</div>
@@ -149,9 +149,9 @@ export default function Dashboard() {
               <table className="table">
                 <tbody>
                   {broadcasts.map((b) => (
-                    <tr key={b.id}>
+                    <tr key={b.id} className="row-link">
                       <td>
-                        <Link to={`/broadcasts/${b.id}`} className="t-main">{b.title}</Link>
+                        <Link to={`/broadcasts/${b.id}`} className="t-main row-link-target">{b.title}</Link>
                         <div className="t-sub">
                           {b.status === 'sent'
                             ? `${b.stats.recipients} recipient${b.stats.recipients === 1 ? '' : 's'}${b.sent_at ? ` · ${timeAgo(b.sent_at)}` : ''}`
@@ -179,12 +179,12 @@ export default function Dashboard() {
               <table className="table">
                 <tbody>
                   {recent.map((r) => (
-                    <tr key={r.id}>
+                    <tr key={r.id} className="row-link">
                       <td>
                         <span className="t-main">{r.name}</span>
                         {r.party_size > 1 ? <span className="muted"> +{r.party_size - 1}</span> : null}
                         <div className="t-sub">
-                          <Link to={`/events/${r.event_id}`}>{r.event_title}</Link> · {timeAgo(r.responded_at)}
+                          <Link to={`/events/${r.event_id}`} className="row-link-target">{r.event_title}</Link> · {timeAgo(r.responded_at)}
                         </div>
                       </td>
                       <td style={{ textAlign: 'right' }}><ResponseBadge response={r.response} /></td>

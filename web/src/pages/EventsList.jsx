@@ -6,9 +6,9 @@ import { Spinner, Empty, StatusBadge, Banner, Card, Icon } from '../ui.jsx';
 function EventRow({ ev }) {
   const s = ev.stats;
   return (
-    <tr>
+    <tr className="row-link">
       <td>
-        <Link to={`/events/${ev.id}`} className="t-main">{ev.title}</Link>
+        <Link to={`/events/${ev.id}`} className="t-main row-link-target">{ev.title}</Link>
         <div className="t-sub">{formatWhen(ev)}{ev.venue_name ? ` · ${ev.venue_name}` : ''}</div>
       </td>
       <td><StatusBadge status={ev.status} /></td>
@@ -22,8 +22,8 @@ function EventRow({ ev }) {
               {s.awaiting} awaiting · {s.invited} invited
             </span>}
       </td>
-      <td style={{ textAlign: 'right' }}>
-        <Link className="btn btn-sm" to={`/events/${ev.id}`}>Open</Link>
+      <td style={{ textAlign: 'right', width: 24 }}>
+        <Icon name="chevronRight" size={16} className="row-chevron" />
       </td>
     </tr>
   );

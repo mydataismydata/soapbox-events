@@ -513,6 +513,26 @@ a.t-main:hover { color: var(--c-accent-text); }
   justify-content: flex-end;
   align-items: center;
 }
+
+/* Clickable rows: a click anywhere in the row opens its record. The row's
+   primary link is stretched over the whole row with an ::after overlay; other
+   controls in the row sit above that overlay and keep working. */
+.table tr.row-link { position: relative; cursor: pointer; }
+.row-link-target::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.table tr.row-link a:not(.row-link-target),
+.table tr.row-link button,
+.table tr.row-link input,
+.table tr.row-link label,
+.table tr.row-link select,
+.table tr.row-link .copy-btn { position: relative; z-index: 1; }
+/* A muted chevron at the row end signals the row is clickable, and leans
+   toward the accent on hover. It sits under the stretched link. */
+.row-chevron { color: var(--c-faint); transition: color var(--transition), transform var(--transition); }
+.table tr.row-link:hover .row-chevron { color: var(--c-accent); transform: translateX(2px); }
 /* Search box with a leading glyph. */
 .search-field {
   position: relative;

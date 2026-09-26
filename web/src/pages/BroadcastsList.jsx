@@ -12,9 +12,9 @@ function BroadcastBadge({ status }) {
 function Row({ b }) {
   const s = b.stats;
   return (
-    <tr>
+    <tr className="row-link">
       <td>
-        <Link to={`/broadcasts/${b.id}`} className="t-main">{b.title}</Link>
+        <Link to={`/broadcasts/${b.id}`} className="t-main row-link-target">{b.title}</Link>
         <div className="t-sub">{b.subject || <em>no subject yet</em>}</div>
       </td>
       <td><BroadcastBadge status={b.status} /></td>
@@ -26,8 +26,8 @@ function Row({ b }) {
             {s.pending ? ` · ${s.pending} queued` : ''} · {s.recipients} recipients</span>}
       </td>
       <td className="t-sub nowrap">{timeAgo(b.sent_at || b.updated_at)}</td>
-      <td style={{ textAlign: 'right' }}>
-        <Link className="btn btn-sm" to={`/broadcasts/${b.id}`}>Open</Link>
+      <td style={{ textAlign: 'right', width: 24 }}>
+        <Icon name="chevronRight" size={16} className="row-chevron" />
       </td>
     </tr>
   );

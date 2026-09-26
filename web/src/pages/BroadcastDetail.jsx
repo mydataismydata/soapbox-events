@@ -25,6 +25,8 @@ export default function BroadcastDetail() {
   const [busy, setBusy] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyTo, setCopyTo] = useState('');
+  const [previewMsg, setPreviewMsg] = useState(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
 
   const load = useCallback(async (quiet = false) => {
     try {
@@ -63,6 +65,19 @@ export default function BroadcastDetail() {
     }
   }
 
+  // Render the message exactly as recipients get it, for a sample recipient.
+  // Works for a draft (what will be sent) and after sending (what went out).
+  async function preview() {
+    setPreviewBusy(true);
+    try {
+      setPreviewMsg(await api.post(`/api/broadcasts/${b.id}/email-preview`, {}));
+    } catch (err) {
+      toast(err.message, 'bad');
+    } finally {
+      setPreviewBusy(false);
+    }
+  }
+
   return (
     <div className="page">
       <div className="page-head">
@@ -74,6 +89,9 @@ export default function BroadcastDetail() {
           <p className="page-sub">{b.subject || <em>no subject</em>}</p>
         </div>
         <div className="head-actions">
+          <button className="btn" disabled={previewBusy} onClick={preview}>
+            <Icon name="eye" size={14} /> {previewBusy ? 'Rendering…' : 'Preview'}
+          </button>
           {b.web_version && b.status !== 'draft'
             ? <a className="btn" href={b.share_url} target="_blank" rel="noopener noreferrer">
                 View web version <Icon name="external" size={14} />
@@ -158,6 +176,15 @@ export default function BroadcastDetail() {
               placeholder="someone@example.com"
               onChange={(e) => setCopyTo(e.target.value)} />
           </Field>
+        </Modal>
+      ) : null}
+
+      {previewMsg ? (
+        <Modal title={`Preview — ${previewMsg.subject}`} size="lg" onClose={() => setPreviewMsg(null)}>
+          <p className="small muted" style={{ marginTop: 0 }}>
+            {b.status === 'draft' ? 'What will be sent' : 'What was sent'}, rendered for a sample recipient ({previewMsg.to}).
+          </p>
+          <iframe className="email-frame" title="Email preview" srcDoc={previewMsg.html} />
         </Modal>
       ) : null}
 

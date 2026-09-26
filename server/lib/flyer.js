@@ -634,14 +634,15 @@ function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideE
     ? `background-color:${c.bg}; background-image:url('${esc(bgUrl)}'); background-size:cover; background-position:center; background-repeat:no-repeat;`
     : `background-color:${c.bg}; background-image:${c.ground};`;
   // The reverse vignette: a solid-black rectangle inset from the card edges,
-  // with a same-colour box-shadow bleeding outward for a short, fast fade. This
-  // fills the centre with black (so the text reads) and reveals the photo in a
-  // rectangular frame — matching the card's shape rather than an ellipse. Only
-  // rendered when there is a photo to reveal. A separate element (not a
-  // background layer) so it can carry the shadow.
+  // with two stacked same-colour box-shadows bleeding outward — a dense inner
+  // one and a soft, far-reaching outer one — so the black fades into the photo
+  // gradually over a wide band rather than at a hard edge. Rectangular, matching
+  // the card's shape rather than an ellipse. Only rendered when there is a photo
+  // to reveal; a separate element (not a background layer) so it can carry the
+  // shadows.
   const core = bgUrl
-    ? `<div style="position:absolute; inset:${px(40 * scale)}; z-index:0; background:rgba(6,9,16,1);
-        border-radius:${px(8 * scale)}; box-shadow:0 0 ${px(34 * scale)} ${px(4 * scale)} rgba(6,9,16,1);"></div>`
+    ? `<div style="position:absolute; inset:${px(60 * scale)}; z-index:0; background:rgba(6,9,16,1); border-radius:${px(12 * scale)};
+        box-shadow:0 0 ${px(100 * scale)} ${px(12 * scale)} rgba(6,9,16,1), 0 0 ${px(210 * scale)} ${px(40 * scale)} rgba(6,9,16,0.72);"></div>`
     : '';
 
   const emblem = `<div style="width:${px(52 * scale)}; height:${px(52 * scale)}; margin:0 auto ${px(18 * scale)};

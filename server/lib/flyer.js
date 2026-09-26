@@ -32,9 +32,9 @@ const THEMES = {
   // small-caps eyebrow and host line.
   classic: { bg: '#f6f1e6', ink: '#1a2a4f', accent: '#1a2a4f', accent2: '#b0873a', red: '#9c2b2e', navy: '#1a2a4f', gold: '#b0873a', goldSoft: '#d8c49a', goldText: '#836326' },
   // Deep near-black ground under an uploaded photo. `ground` is the no-photo
-  // fallback; the renderer lays a `scrim` gradient over any image so the text
-  // stays legible. `gold` is the accent for the eyebrow, emblem, RSVP outline
-  // and host line.
+  // fallback; the renderer lays a radial reverse-vignette over any image (black
+  // centre, transparent edges) so the text stays legible. `gold` is the accent
+  // for the eyebrow, emblem, RSVP outline and host line.
   dark: { bg: '#0b0f1a', ink: '#f6f8fc', accent: '#c8a24a', accent2: '#c8a24a', red: '#c8a24a', navy: '#0b0f1a',
     gold: '#d3b063', muted: 'rgba(246,248,252,0.76)', faint: 'rgba(246,248,252,0.58)',
     ground: 'radial-gradient(120% 85% at 50% 0%, #1c2745 0%, #0b0f1a 58%, #05070d 100%)' },
@@ -614,26 +614,28 @@ function renderClassic({ event, flyer, colors, font, scale, images, hostLine, hi
 }
 
 // A dramatic dark invitation. An uploaded photo (the flyer's Background image)
-// fills the card behind a strong top-and-bottom scrim — an "inverse vignette"
-// that never lets the middle get lighter than ~0.55 opacity — and every line of
-// type carries a soft shadow, so the words stay legible over any photo. With no
-// photo it falls back to a rich radial navy ground, so the style still looks
-// intentional on its own.
+// fills the card, and a radial "reverse vignette" paints the centre solid black
+// (hiding the photo behind the text) and fades to fully transparent at the
+// edges, so the photo reads as a frame around the type. Every line also carries
+// a soft shadow. With no photo it falls back to a rich radial navy ground, so
+// the style still looks intentional on its own.
 function renderDark({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, bgUrl }) {
   const c = colors;
   const w = whenParts(event);
   const vb = venueTimeBits(event, flyer);
   const bright = c.ink;
 
-  // The scrim sits over the photo: darkest at the top (eyebrow + title) and the
-  // bottom (details), and held at ~0.55 through the middle so mid-card text
-  // stays readable even over a bright picture.
-  const scrim = 'linear-gradient(180deg, rgba(6,9,16,0.84) 0%, rgba(6,9,16,0.55) 30%, rgba(6,9,16,0.55) 62%, rgba(6,9,16,0.92) 100%)';
+  // A reverse vignette over the photo: solid black through the centre column
+  // where the text sits, fading to fully transparent at the edges so the photo
+  // only shows framing the card. `farthest-side` maps the fade to the card's
+  // edges; the gradient layer is sized to the whole box (100% 100%) so it lines
+  // up while the photo layer covers.
+  const scrim = 'radial-gradient(ellipse farthest-side at 50% 50%, rgba(6,9,16,1) 0%, rgba(6,9,16,0.98) 50%, rgba(6,9,16,0.78) 70%, rgba(6,9,16,0.36) 87%, rgba(6,9,16,0) 100%)';
   // The url() sits inside a double-quoted style="" attribute, so it uses single
   // quotes internally. bgUrl is a server-built /files/<token> URL (token is
   // alphanumeric), so it carries no quotes of its own.
   const bgLayers = bgUrl
-    ? `background-color:${c.bg}; background-image:${scrim}, url('${esc(bgUrl)}'); background-size:cover; background-position:center; background-repeat:no-repeat;`
+    ? `background-color:${c.bg}; background-image:${scrim}, url('${esc(bgUrl)}'); background-size:100% 100%, cover; background-position:center; background-repeat:no-repeat;`
     : `background-color:${c.bg}; background-image:${c.ground};`;
 
   const emblem = `<div style="width:${px(52 * scale)}; height:${px(52 * scale)}; margin:0 auto ${px(18 * scale)};

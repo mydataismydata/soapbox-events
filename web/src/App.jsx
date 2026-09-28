@@ -111,6 +111,12 @@ function Layout({ children }) {
     <div className="shell">
       <header className="appbar">
         <div className="appbar-top">
+          {/* Keyed on the address so a new icon gets a fresh element, not one
+              an earlier failed load already hid. */}
+          {org.icon_url ? (
+            <img key={org.icon_url} className="appbar-icon" src={org.icon_url} alt=""
+              onError={(e) => { e.currentTarget.hidden = true; }} />
+          ) : null}
           <span className="brandmark">Soapbox</span>
           <span className="appbar-sep" aria-hidden="true">/</span>
           <span className="appbar-org" title={org.name}>{org.name}</span>

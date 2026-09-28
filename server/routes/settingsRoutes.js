@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { config } from '../lib/env.js';
-import { core, getSetting, setSetting } from '../lib/db.js';
+import { core, getSetting, setSetting, appIconPath } from '../lib/db.js';
 import { wrap, v, ApiError } from '../lib/validate.js';
 import { requireAdmin } from '../lib/auth.js';
 import { publishAndLog, recentDeliveries, websiteConfigured } from '../lib/websitePush.js';
@@ -23,6 +23,7 @@ settingsRouter.get('/settings', wrap(async (req, res) => {
       website_push_token_set: Boolean(getSetting(req.db, 'website_push_token', '')),
       default_start_time: getSetting(req.db, 'default_start_time', ''),
       default_end_time: getSetting(req.db, 'default_end_time', ''),
+      app_icon_url: appIconPath(req.db, req.org.slug),
     },
     env: {
       smtp2go_key_present: Boolean(config.smtp2goApiKey),
@@ -68,6 +69,14 @@ settingsRouter.put('/settings', requireAdmin, wrap(async (req, res) => {
   }
   if (b.default_end_time !== undefined) {
     setSetting(req.db, 'default_end_time', v.time(b.default_end_time, { label: 'Default end time' }));
+  }
+  if (b.app_icon_token !== undefined) {
+    const token = v.optStr(b.app_icon_token, { label: 'App icon', max: 64 });
+    // Only an image already uploaded to this organization can become its icon.
+    if (token && !req.db.prepare('SELECT 1 FROM uploads WHERE token = ?').get(token)) {
+      throw new ApiError(400, 'That image could not be found. Upload it again.');
+    }
+    setSetting(req.db, 'app_icon_token', token);
   }
   if (b.website_push_url !== undefined) {
     const url = v.optStr(b.website_push_url, { label: 'Website address', max: 400 });

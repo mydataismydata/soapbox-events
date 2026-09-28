@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { config } from '../lib/env.js';
-import { orgDb, listOrgs } from '../lib/db.js';
+import { orgDb, listOrgs, appIconPath } from '../lib/db.js';
 import { verifyPassword, hashPassword, createSession, destroySession, resolveSession } from '../lib/auth.js';
 import { take } from '../lib/ratelimit.js';
 import { wrap, v, ApiError } from '../lib/validate.js';
@@ -50,7 +50,7 @@ authRouter.post('/auth/login', wrap(async (req, res) => {
   createSession(db, org.slug, user.id, req, res);
   res.json({
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
-    org: { slug: org.slug, name: org.name },
+    org: { slug: org.slug, name: org.name, icon_url: appIconPath(db, org.slug) },
   });
 }));
 
@@ -69,7 +69,7 @@ authRouter.get('/auth/me', wrap(async (req, res) => {
       email: resolved.user.email,
       role: resolved.user.role,
     },
-    org: { slug: resolved.org.slug, name: resolved.org.name },
+    org: { slug: resolved.org.slug, name: resolved.org.name, icon_url: appIconPath(resolved.db, resolved.org.slug) },
     app: { name: config.appName, base_url: config.baseUrl, version: config.version, build: config.build },
   });
 }));

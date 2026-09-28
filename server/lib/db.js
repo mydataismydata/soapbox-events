@@ -128,3 +128,11 @@ export function setSetting(db, key, value) {
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
   ).run(key, value == null ? '' : String(value));
 }
+
+// The organization's icon for the admin header, or '' when none is set. It is
+// a path on this server rather than a full URL, because the admin app is
+// always served from here, whatever BASE_URL says.
+export function appIconPath(db, orgSlug) {
+  const token = getSetting(db, 'app_icon_token', '');
+  return token ? `/o/${orgSlug}/files/${token}` : '';
+}

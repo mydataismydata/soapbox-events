@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { api, timeAgo } from '../api.js';
 import { useAuth } from '../App.jsx';
@@ -444,6 +444,114 @@ function UsersCard() {
   );
 }
 
+// The longest side an app icon is stored at, in pixels. The header shows it
+// 28px tall, so this stays sharp on a 3x screen, and a 5 MB photo is not
+// fetched on every page.
+const ICON_MAX = 256;
+
+// Read a picked image and shrink it to ICON_MAX on its longest side. An image
+// already that small goes up untouched, which also keeps a GIF animated.
+async function iconDataUrl(file) {
+  const original = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  // Wait on the load event, not img.decode(): decode() can sit unresolved
+  // while the tab is in the background, and the upload would hang with it.
+  const img = new Image();
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = () => reject(new Error('That file could not be read as an image.'));
+    img.src = original;
+  });
+  const scale = Math.min(1, ICON_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+  if (scale === 1) return original;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  // PNG keeps any transparency. A photo stays a JPEG, which is far smaller.
+  return canvas.toDataURL(file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png', 0.9);
+}
+
+// The icon shown to the left of "Soapbox" in the header. A new icon applies
+// the moment it uploads, so the header above is its own preview.
+function AppIconCard({ isAdmin }) {
+  const toast = useToast();
+  const { org, refresh } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+
+  // Save the icon, then reload the session: the header reads the icon from it.
+  async function apply(tokenFor, message) {
+    setBusy(true);
+    try {
+      const token = await tokenFor();
+      await api.put('/api/settings', { app_icon_token: token });
+      await refresh();
+      toast(message);
+    } catch (err) {
+      toast(err.message, 'bad');
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  function upload(file) {
+    if (!file) return;
+    apply(async () => {
+      const up = await api.post('/api/uploads', { name: file.name, data: await iconDataUrl(file) });
+      return up.token;
+    }, 'App icon updated');
+  }
+
+  return (
+    <Card title="App icon">
+      <p className="small muted" style={{ marginTop: 0 }}>
+        Shown to the left of “Soapbox” in the header, for everyone signed in to this organization.
+      </p>
+      <div className="row" style={{ gap: 'var(--sp-4)' }}>
+        <div style={{
+          width: 64, height: 64, flexShrink: 0, display: 'grid', placeItems: 'center',
+          border: '1px solid var(--c-line)', background: 'var(--c-surface-2)', color: 'var(--c-faint)',
+        }}>
+          {org.icon_url
+            ? <img src={org.icon_url} alt="The current app icon"
+                style={{ maxWidth: 48, maxHeight: 48, objectFit: 'contain' }} />
+            : <Icon name="image" size={20} />}
+        </div>
+        {isAdmin ? (
+          <div className="row">
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
+              style={{ display: 'none' }} onChange={(e) => upload(e.target.files?.[0])} />
+            <button type="button" className="btn btn-sm" disabled={busy}
+              onClick={() => fileRef.current?.click()}>
+              <Icon name={org.icon_url ? 'refresh' : 'upload'} size={14} />
+              {busy ? 'Saving…' : org.icon_url ? 'Replace icon' : 'Upload icon'}
+            </button>
+            {org.icon_url ? (
+              <button type="button" className="btn btn-sm btn-ghost" disabled={busy}
+                onClick={() => apply(async () => '', 'App icon removed')}>
+                Remove
+              </button>
+            ) : null}
+          </div>
+        ) : !org.icon_url ? <span className="small muted">No icon set.</span> : null}
+      </div>
+      <p className="small muted" style={{ marginBottom: 0 }}>
+        {isAdmin
+          ? 'A square image works best. It keeps its shape in the header and is shown 28px tall. JPEG, PNG, GIF or WebP.'
+          : 'Only administrators can change the app icon.'}
+      </p>
+    </Card>
+  );
+}
+
 function AccountCard() {
   const toast = useToast();
   const [current, setCurrent] = useState('');
@@ -540,6 +648,8 @@ export default function Settings() {
             }}>Save</button>
         ) : null}
       </Card>
+
+      <AppIconCard isAdmin={isAdmin} />
 
       <Card title="Event defaults">
         <p className="small muted" style={{ marginTop: 0 }}>

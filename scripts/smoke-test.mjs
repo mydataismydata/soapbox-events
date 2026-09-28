@@ -629,6 +629,40 @@ let guests = [];
   check('cannot demote self', selfDemote.status === 400);
 }
 
+// --- app icon: an admin's image beside "Soapbox" in the header -------------
+{
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const token = (await A.api('POST', '/api/uploads', { name: 'icon.png', data: png })).data.token;
+  const path = `/o/alpha/files/${token}`;
+  const iconNow = async () => (await A.api('GET', '/api/auth/me')).data.org.icon_url;
+
+  check('no app icon until one is set', (await iconNow()) === '');
+  const put = await A.api('PUT', '/api/settings', { app_icon_token: token });
+  check('an admin sets the app icon', put.status === 200, JSON.stringify(put.data));
+  check('the session reports the icon', (await iconNow()) === path);
+  check('settings report the icon',
+    (await A.api('GET', '/api/settings')).data.settings.app_icon_url === path);
+  const img = await fetch(`${BASE}${path}`);
+  check('the icon is served as an image', img.status === 200 && img.headers.get('content-type') === 'image/png');
+  const fresh = await new Client().api('POST', '/api/auth/login', { email: 'admin@alpha.test', password: 'correct-horse-battery' });
+  check('signing in reports the icon', fresh.data?.org?.icon_url === path);
+  check('another organization keeps its own header',
+    (await B.api('GET', '/api/auth/me')).data.org.icon_url === '');
+
+  const bogus = await A.api('PUT', '/api/settings', { app_icon_token: 'noSuchUpload123' });
+  check('an icon must be an uploaded image', bogus.status === 400 && (await iconNow()) === path);
+
+  const nu = await A.api('POST', '/api/users', { name: 'Icon Member', email: 'icon-member@alpha.test', role: 'member' });
+  const member = new Client();
+  await member.api('POST', '/api/auth/login', { email: 'icon-member@alpha.test', password: nu.data.temp_password });
+  const refused = await member.api('PUT', '/api/settings', { app_icon_token: '' });
+  check('a member cannot change the app icon', refused.status === 403 && (await iconNow()) === path);
+  check('a member sees the icon too', (await member.api('GET', '/api/auth/me')).data.org.icon_url === path);
+
+  await A.api('PUT', '/api/settings', { app_icon_token: '' });
+  check('removing the app icon clears it', (await iconNow()) === '');
+}
+
 // --- broadcasts (standalone email blast, no event/RSVP) --------------------
 {
   const cr = await A.api('POST', '/api/broadcasts', {

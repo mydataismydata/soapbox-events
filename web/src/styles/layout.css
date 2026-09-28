@@ -28,6 +28,16 @@
   align-items: center;
   gap: var(--sp-3);
 }
+/* The organization's own icon, set in Settings. It keeps its proportions:
+   a square fills the box, and a wide one is letterboxed inside it. */
+.appbar-icon {
+  display: block;
+  flex-shrink: 0;
+  height: 28px;
+  width: auto;
+  max-width: 56px;
+  object-fit: contain;
+}
 .brandmark {
   font-family: var(--font-mono);
   font-size: var(--fs-base);

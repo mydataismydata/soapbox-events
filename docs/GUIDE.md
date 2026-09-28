@@ -20,6 +20,11 @@ else (events, contacts, sending). Add teammates in **Settings → Team
 members** — the app generates a temporary password shown once. Locked out
 entirely? The operator can run `node scripts/reset-password.mjs`.
 
+**App icon.** An admin can give the organization its own icon in
+**Settings → App icon**. It appears to the left of "Soapbox" in the header for
+everyone signed in to the organization. A square image works best, and a large
+one is shrunk to 256px before it uploads.
+
 ## Contacts
 
 **Contacts** is your organization's address book: name (required), email

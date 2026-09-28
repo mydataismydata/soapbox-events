@@ -465,7 +465,12 @@ input[type='radio']:focus-visible { outline-offset: 2px; }
 
 /* === tables ============================================================== */
 
+/* Positioned so it contains the absolutely positioned .sr-only labels in its
+   tables, such as a header's hidden "Actions". Without this they belong to the
+   page instead. They then sit out past a wide table's right edge, and on a
+   phone the whole page grows sideways to reach them. */
 .table-wrap {
+  position: relative;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }

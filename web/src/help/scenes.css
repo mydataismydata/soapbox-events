@@ -1,0 +1,526 @@
+/* ---------------------------------------------------------------------------
+   Help scenes: small moving pictures of the app, drawn with its own classes.
+   Everything here is prefixed hs- to keep it apart from the app's classes.
+--------------------------------------------------------------------------- */
+
+/* --- the frame, the pointer and the caption ----------------------------- */
+.hs-scene {
+  position: relative;
+  max-width: 100%;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--c-line-strong);
+  background: var(--c-canvas);
+}
+.hs-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  overflow: hidden;
+  background: var(--c-canvas);
+  color: var(--c-ink);
+  font-size: var(--fs-base);
+  line-height: 1.45;
+  transition: opacity 300ms ease;
+}
+.hs-inner.is-fading { opacity: 0; }
+
+.hs-ptr {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border: 2px solid var(--c-accent);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--c-accent) 22%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 600ms cubic-bezier(0.45, 0, 0.25, 1),
+    opacity 200ms ease,
+    scale 150ms ease,
+    background 150ms ease;
+}
+.hs-ptr.on { opacity: 1; }
+.hs-ptr.jump { transition: opacity 200ms ease; }
+.hs-ptr.down {
+  scale: 0.72;
+  background: color-mix(in srgb, var(--c-accent) 45%, transparent);
+}
+
+/* The caption reverses the page's colours, so it reads in either theme. */
+.hs-note {
+  position: absolute;
+  z-index: 101;
+  max-width: 240px;
+  padding: 6px 10px;
+  border-radius: var(--r-md);
+  background: var(--c-ink);
+  color: var(--c-surface);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  box-shadow: 0 4px 14px rgba(23, 35, 52, 0.25);
+  animation: hs-pop 180ms ease-out;
+}
+@keyframes hs-pop {
+  from { opacity: 0; transform: translateY(4px); }
+}
+
+/* --- the screen and its top bar ----------------------------------------- */
+.hs-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 14px;
+  background: var(--c-surface);
+  flex: none;
+}
+.hs-bar .brandmark { font-size: 12px; }
+.hs-sep { color: var(--c-faint); }
+.hs-org {
+  color: var(--c-ink-2);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.hs-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.hs-helpbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 7px;
+  border-radius: var(--r-sm);
+  color: var(--c-ink-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+.hs-iconbtn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--c-ink-2);
+}
+.hs-acct-wrap { position: relative; }
+.hs-acct {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-sm);
+  background: var(--c-surface);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.hs-acct .acct-avatar { width: 20px; height: 20px; font-size: 10px; }
+.hs-acct .ico { color: var(--c-faint); }
+.hs-acct-menu { min-width: 210px; animation: none; }
+.hs-acct-menu a { padding: 6px 10px; font-size: 13px; }
+
+.hs-tabs {
+  display: flex;
+  gap: 18px;
+  height: 34px;
+  padding: 0 14px;
+  border-top: 1px solid var(--c-line);
+  border-bottom: 1px solid var(--c-line-strong);
+  background: var(--c-surface);
+  flex: none;
+}
+.hs-tabs span {
+  display: flex;
+  align-items: center;
+  border-bottom: 2px solid transparent;
+  color: var(--c-ink-2);
+  font-size: 13px;
+  font-weight: 500;
+}
+.hs-tabs span.on {
+  border-bottom-color: var(--c-accent);
+  color: var(--c-ink);
+  font-weight: 600;
+}
+
+/* Not positioned, so a dialog's backdrop covers the whole screen, top bar
+   included, as it does in the app. */
+.hs-page {
+  flex: 1;
+  min-height: 0;
+  padding: 14px 16px;
+  overflow: hidden;
+}
+
+/* --- the app's layout, held at its computer size ------------------------ */
+/* Several of the app's classes change their layout on a narrow window. A
+   scene is always drawn at its own size and shrunk as a whole, so inside one
+   they keep the layout they have on a computer, whatever the window. */
+.hs-screen .page-head { flex-wrap: nowrap; gap: 12px; margin-bottom: 12px; }
+.hs-screen .page-title { font-size: 19px; }
+.hs-screen .page-sub { margin-top: 4px; font-size: 10.5px; }
+.hs-screen .head-actions { width: auto; flex-wrap: nowrap; }
+.hs-screen .grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.hs-screen .grid3 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.hs-screen .field-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.hs-screen .field-row3 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.hs-screen .field { margin-bottom: 10px; }
+.hs-screen .field > label { margin-bottom: 4px; font-size: 12.5px; }
+.hs-screen .card-pad { padding: 12px 14px; }
+.hs-screen .card-head { min-height: 40px; padding: 8px 14px; }
+.hs-screen .card + .card { margin-top: 12px; }
+.hs-screen .grid2 > .card + .card,
+.hs-screen .grid3 > .card + .card { margin-top: 0; }
+.hs-screen .modal-foot { justify-content: flex-end; padding: 10px 16px 12px; }
+.hs-screen .modal-foot .btn { flex: none; }
+.hs-screen .modal-head { padding: 12px 16px 10px; }
+.hs-screen .modal-head h3 { font-size: 15px; }
+.hs-screen .modal-body { padding: 12px 16px; }
+.hs-screen .wiz { grid-template-columns: 140px minmax(0, 1fr); gap: 12px; }
+.hs-screen .wiz-rail { position: static; flex-direction: column; padding: 6px; overflow: visible; }
+.hs-screen .wiz-step { padding: 6px; font-size: 12px; white-space: normal; line-height: 1.25; }
+.hs-screen .wiz-foot { margin-top: 12px; }
+.hs-screen .seg { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.hs-screen .style-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.hs-screen .stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 12px; }
+.hs-screen .stat { padding: 8px 10px 10px; }
+.hs-screen .stat .label { font-size: 9.5px; }
+.hs-screen .stat .value { margin-top: 4px; font-size: 22px; }
+.hs-screen .stat .sub { font-size: 10.5px; }
+.hs-screen .stat-ico { display: none; }
+.hs-screen .mini-tiles { flex-wrap: nowrap; }
+.hs-screen .table th { padding: 7px 10px; }
+.hs-screen .table td { padding: 7px 10px; }
+.hs-screen .table-toolbar { padding: 8px 10px; }
+.hs-screen .tabs { margin-bottom: 10px; }
+.hs-screen .banner { margin-bottom: 10px; padding: 8px 12px; font-size: 12.5px; }
+.hs-screen .checkbox { margin: 8px 0; }
+.hs-screen .btn { cursor: default; }
+
+/* --- lookalike controls -------------------------------------------------- */
+.hs-input {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.hs-input.is-focus { border-color: var(--c-accent); box-shadow: var(--ring); }
+.hs-input .ph { color: var(--c-faint); }
+.hs-input .hs-val { min-width: 0; overflow: hidden; text-overflow: clip; }
+/* Laid out right to left, the text overflows at its start, so the end stays
+   in view the way a real box scrolls as you type. The <bdi> inside keeps the
+   words in their own order. */
+.hs-input.is-focus:not(.hs-area) .hs-val { direction: rtl; text-align: left; }
+.hs-screen .hs-tight th,
+.hs-screen .hs-tight td { padding-left: 8px; padding-right: 8px; }
+.hs-mono { font-family: var(--font-mono); font-size: 12px; }
+.hs-area {
+  align-items: flex-start;
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+.hs-area .hs-val { overflow: visible; }
+.hs-caret {
+  display: inline-block;
+  flex: none;
+  width: 1px;
+  height: 1.15em;
+  margin-left: 1px;
+  background: var(--c-ink);
+  animation: hs-blink 1s steps(1) infinite;
+}
+@keyframes hs-blink {
+  50% { opacity: 0; }
+}
+.hs-select {
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23676d7a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 9px center;
+  background-repeat: no-repeat;
+}
+.hs-anchor { position: relative; }
+.hs-menu {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 0;
+  right: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--c-line-strong);
+  background: var(--c-surface);
+  box-shadow: var(--sh-md);
+  animation: hs-drop 120ms ease-out;
+}
+.hs-menu span {
+  padding: 5px 9px;
+  border-radius: var(--r-sm);
+  color: var(--c-ink-2);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.hs-menu span.hi { background: var(--c-accent-soft); color: var(--c-accent-text); }
+.hs-menu span.grp {
+  padding-top: 6px;
+  color: var(--c-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+@keyframes hs-drop {
+  from { opacity: 0; transform: translateY(-3px); }
+}
+
+/* A list that scrolls in the app, cut off here. */
+.hs-list {
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+}
+.hs-list .table td { padding: 5px 10px; }
+
+/* Dialogs and toasts sit inside the picture, not over the whole window. */
+.hs-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 18px 16px;
+  background: rgba(10, 12, 16, 0.45);
+  animation: hs-fade 160ms ease-out;
+}
+.hs-overlay .modal { max-width: 100%; }
+@keyframes hs-fade {
+  from { opacity: 0; }
+}
+.hs-toasts {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 40;
+  max-width: 320px;
+}
+.hs-toasts .toast { font-size: 12.5px; }
+
+/* A row that has just arrived. */
+.hs-new { animation: hs-arrive 500ms ease-out; }
+@keyframes hs-arrive {
+  from { background: var(--c-accent-soft); }
+}
+
+/* --- an email, as the reader gets it ------------------------------------- */
+/* Emails are always light, as they are in a mail program. */
+.hs-email {
+  padding: 12px;
+  background: #eef1f5;
+  color: #1f2937;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.hs-email-card {
+  padding: 14px 16px;
+  background: #fff;
+}
+.hs-email-card p { margin: 0 0 8px; }
+.hs-email-details {
+  margin: 10px 0;
+  padding: 6px 10px;
+  border: 1px solid #e3e8ef;
+  background: #f7f9fb;
+}
+.hs-email-details div { display: flex; gap: 12px; padding: 3px 0; }
+.hs-email-details .k {
+  width: 44px;
+  color: #6b7280;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  line-height: 18px;
+  text-transform: uppercase;
+}
+.hs-email-rsvp { text-align: center; }
+.hs-email-rsvp div { display: flex; justify-content: center; gap: 8px; margin-top: 6px; }
+.hs-email-yes,
+.hs-email-no {
+  padding: 6px 14px;
+  color: #fff;
+  font-weight: 600;
+}
+.hs-email-yes { background: #2f6f3e; }
+.hs-email-no { background: #9a3b28; }
+.hs-email-foot {
+  padding-top: 8px;
+  color: #6b7280;
+  font-size: 10.5px;
+  text-align: center;
+}
+
+/* --- the flyer designer, small ------------------------------------------- */
+.hs-designer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 214px;
+  gap: 16px;
+  align-items: start;
+}
+.hs-preview { text-align: center; }
+.hs-preview .small { margin: 6px 0 0; font-size: 11px; line-height: 1.35; }
+
+/* Flyers keep their own colours in either theme, as they do on the event
+   page. */
+.hs-flyer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 214px;
+  height: 318px;
+  padding: 20px 18px;
+  overflow: hidden;
+  text-align: center;
+  line-height: 1.2;
+}
+.hs-flyer .star {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-size: 12px;
+}
+.hs-flyer .eyebrow,
+.hs-flyer .host,
+.hs-flyer .pill {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.hs-flyer .title { font-size: 15px; font-weight: 800; }
+.hs-flyer .tag { font-size: 9.5px; font-style: italic; }
+.hs-flyer .pill {
+  padding: 3px 9px;
+  border: 1px solid currentColor;
+  border-radius: 99px;
+}
+.hs-flyer .date {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.hs-flyer .time,
+.hs-flyer .venue { font-size: 8.5px; }
+
+.hs-flyer.classic { background: #f6f0e1; color: #1f3158; }
+.hs-flyer.classic .frame {
+  position: absolute;
+  inset: 7px;
+  border: 1.5px solid #b8963e;
+  outline: 1px solid #b8963e;
+  outline-offset: -5px;
+  pointer-events: none;
+}
+.hs-flyer.classic .star,
+.hs-flyer.classic .eyebrow,
+.hs-flyer.classic .host { color: #a8852f; }
+.hs-flyer.classic .pill { color: #1f3158; }
+
+.hs-flyer.dark { background: linear-gradient(180deg, #13223d, #05080f); color: #fff; }
+.hs-flyer.light { background: linear-gradient(180deg, #fafbfd, #e6eaf1); color: #1f3158; }
+.hs-flyer.dark .star,
+.hs-flyer.dark .eyebrow,
+.hs-flyer.dark .host,
+.hs-flyer.dark .pill,
+.hs-flyer.light .star,
+.hs-flyer.light .eyebrow,
+.hs-flyer.light .host,
+.hs-flyer.light .pill { color: #c9a34a; }
+
+.hs-flyer.retro { gap: 0; padding: 0; background: #e9ddc1; color: #1f3a5f; }
+.hs-flyer.retro .top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 24px 14px 20px;
+  background: #1f3a5f;
+  color: #f0e5c9;
+}
+.hs-flyer.retro .eyebrow { color: #d2553b; }
+.hs-flyer.retro .title { font-size: 16px; font-weight: 900; text-transform: uppercase; }
+.hs-flyer.retro .pill { border-color: #c64a31; background: #c64a31; color: #fff; }
+.hs-flyer.retro .band {
+  width: 100%;
+  padding: 7px;
+  background: #c64a31;
+  color: #f0e5c9;
+  font-size: 9.5px;
+}
+.hs-flyer.retro .bottom {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+}
+.hs-flyer.retro .rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9px;
+}
+.hs-flyer.retro .rule::before,
+.hs-flyer.retro .rule::after {
+  content: '';
+  flex: 1;
+  border-top: 1.5px solid #1f3a5f;
+}
+.hs-flyer.retro .date span { color: #c64a31; }
+.hs-flyer.retro .date,
+.hs-flyer.retro .venue { font-size: 10px; }
+.hs-flyer.retro .venue { font-weight: 800; text-transform: uppercase; }
+
+/* The message editor's controls, drawn as plain boxes. */
+.hs-screen span.rt-select { display: inline-flex; align-items: center; }
+.hs-screen .rt-editor { min-height: 0; font-size: 13px; line-height: 1.5; }
+.hs-rt-focus { border-color: var(--c-accent); box-shadow: var(--ring); }
+.hs-scroll { transition: transform 500ms ease; }
+.hs-screen .seg-opt { padding: 10px 30px 10px 12px; }
+.hs-screen .seg-opt .seg-sub { font-size: 12px; line-height: 1.4; }
+.hs-screen .seg-mark { top: 10px; right: 10px; }
+.hs-area .hs-caret { vertical-align: text-bottom; }
+.hs-screen .kv .k { min-width: 84px; }
+
+/* A toast leaves after a few seconds, as the app's do. */
+.hs-toasts .toast { animation: toast-in 160ms ease-out, hs-toast-out 300ms ease-in 3.6s forwards; }
+@keyframes hs-toast-out {
+  to { opacity: 0; transform: translateY(4px); }
+}

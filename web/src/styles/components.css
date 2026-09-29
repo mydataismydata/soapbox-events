@@ -941,7 +941,14 @@ button.chip.active,
   line-height: 1.4;
 }
 .style-card .seg-mark { top: 9px; right: 9px; width: 14px; height: 14px; }
-.style-card.active .seg-mark::after { width: 7px; height: 7px; }
+.style-card.active .seg-mark { border-color: var(--c-accent); }
+.style-card.active .seg-mark::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-pill);
+  background: var(--c-accent);
+}
 .s-tag {
   display: inline-block;
   margin-left: 5px;

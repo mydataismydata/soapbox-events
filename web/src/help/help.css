@@ -1,0 +1,110 @@
+/* ---------------------------------------------------------------------------
+   The Help panel: a sheet down the right-hand side, the full height of the
+   window, explaining the page underneath it.
+--------------------------------------------------------------------------- */
+
+.helpsheet {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(620px, 100vw);
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--c-line);
+  background: var(--c-surface);
+  color: var(--c-ink);
+  box-shadow: var(--sh-lg);
+}
+.helpsheet[open] { animation: help-slide 180ms ease-out; }
+.helpsheet::backdrop { background: rgba(10, 12, 16, 0.32); }
+@keyframes help-slide {
+  from { transform: translateX(24px); opacity: 0; }
+}
+
+.help-sheet-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.help-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--c-line);
+}
+.help-kicker {
+  color: var(--c-muted);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.help-head h2 {
+  margin: 2px 0 0;
+  font-size: var(--fs-xl);
+}
+.help-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-4) var(--sp-5) var(--sp-8);
+  line-height: 1.55;
+}
+.help-intro {
+  margin: 0 0 var(--sp-4);
+  color: var(--c-ink-2);
+}
+.help-toc {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-bottom: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--c-line);
+  background: var(--c-surface-2);
+}
+.help-toc button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-accent-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.help-toc button:hover { text-decoration: underline; }
+.help-section {
+  padding-top: var(--sp-4);
+  scroll-margin-top: var(--sp-2);
+}
+.help-section + .help-section {
+  margin-top: var(--sp-3);
+  border-top: 1px solid var(--c-line);
+}
+.help-section h3 {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-lg);
+}
+.help-section p { margin: 0 0 var(--sp-2); }
+.help-section ol,
+.help-section ul {
+  margin: 0 0 var(--sp-3);
+  padding-left: 1.3em;
+}
+.help-section li + li { margin-top: 4px; }
+.help-section figure { margin: var(--sp-3) 0 0; }
+
+@media (max-width: 520px) {
+  .help-head,
+  .help-body { padding-left: var(--sp-4); padding-right: var(--sp-4); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .helpsheet[open] { animation: none; }
+}

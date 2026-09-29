@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, {
+  Suspense, createContext, lazy, useCallback, useContext, useEffect, useRef, useState,
+} from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { api, onUnauthorized } from './api.js';
 import { ToastProvider, ThemeProvider, ThemeToggle, Spinner } from './ui.jsx';
@@ -17,6 +19,11 @@ import Venues from './pages/Venues.jsx';
 import Templates from './pages/Templates.jsx';
 import Emails from './pages/Emails.jsx';
 import Settings from './pages/Settings.jsx';
+
+// The Help panel and its pictures load the first time someone asks for help,
+// or points at the button, so they add nothing to the first page load.
+const loadHelp = () => import('./help/HelpPanel.jsx');
+const HelpPanel = lazy(loadHelp);
 
 const AuthContext = createContext(null);
 export function useAuth() {
@@ -107,6 +114,8 @@ function AccountMenu({ user, logout }) {
 
 function Layout({ children }) {
   const { user, org, app, logout } = useAuth();
+  const [helpOpen, setHelpOpen] = useState(false);
+  const closeHelp = useCallback(() => setHelpOpen(false), []);
   return (
     <div className="shell">
       <header className="appbar">
@@ -126,6 +135,11 @@ function Layout({ children }) {
                 v{app.version} · build {app.build}
               </span>
             ) : null}
+            <button type="button" className="helpbtn" aria-haspopup="dialog"
+              onClick={() => setHelpOpen(true)} onMouseEnter={loadHelp} onFocus={loadHelp}>
+              <Icon name="help" size={17} />
+              <span className="word">Help</span>
+            </button>
             <ThemeToggle />
             <AccountMenu user={user} logout={logout} />
           </div>
@@ -143,6 +157,12 @@ function Layout({ children }) {
       </header>
 
       <main className="main">{children}</main>
+
+      {helpOpen ? (
+        <Suspense fallback={null}>
+          <HelpPanel onClose={closeHelp} />
+        </Suspense>
+      ) : null}
     </div>
   );
 }

@@ -9,8 +9,8 @@ organizations from one installation**, with hard isolation between them.
 
 **Events & invitations**
 - Guided 5-step wizard: details → RSVP options → invitation & flyer → guests → review & send
-- Flyer designer with 6 ready-made templates — four portrait (Blue, White,
-  Red, Retro) and two wide (Spotlight, Panel) — each with its own fixed
+- Flyer designer with 6 ready-made templates — four portrait (Classic, Dark,
+  Light, Retro) and two wide (Spotlight, Panel) — each with its own fixed
   color scheme, 5 font pairings, adjustable title sizes, and featured
   images: up to three side by side on the portrait templates (e.g. featured
   speakers), or one full-height photo down the side on the wide ones
@@ -79,6 +79,13 @@ organizations from one installation**, with hard isolation between them.
   entire system is testable before you connect a provider.
 - Throttled background queue, failure tracking with one-click retry,
   `List-Unsubscribe` header on every invitation
+
+**Help**
+- A Help button on every page opens a side panel about that page
+- Most sections carry a small animated walkthrough, drawn with the app's own
+  styles, where a pointer clicks through the task with captions beside it
+- The help loads only when someone opens it, and the smoke test checks that
+  every page has some
 
 ## Multi-tenancy: the isolation model
 

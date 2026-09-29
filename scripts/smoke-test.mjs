@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { sendQueue, sendLabel, sendSummary } from '../web/src/components/sendQueue.js';
 import { personName, splitPersonName } from '../server/lib/contacts.js';
+import { allScenes, helpFor, sectionsFor } from '../web/src/help/content.js';
 
 const PORT = 3870 + Math.floor(Math.random() * 100);
 const BASE = `http://localhost:${PORT}`;
@@ -1381,6 +1382,30 @@ let guests = [];
     check('the delivery log is admin-only',
       (await member.api('GET', '/api/settings/website/deliveries')).status === 401);
   }
+}
+
+// --- help: every page has help, and every picture it names exists ----------
+{
+  const app = fs.readFileSync(new URL('../web/src/App.jsx', import.meta.url), 'utf8');
+  const routes = [...app.matchAll(/<Route path="([^"]+)"/g)].map((m) => m[1]).filter((p) => p !== '*');
+  check('the app has routes to look for help on', routes.length >= 15, `found ${routes.length}`);
+  const missing = routes.filter((r) => !helpFor(r.replace(/:\w+/g, '12')));
+  check('every page has help', missing.length === 0, missing.join(', '));
+  check('a new event gets the wizard help, not an event page’s',
+    helpFor('/events/new') === helpFor('/events/12/edit') && helpFor('/events/new') !== helpFor('/events/12'));
+  check('an unknown address has no help', helpFor('/nowhere') === null);
+
+  const files = fs.readdirSync(new URL('../web/src/help/scenes/', import.meta.url))
+    .filter((f) => f.endsWith('.jsx')).map((f) => f.slice(0, -'.jsx'.length));
+  const named = allScenes();
+  const absent = named.filter((n) => !files.includes(n));
+  const unused = files.filter((f) => !named.includes(f));
+  check('every picture the help names exists', absent.length === 0, absent.join(', '));
+  check('every picture is used by the help', unused.length === 0, unused.join(', '));
+
+  const settings = (role) => sectionsFor(helpFor('/settings'), role).map((s) => s.heading);
+  check('admins get help on team members', settings('admin').includes('Team members'));
+  check('members do not', !settings('member').includes('Team members'));
 }
 
 // ---------------------------------------------------------------------------

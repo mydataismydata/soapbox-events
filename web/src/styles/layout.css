@@ -72,6 +72,27 @@
   white-space: nowrap;
 }
 
+/* Help for the page underneath. On a phone only its icon shows; the word
+   stays for screen readers. */
+.helpbtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--control-h-sm);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--c-ink-2);
+  font: inherit;
+  font-size: var(--fs-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.helpbtn:hover { background: var(--c-surface-2); color: var(--c-ink); }
+
 /* Row 2: section tabs, active one underlined in accent. */
 .appbar-tabs-row { border-top: 1px solid var(--c-line); }
 .appbar-tabs {
@@ -250,4 +271,13 @@
 }
 @media (max-width: 520px) {
   .appbar-org, .appbar-sep { display: none; }
+  .helpbtn { width: var(--control-h-sm); padding: 0; justify-content: center; }
+  .helpbtn .word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }

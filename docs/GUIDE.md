@@ -2,6 +2,14 @@
 
 Everything Soapbox does, in the order you'll meet it.
 
+## Help inside the app
+
+Every page has a **Help** button at the top right, beside your name. It opens
+a panel explaining the page you are on. Most sections have a small moving
+picture of the screen, where a pointer clicks through the task step by step.
+The pictures play while they are in view. Anyone whose device asks for less
+motion sees each picture's finished state, standing still.
+
 ## Organizations & signing in
 
 Each organization is completely separate: its own sign-in accounts, contacts,
@@ -101,7 +109,7 @@ leave and resume any time (it stays a draft until you send or publish).
    guest list (first names + last initial). The *shareable link* toggle
    controls whether strangers with the link can RSVP.
 3. **Invitation & flyer** — design the flyer: pick one of six templates,
-   each with its own fixed colors. Four are portrait (Blue, White, Red,
+   each with its own fixed colors. Four are portrait (Classic, Dark, Light,
    Retro) and two are wide (Spotlight, Panel), which run side-on with the
    type on the left and one photo down the right. Then set fonts, title
    size, four short text slots (eyebrow / tagline / footnote / contact),

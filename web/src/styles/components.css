@@ -948,9 +948,16 @@ button.chip.active,
   color: var(--c-tool-ink);
   box-shadow: var(--sh-tool);
   cursor: pointer;
-  transition: transform var(--transition), filter var(--transition);
+  /* See-through at rest, so the flyer shows past the buttons instead of the
+     buttons standing out from it. Pointing at one, or tabbing to it, brings
+     it up full. The X on a picture stays solid. */
+  opacity: 0.7;
+  transition: transform var(--transition), filter var(--transition), opacity var(--transition);
 }
 .flyer-tool:hover { filter: brightness(0.95); }
+.flyer-tool:hover,
+.flyer-tool:focus-visible,
+.flyer-tool.remove { opacity: 1; }
 .flyer-tool:active { transform: scale(0.94); }
 .flyer-tool:focus-visible { outline: 2px solid var(--c-tool-accent); outline-offset: 2px; }
 .flyer-tool:disabled { cursor: default; filter: none; transform: none; }

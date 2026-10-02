@@ -419,6 +419,7 @@
   color: var(--c-tool-ink);
   box-shadow: var(--sh-tool);
   letter-spacing: 0;
+  opacity: 0.7;
 }
 .hs-tool.accept,
 .hs-tool.add {

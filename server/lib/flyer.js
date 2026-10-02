@@ -193,7 +193,7 @@ function px(n) {
 // types on the flyer carries data-slot="<field>", so the designer can find
 // the line, put a pencil beside it and type into it in place. An empty line is
 // still drawn, faintly, with its name standing in for the text (data-ghost),
-// so there is somewhere to type. Pictures, the tile a first picture goes on and
+// so there is somewhere to type. Pictures, the spot a first picture goes in and
 // the photo templates' background carry data-slot too, for the buttons that
 // add, remove and resize them. Nothing guests see is ever drawn in edit mode.
 const PLACEHOLDERS = {
@@ -245,14 +245,13 @@ function imageFrame(border, bg) {
 
 // Render 1–3 featured images. One is centred at its own proportions; two sit
 // side by side in equal columns; three keep the first two side by side with
-// the third centred below. With none, the editing view draws a faint tile
-// where the first one would go, for the designer's add button to sit on.
-function featuredImages(images, { scale, colors, frame, captionColor, marginTop = 22, edit = false, tile = colors.ink }) {
+// the third centred below. With none, the editing view keeps a little room
+// where the first one would go, for the designer's add button to sit in.
+function featuredImages(images, { scale, colors, frame, captionColor, marginTop = 22, edit = false }) {
   const n = images.length;
   if (!n) {
     return edit
-      ? `<div data-slot="image-add" data-ghost style="max-width:${px(300 * scale)}; height:${px(96 * scale)};
-          margin:${px(marginTop)} auto 4px; border:2px dashed ${tile}; border-radius:8px;"></div>`
+      ? `<div data-slot="image-add" data-ghost style="height:${px(Math.max(42, 44 * scale))}; margin:${px(marginTop)} auto 4px;"></div>`
       : '';
   }
   const gap = px(14 * scale);
@@ -345,13 +344,12 @@ function iconDot(name, { size, bg, ink, border = 'none' }) {
 // The single featured image of a wide template. It sits in a column that
 // stretches to the card's full height, so a tall picture uses every pixel of it
 // and a short one is centred in the space instead of being stretched.
-// With no picture, the editing view draws the column anyway, as a faint tile
-// for the designer's add button.
-function widePhoto(image, { minHeight, fit = 'cover', radius = 0, bg = 'transparent', scale, colors, captionColor, edit = false, tile = '#ffffff' }) {
+// With no picture, the editing view keeps the column anyway, empty, for the
+// designer's add button to sit in the middle of.
+function widePhoto(image, { minHeight, fit = 'cover', radius = 0, bg = 'transparent', scale, colors, captionColor, edit = false }) {
   if (!image) {
     return edit
-      ? `<div data-slot="image-add" data-ghost style="align-self:stretch; width:100%; min-height:${px(minHeight)};
-          border:2px dashed ${tile}; border-radius:${px(Math.max(radius, 8 * scale))};"></div>`
+      ? `<div data-slot="image-add" data-ghost style="align-self:stretch; width:100%; min-height:${px(minHeight)};"></div>`
       : '';
   }
   const caption = slot(edit, 'caption:0', image.caption);
@@ -396,9 +394,9 @@ function renderRetro({ event, flyer, colors, font, scale, images, hostLine, hide
     <span${eb.attrs} style="font-family:${font.heading}; font-weight:800; font-size:${px(18 * scale)}; letter-spacing:0.08em;
       text-transform:uppercase; color:${c.red};">${esc(eb.text)}</span>
     ${starRow(3, { size: 15 * scale, color: c.red, gap: 0.22 })}</div>` : '';
-  // The editing view's add tile doesn't count as a picture: the stripes and
+  // The editing view's add-picture spot doesn't count as a picture: the stripes and
   // spacing stay as they will be printed until a real one is added.
-  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.parchment, '#ffffff'), captionColor: tint(c.parchment, 0.9), marginTop: 18, edit, tile: c.parchment });
+  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.parchment, '#ffffff'), captionColor: tint(c.parchment, 0.9), marginTop: 18, edit });
   const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp' ? rsvpBadge(scale, { bg: c.red, ink: c.parchment, marginTop: 14 }) : '';
   const topArea = `
     <div style="background:${c.navy}; color:${c.parchment}; text-align:center;
@@ -442,9 +440,9 @@ function renderSpotlight({ event, flyer, colors, font, scale, images, hostLine, 
   const eyebrow = slot(edit, 'eyebrow', flyer.eyebrow);
   const tagline = slot(edit, 'tagline', flyer.tagline);
   const note = slot(edit, 'note', flyer.note);
-  const well = widePhoto(images[0], { minHeight: 280 * scale, fit: 'contain', scale, colors: c, edit, tile: 'rgba(255,255,255,0.7)' });
+  const well = widePhoto(images[0], { minHeight: 280 * scale, fit: 'contain', scale, colors: c, edit });
   const photo = well
-    ? `<div style="flex:1 1 34%; min-width:230px; box-sizing:border-box; display:flex;${images[0] ? '' : ` padding:${px(18 * scale)};`}">${well}</div>`
+    ? `<div style="flex:1 1 34%; min-width:230px; box-sizing:border-box; display:flex;">${well}</div>`
     : '';
 
   // Detail rows sit on a white card, venue/contact on the left of a hairline
@@ -506,7 +504,7 @@ function renderPanel({ event, flyer, colors, font, scale, images, hostLine, hide
   const w = whenParts(event);
   const vb = venueTimeBits(event, flyer);
   const tagline = slot(edit, 'tagline', flyer.tagline);
-  const well = widePhoto(images[0], { minHeight: 300 * scale, fit: 'contain', radius: 6 * scale, scale, colors: c, edit, tile: line });
+  const well = widePhoto(images[0], { minHeight: 300 * scale, fit: 'contain', radius: 6 * scale, scale, colors: c, edit });
   const photo = well
     ? `<div style="flex:1 1 36%; min-width:240px; box-sizing:border-box; display:flex; padding:${px(18 * scale)};">${well}</div>`
     : '';
@@ -598,7 +596,7 @@ function renderClassic({ event, flyer, colors, font, scale, images, hostLine, hi
     <span style="color:${c.gold}; font-size:${px(10 * scale)}; line-height:1;">&#9670;</span>
     <div style="height:1px; width:${px(66 * scale)}; background:${c.gold};"></div></div>`;
 
-  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.gold, '#ffffff'), captionColor: tint(c.ink, 0.7), marginTop: 22, edit, tile: c.gold });
+  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.gold, '#ffffff'), captionColor: tint(c.ink, 0.7), marginTop: 22, edit });
 
   const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp'
     ? `<div style="margin-top:${px(20 * scale)};"><span style="display:inline-block; border:1.5px solid ${c.gold}; color:${c.ink};
@@ -737,7 +735,7 @@ function renderPhoto({ event, flyer, colors, font, scale, images, hostLine, hide
   // Featured images get a soft frame in the palette's tone — translucent white
   // on Dark, a faint ink hairline on Light — so they read as part of the flyer
   // rather than a hard block.
-  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.frame, c.frameBg), captionColor: c.muted, marginTop: 22, edit, tile: c.gold });
+  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.frame, c.frameBg), captionColor: c.muted, marginTop: 22, edit });
 
   const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp'
     ? `<div style="margin-top:${px(20 * scale)};"><span style="display:inline-block; border:1.5px solid ${c.gold}; color:${bright};

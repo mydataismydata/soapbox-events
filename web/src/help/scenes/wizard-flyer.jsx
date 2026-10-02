@@ -26,8 +26,10 @@ const steps = [
 ];
 
 // A line typed on the flyer: its text, or a faint placeholder while it is
-// empty, with its pencil beside it, or the ⏎ button while it is being typed in.
-// Preview drops the placeholders and the buttons.
+// empty, with its pencil in front of it. While it is being typed in, the ⏎
+// button sits at the end of the text instead. Preview drops the placeholders
+// and the buttons. The buttons hang outside the line, so the text stays
+// centred just as it is on the real flyer.
 function Line({ name, text, ghost, typing: open, preview, className }) {
   if (preview && !text) return null;
   let cls = '';
@@ -35,17 +37,18 @@ function Line({ name, text, ghost, typing: open, preview, className }) {
   else if (!text) cls = 'ghost';
   return (
     <div className={className}>
-      <span className={cls}>{text || (open ? '' : ghost)}{open ? <span className="hs-caret" /> : null}</span>
-      {preview ? null : open
-        ? <span className="hs-tool accept" data-t="accept"><Icon name="enter" size={9} strokeWidth={2.4} /></span>
-        : <span className="hs-tool" data-t={`pencil-${name}`}><Icon name="pencil" size={9} strokeWidth={2.2} /></span>}
+      <span className="hs-line">
+        {preview || open ? null : <span className="hs-tool lead" data-t={`pencil-${name}`}><Icon name="pencil" size={9} strokeWidth={2.2} /></span>}
+        <span className={cls}>{text || (open ? '' : ghost)}{open ? <span className="hs-caret" /> : null}</span>
+        {open && !preview ? <span className="hs-tool accept" data-t="accept"><Icon name="enter" size={9} strokeWidth={2.4} /></span> : null}
+      </span>
     </div>
   );
 }
 
 // The speakers' pictures. One keeps its own shape; two sit side by side,
 // cropped to match. Each carries an X, and the add button waits beside the
-// last one, or on a faint tile before there are any.
+// last one, or on its own where the first will go.
 function Pictures({ count, preview }) {
   const add = <span className="hs-tool add" data-t="add"><Icon name="imagePlus" size={12} strokeWidth={2} /></span>;
   if (!count) return preview ? null : <div className="hs-tile">{add}</div>;

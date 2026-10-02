@@ -44,6 +44,17 @@ function maxOf(key) {
   return String(key).startsWith('note:') ? 64 : lineOf(key).max;
 }
 
+// Where a line starts, for the pencil in front of it. A line set in a row
+// with its own decorations (Retro's stars, Spotlight's star and icons, Panel's
+// arrows) starts at the first of them, so the pencil doesn't cover one.
+function leadOf(el, textLeft) {
+  const row = el.parentElement;
+  if (!row || row.children.length < 2) return textLeft;
+  const cs = row.ownerDocument.defaultView.getComputedStyle(row);
+  if (!cs.display.includes('flex') || !cs.flexDirection.startsWith('row')) return textLeft;
+  return Math.min(textLeft, ...[...row.children].map((c) => c.getBoundingClientRect().left));
+}
+
 // A picture drawn with object-fit: contain fills its box only along one side.
 // Its buttons belong on the picture, so measure the part the picture covers.
 function pictureBox(el) {
@@ -94,8 +105,15 @@ function isReady(frame) {
   return Boolean(doc?.body && doc.URL === 'about:srcdoc' && doc.readyState === 'complete');
 }
 
-// Where a button goes beside a line: just past the end of its text, or under
-// that end when the text runs to the flyer's edge.
+// Where a line's pencil goes: in front of the line, level with its first row
+// of text, kept inside the flyer.
+function before(r, card, size) {
+  const left = Math.max(card.x + 4, r.x - size - 6);
+  return { left: Math.round(left), top: Math.round(r.y + r.h / 2 - size / 2) };
+}
+
+// Where the ⏎ button goes while a line is typed in: just past the end of the
+// text, or under that end when the text runs to the flyer's edge.
 function beside(r, card, size) {
   let left = r.x + r.w + 6;
   let top = r.y + r.h / 2 - size / 2;
@@ -152,12 +170,14 @@ export default function FlyerStage({
     const slots = [...doc.querySelectorAll('[data-slot]')].map((el) => {
       const s = { key: el.getAttribute('data-slot'), box: box(pictureBox(el)), ghost: el.hasAttribute('data-ghost') };
       if (lineOf(s.key)) {
-        // The end of the text itself, not of its box: a centred line's box
-        // runs the width of the flyer.
+        // The start and end of the text itself, not of its box: a centred
+        // line's box runs the width of the flyer.
         const range = doc.createRange();
         range.selectNodeContents(el);
         const lines = [...range.getClientRects()].filter((r) => r.width > 0.5);
+        const first = lines[0] || el.getBoundingClientRect();
         s.end = lines.length ? box(lines[lines.length - 1]) : s.box;
+        s.start = box({ left: leadOf(el, first.left), top: first.top, width: first.width, height: first.height });
       }
       return s;
     });
@@ -439,15 +459,15 @@ export default function FlyerStage({
     for (const s of slots) {
       if (!lineOf(s.key)) continue;
       const name = nameOf(s.key, pics.length);
-      const at = beside(s.end || s.box, card, TOOL);
+      // One button per line, so the focus stays on it from pencil to ⏎ and back.
       if (typing === s.key) {
         tools.push({
-          id: s.key, kind: 'accept', icon: 'enter', label: `Keep the ${name} (Enter)`, ...at,
+          id: s.key, kind: 'accept', icon: 'enter', label: `Keep the ${name} (Enter)`, ...beside(s.end || s.box, card, TOOL),
           press: () => { finishTyping(true); focusTool(s.key); },
         });
       } else {
         tools.push({
-          id: s.key, kind: 'pencil', icon: 'pencil', label: `${s.ghost ? 'Add' : 'Change'} the ${name}`, ...at,
+          id: s.key, kind: 'pencil', icon: 'pencil', label: `${s.ghost ? 'Add' : 'Change'} the ${name}`, ...before(s.start || s.box, card, TOOL),
           press: () => startTyping(s.key),
         });
       }

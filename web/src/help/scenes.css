@@ -413,7 +413,7 @@
   height: 16px;
   margin-left: 5px;
   vertical-align: middle;
-  border-radius: 50%;
+  border-radius: var(--r-md);
   border: 1px solid var(--c-tool-line);
   background: var(--c-tool);
   color: var(--c-tool-ink);
@@ -427,14 +427,17 @@
   color: var(--c-tool-accent-ink);
 }
 .hs-tool.add { width: 22px; height: 22px; margin: 0; }
+/* A line's pencil hangs in front of it, and the ⏎ button after it. */
+.hs-line { position: relative; display: inline-block; }
+.hs-line > .hs-tool { position: absolute; top: 50%; margin: -8px 0 0; }
+.hs-line > .hs-tool.lead { right: 100%; margin-right: 6px; }
+.hs-line > .hs-tool.accept { left: 100%; margin-left: 6px; }
+/* Where the first picture will go: just room for the add button. */
 .hs-tile {
   display: grid;
   place-items: center;
-  width: 150px;
-  height: 44px;
+  height: 30px;
   margin: 3px 0;
-  border: 1.5px dashed #b8963e;
-  border-radius: 4px;
 }
 /* The add button waits just to the right of the last picture. */
 .hs-pics { position: relative; display: flex; gap: 8px; margin: 3px 0; }
@@ -464,7 +467,7 @@
   place-items: center;
   width: 13px;
   height: 13px;
-  border-radius: 50%;
+  border-radius: var(--r-md);
   border: 1px solid var(--c-tool-strong-line);
   background: var(--c-tool-strong);
   color: var(--c-tool-strong-ink);

@@ -941,7 +941,8 @@ button.chip.active,
   width: 26px;
   height: 26px;
   padding: 0;
-  border-radius: var(--r-pill);
+  /* Square, with the same hairline rounding as every other control. */
+  border-radius: var(--r-md);
   border: 1px solid var(--c-tool-line);
   background: var(--c-tool);
   color: var(--c-tool-ink);

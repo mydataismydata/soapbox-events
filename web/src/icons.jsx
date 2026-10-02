@@ -30,6 +30,9 @@ const PATHS = {
   external: <><path d="M14 4h6v6" /><path d="m20 4-8.5 8.5" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></>,
   refresh: <><path d="M20 12a8 8 0 1 1-2.6-5.9" /><path d="M20 4v5h-5" /></>,
   image: <><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.6" /><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5" /></>,
+  imagePlus: <><path d="M20.5 13v5a2 2 0 0 1-2 2h-14a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h8" /><circle cx="8" cy="10" r="1.6" /><path d="m3 17.5 5-4.5 4 3.5 3-2.5 5.5 4.5" /><path d="M18.5 2.5v6M15.5 5.5h6" /></>,
+  // The return key: what accepts a line typed on the flyer.
+  enter: <><path d="M19.5 5v6.5a2.5 2.5 0 0 1-2.5 2.5H5" /><path d="m9.5 9.5-4.5 4.5 4.5 4.5" /></>,
   link: <><path d="M10.5 13.5a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 0 0-5.7-5.7l-1.4 1.4" /><path d="M13.5 10.5a4 4 0 0 0-5.7 0L5 13.3a4 4 0 0 0 5.7 5.7l1.4-1.4" /></>,
   clipboard: <><rect x="6" y="4.5" width="12" height="16" rx="2" /><path d="M9.5 4.5A1.5 1.5 0 0 1 11 3h2a1.5 1.5 0 0 1 1.5 1.5v1h-5Z" /></>,
   eye: <><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="3" /></>,
@@ -57,6 +60,8 @@ const PATHS = {
   chevronLeft: <path d="m14.5 6-6 6 6 6" />,
   arrowLeft: <><path d="M20 12H4" /><path d="m9.5 6.5-5.5 5.5 5.5 5.5" /></>,
   arrowRight: <><path d="M4 12h16" /><path d="m14.5 6.5 5.5 5.5-5.5 5.5" /></>,
+  arrowUp: <><path d="M12 20V4" /><path d="m6.5 9.5 5.5-5.5 5.5 5.5" /></>,
+  arrowDown: <><path d="M12 4v16" /><path d="m6.5 14.5 5.5 5.5 5.5-5.5" /></>,
   logout: <><path d="M15 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2" /><path d="M20 12H9.5" /><path d="m16.5 8.5 3.5 3.5-3.5 3.5" /></>,
 
   // --- text editor --------------------------------------------------------

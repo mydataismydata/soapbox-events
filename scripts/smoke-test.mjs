@@ -517,6 +517,55 @@ let guests = [];
   check('snapshot flyer drops the page furniture',
     snapHtml.includes('Preview Party') && !snapHtml.includes('box-shadow') && !snapHtml.includes('translateX(-50%)'));
   check('snapshot flyer is laid out at a fixed width', snapHtml.includes('max-width:920px'));
+  check('presets give the designer the email picture widths',
+    pres.data?.snapshotWidths?.portrait === 640 && pres.data?.snapshotWidths?.wide === 920);
+
+  // A picture on its own keeps its own shape inside a 300px square, so a tall
+  // one stays tall; pictures side by side are cropped to 3:2 to match.
+  const lone = await (await A.raw('POST', '/api/flyer/preview', {
+    body: { event: { title: 'Preview Party', date: future }, flyer: { style: 'classic', imageTokens: ['prevIMGone'] } },
+  })).text();
+  check('a single picture keeps its own proportions',
+    /\/files\/prevIMGone"[^>]*max-height:300px/.test(lone) && !/\/files\/prevIMGone"[^>]*aspect-ratio/.test(lone));
+  check('pictures side by side are cropped to match', /\/files\/prevIMGone"[^>]*aspect-ratio:3\/2/.test(fpHtml));
+
+  // The designer's own flyer: in edit mode every typed line, the picture tile
+  // and the photo templates' background are marked for the designer's buttons,
+  // and an empty line is drawn as a faint placeholder. Nothing else ever
+  // carries those marks: not the plain preview, not the email picture.
+  const SLOTS = {
+    classic: 'eyebrow,tagline,image-add,contact,note',
+    dark: 'bg,eyebrow,tagline,image-add,contact,note',
+    light: 'bg,eyebrow,tagline,image-add,contact,note',
+    retro: 'image-add,eyebrow,tagline,note,contact',
+    spotlight: 'eyebrow,tagline,contact,note,image-add',
+    panel: 'eyebrow,tagline,note:0,contact,image-add',
+  };
+  const slotsIn = (h) => [...h.matchAll(/data-slot="([^"]+)"/g)].map((m) => m[1]).join(',');
+  const draw = async (extra) => (await A.raw('POST', '/api/flyer/preview', { body: extra })).text();
+  for (const style of ids) {
+    const body = { event: { title: 'Mark Party', date: future, venue_name: 'Hall' }, flyer: { style, eyebrow: 'Hello' } };
+    const edit = await draw({ ...body, edit: true });
+    check(`${style}: edit mode marks every line and the picture tile`, slotsIn(edit) === SLOTS[style], slotsIn(edit));
+    check(`${style}: the empty lines are drawn as placeholders`, (edit.match(/ data-ghost\b/g) || []).length === 4);
+    check(`${style}: edit mode brings its own styles`, edit.includes('[data-ghost]'));
+    const plain = await draw(body);
+    check(`${style}: the plain preview carries no editing marks`,
+      !/data-slot|data-ghost|\[data-ghost\]/.test(plain) && plain.includes('Hello'));
+    const shot = await draw({ ...body, edit: true, snapshot: true });
+    check(`${style}: the email picture never carries editing marks`, !/data-slot|data-ghost/.test(shot));
+  }
+  const filled = await draw({ event: { title: 'Mark Party', date: future },
+    flyer: { style: 'classic', imageTokens: ['prevIMGone', 'prevIMGtwo'], imageCaptions: ['Ada', ''] }, edit: true });
+  check('edit mode marks each picture and its caption',
+    slotsIn(filled).includes('image:0,caption:0,image:1,caption:1') && /data-slot="caption:1" data-ghost/.test(filled));
+  const bullets = await draw({ event: { title: 'Mark Party', date: future },
+    flyer: { style: 'panel', note: 'Free parking · Doors at 5' }, edit: true });
+  check('Panel marks each footnote bullet and a spare for the next',
+    slotsIn(bullets).includes('note:0,note:1,note:2') && /data-slot="note:2" data-ghost/.test(bullets));
+  const mast = await draw({ event: { title: 'News' }, flyer: { style: 'classic' }, mode: 'broadcast', edit: true });
+  check('a broadcast masthead has no contact line to type on',
+    !slotsIn(mast).split(',').includes('contact') && slotsIn(mast).startsWith('eyebrow'));
 }
 
 // --- public pages ----------------------------------------------------------
@@ -528,6 +577,7 @@ let guests = [];
   check('landing page shows venue phone + directions link', landing.status === 200
     && html.includes('(555) 100-2000') && html.includes('Get directions')
     && html.includes('https://maps.example.com/grandhall'));
+  check('landing page flyer carries no editing marks', !/data-slot|data-ghost/.test(html));
   // The guest pages wear the admin app's look, typeface included.
   check('guest pages use the app typeface', html.includes("font-family: 'IBM Plex Sans'")
     && html.includes('/fonts/ibm-plex-sans/ibm-plex-sans-latin-400-normal.woff2'));

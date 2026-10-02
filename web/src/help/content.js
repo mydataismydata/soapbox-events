@@ -53,12 +53,14 @@ const EVENT_WIZARD = {
       heading: '3. Designing the flyer',
       text: [
         'The flyer is the top of the event’s public page. There are six templates. Classic, Dark, Light and Retro are tall, and Spotlight and Panel are wide.',
-        'The preview beside the choices is the real page, and it changes as you type.',
+        'You type every line straight onto the flyer. Click the pencil beside a line and type. Press Enter or the return button to keep it, or Esc to put the line back.',
       ],
       points: [
-        'The short lines, such as the tagline, each have a set place on the flyer.',
-        'Add image puts up to three photos across a tall flyer, such as the candidates who are speaking.',
-        'Dark and Light also take a background photo.',
+        'Faint lines such as Tagline and Footnote stand in for lines you have not written yet.',
+        'The picture button adds up to three photos to a tall flyer, such as the candidates who are speaking. The X on a photo removes it.',
+        'On Dark and Light, the button in the top-left corner adds a background photo. The arrow at the bottom left shrinks it into the top half.',
+        'Preview shows the flyer the way the email picture looks, without the pencils and placeholders. Click it again to keep editing.',
+        'Reset flyer clears every line and photo, once you confirm.',
       ],
       scene: 'wizard-flyer',
     },
@@ -112,7 +114,7 @@ const BROADCAST_WIZARD = {
       ],
       points: [
         'Soapbox adds an unsubscribe link to the end of every broadcast.',
-        'With the web version on, this step also designs the masthead at the top of the web page.',
+        'With the web version on, this step also designs the masthead at the top of the web page. You type its lines straight onto it, the same way as an event’s flyer.',
       ],
       scene: 'broadcast-message',
     },

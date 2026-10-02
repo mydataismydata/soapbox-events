@@ -18,6 +18,9 @@ organizations from one installation**, with hard isolation between them.
   in the browser (no headless browser on the server) and the invitation carries
   it under the Accept / Decline buttons
 - Live preview — the exact renderer that guests see powers the design preview
+- Edit on the flyer itself: a pencil beside each line turns it into a text
+  box in place, pictures and backgrounds are added and removed from buttons on
+  the flyer, and a Preview toggle hides every editing mark
 - Invitation emails with prominent, fixed-color **Accept / Decline buttons**,
   automatic event-details card, plain-text alternative, and per-guest
   placeholders

@@ -108,23 +108,41 @@ leave and resume any time (it stays a draft until you send or publish).
    the largest allowed party size, and whether the public page shows the
    guest list (first names + last initial). The *shareable link* toggle
    controls whether strangers with the link can RSVP.
-3. **Invitation & flyer** — design the flyer: pick one of six templates,
-   each with its own fixed colors. Four are portrait (Classic, Dark, Light,
-   Retro) and two are wide (Spotlight, Panel), which run side-on with the
-   type on the left and one photo down the right. Then set fonts, title
-   size, four short text slots (eyebrow / tagline / footnote / contact),
-   and the featured images — up to three side by side on a portrait
-   template (e.g. featured speakers), or a single full-height photo on a
-   wide one — each with an optional caption. On the Panel template,
-   separating the footnote with `·` turns it into up to three bullet rows.
-   Long text shrinks and wraps automatically so it always stays
-   inside the flyer. The preview is live and pixel-identical to the public
-   page. Below it, write the email: start from a template, insert
-   placeholders, and *Preview email* to see the real rendering. The email
-   leads with your message and nothing above it — tick **Include flyer in
-   email** if you want the artwork in there too. That sends a picture of the
-   finished flyer under the Accept / Decline buttons, re-made automatically
-   whenever you change the design or the event's date, time or venue.
+3. **Invitation & flyer** — write the email, then design the flyer. For the
+   email, start from a template, insert placeholders, and *Preview email* to
+   see the real rendering. The email leads with your message and nothing
+   above it — tick **Include flyer in email** if you want the artwork in
+   there too. That sends a picture of the finished flyer under the Accept /
+   Decline buttons, re-made automatically whenever you change the design or
+   the event's date, time or venue.
+
+   For the flyer, pick one of six templates, each with its own fixed colors.
+   Four are portrait (Classic, Dark, Light, Retro) and two are wide
+   (Spotlight, Panel), which run side-on with the type on the left and one
+   photo down the right. Fonts, title size and the host line and venue
+   address checkboxes sit above the flyer. Everything else is set on the
+   flyer itself, which is drawn by the same code as the public page:
+
+   - **Lines.** Click the pencil beside the eyebrow, tagline, footnote,
+     contact line or a picture's caption, and type it right there in the
+     flyer's own type. Enter or the ⏎ button keeps it, and Esc puts it back.
+     A line you haven't written yet shows as a faint placeholder.
+   - **Pictures.** The picture button adds featured images one at a time:
+     up to three on a portrait template (two side by side, the third
+     centered under them), or one full-height photo on a wide one. A picture
+     on its own keeps its own shape. The X in a picture's corner removes it.
+   - **Backgrounds.** On Dark and Light, the button in the flyer's top-left
+     corner adds a background photo, and its X takes it off again. The arrow
+     at the bottom left shrinks the photo into the top half, and the arrow
+     where the shrunk photo ends spreads it back out.
+   - **Panel bullets.** On the Panel template each footnote point has its
+     own pill, and a faint pill waits for the next one, up to three.
+   - **Preview** shows the flyer the way the email picture looks, with none
+     of the pencils or placeholders. Click it again to keep editing.
+     **Reset flyer** clears every line and picture once you confirm.
+
+   Long text shrinks and wraps automatically so it always stays inside the
+   flyer.
 4. **Guests** — tick groups, tick individual contacts, and add brand-new
    people inline (they're saved to your contacts too). People without an
    email address can be invited but only reached by phone/link.
@@ -146,7 +164,8 @@ list, no date/venue.
    the email subject (defaults to the title), and whether to publish a **web
    version** (see below).
 2. **Design & message** — the flyer designer, here producing a *masthead* (the
-   styled title block that fronts the web version — no date/venue lines). Then
+   styled title block that fronts the web version — no date/venue lines). Its
+   lines are typed straight onto it, just as on an event's flyer. Then
    the message body, with a template picker and the `{{first_name}}`,
    `{{recipient_name}}`, and `{{org_name}}` placeholders. The email itself goes
    out as your message and nothing else, so the masthead only appears if the

@@ -29,7 +29,9 @@ flyerRouter.post('/flyer/preview', wrap(async (req, res) => {
   const bgUrl = flyerBgUrl(req.org.slug, flyer);
   const hideEventMeta = req.body.mode === 'broadcast';
   // The designer asks for `snapshot` when it is about to rasterize the flyer
-  // into the JPEG that goes in the invitation email.
+  // into the JPEG that goes in the invitation email, and for `edit` for the
+  // flyer it lets the host type on. A snapshot never carries editing marks.
   const snapshot = req.body.snapshot === true;
-  res.type('html').send(renderFlyerDocument({ event, flyer, imageUrls, bgUrl, hideEventMeta, snapshot }));
+  const edit = req.body.edit === true && !snapshot;
+  res.type('html').send(renderFlyerDocument({ event, flyer, imageUrls, bgUrl, hideEventMeta, snapshot, edit }));
 }));

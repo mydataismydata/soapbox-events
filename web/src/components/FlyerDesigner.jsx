@@ -1,293 +1,167 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
-import { Field, useToast, Icon } from '../ui.jsx';
+import { ConfirmModal, Field, useToast, Icon } from '../ui.jsx';
+import FlyerStage from './FlyerStage.jsx';
 
 let cachedPresets = null;
 
-// The flyer designer: pick a style, adjust palette / fonts / sizes, add short
-// text and an optional featured image. The preview iframe is rendered by the
-// server with the exact same code that renders the public landing page.
+const MAX_MB = 5;
+
+// The Panel template's footnote as up to three points, split the way the
+// server's renderer splits it (splitPoints in server/lib/flyer.js).
+function splitPoints(note) {
+  return String(note || '').split(/\s*[·•|;]\s*/).map((s) => s.trim()).filter(Boolean).slice(0, 3);
+}
+
+function readFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// The flyer designer. The template, fonts, title size and the two event
+// checkboxes sit above the flyer; everything else is set on the flyer itself
+// (FlyerStage draws it and its pencils and picture buttons). Reset flyer clears
+// what is on the flyer, and Preview shows it without any of the editing marks.
 export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'event' }) {
   const [presets, setPresets] = useState(cachedPresets);
-  const [srcdoc, setSrcdoc] = useState('');
-  const [previewHeight, setPreviewHeight] = useState(640);
-  const [uploadingSlot, setUploadingSlot] = useState(-1);
-  const [uploadingBg, setUploadingBg] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [uploading, setUploading] = useState(''); // '' | 'picture' | 'background'
+  const [resetting, setResetting] = useState(false);
   const toast = useToast();
-  const timer = useRef(null);
   const fileRef = useRef(null);
-  const bgFileRef = useRef(null);
-  const frameRef = useRef(null);
-  const pendingSlot = useRef(0);
+  const fileFor = useRef('');
+  // Writes start from the newest flyer, not the one this render saw: an upload
+  // can finish after the host has typed something else on the flyer.
+  const latest = useRef(flyer);
+  latest.current = flyer;
 
   useEffect(() => {
     if (cachedPresets) return;
     api.get('/api/flyer/presets').then((d) => { cachedPresets = d; setPresets(d); }).catch(() => {});
   }, []);
 
-  // Debounced live preview.
-  useEffect(() => {
-    clearTimeout(timer.current);
-    timer.current = setTimeout(async () => {
-      try {
-        const res = await fetch('/api/flyer/preview', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-requested-with': 'sjc-vite' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ event: eventBasics, flyer, mode }),
-        });
-        if (res.ok) setSrcdoc(await res.text());
-      } catch { /* preview is best-effort */ }
-    }, 350);
-    return () => clearTimeout(timer.current);
-  }, [JSON.stringify(eventBasics), JSON.stringify(flyer), mode]);
-
-  // Grow the preview iframe to fit the flyer, so even a long design shows in
-  // full with no inner scrollbar. A srcdoc frame is same-origin, so we can
-  // measure the rendered document and watch it for late changes (image loads).
-  useEffect(() => {
-    const frame = frameRef.current;
-    if (!frame) return undefined;
-    let ro = null;
-    const measure = () => {
-      const doc = frame.contentDocument;
-      if (!doc || !doc.body) return;
-      // Measure the body box itself — scrollHeight would floor at the frame's
-      // own height, which grows every pass once we resize it.
-      const h = Math.ceil(doc.body.getBoundingClientRect().height);
-      // The frame's border sits inside its height, so add it back.
-      const border = Math.max(0, frame.offsetHeight - frame.clientHeight);
-      if (h > 0) setPreviewHeight(h + border);
-    };
-    const attach = () => {
-      measure();
-      const doc = frame.contentDocument;
-      if (!doc || !doc.body || typeof ResizeObserver === 'undefined') return;
-      ro?.disconnect();
-      ro = new ResizeObserver(measure);
-      ro.observe(doc.body);
-    };
-    frame.addEventListener('load', attach);
-    attach();
-    return () => { frame.removeEventListener('load', attach); ro?.disconnect(); };
-  }, [srcdoc]);
-
   function set(patch) {
-    onChange({ ...flyer, ...patch });
-  }
-
-  // The wide (landscape) templates put one tall photo down their right-hand
-  // side, so they offer a single image slot instead of three.
-  const wide = Boolean(presets?.styles.find((s) => s.id === flyer.style)?.landscape);
-  const slotCount = wide ? 1 : 3;
-
-  // The photo templates (Dark, Light) take a full-bleed background photo. The
-  // style's `photo` value is its tone, which decides how the field is worded.
-  const photoTone = presets?.styles.find((s) => s.id === flyer.style)?.photo || '';
-  const shadeName = photoTone === 'light' ? 'white' : 'black';
-
-  // Featured images live in parallel arrays (imageTokens / imageCaptions), one
-  // entry per slot. imageToken / imageCaption mirror the first slot so older
-  // readers still work. These helpers always write both the arrays and mirror.
-  function writeImages(tokens, captions) {
-    const filled = tokens.filter(Boolean).length;
-    set({
-      imageColumns: Math.max(1, filled),
-      imageTokens: tokens,
-      imageCaptions: captions,
-      imageToken: tokens[0] || '',
-      imageCaption: captions[0] || '',
-    });
-  }
-
-  function pickImage(i) {
-    pendingSlot.current = i;
-    fileRef.current?.click();
-  }
-
-  async function uploadImage(file) {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { toast('Images must be 5 MB or smaller', 'bad'); return; }
-    const slot = pendingSlot.current;
-    setUploadingSlot(slot);
-    try {
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      const up = await api.post('/api/uploads', { name: file.name, data: dataUrl });
-      const tokens = imageSlots().map((t, i) => (i === slot ? up.token : t));
-      writeImages(tokens, captionSlots());
-      toast('Image added to the flyer');
-    } catch (err) {
-      toast(err.message, 'bad');
-    } finally {
-      setUploadingSlot(-1);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  }
-
-  // The photo templates' full-bleed background photo. It uploads through the
-  // same endpoint as featured images but lives in its own token (flyer.bgToken);
-  // the renderer lays a reverse vignette over it so the text stays legible.
-  async function uploadBg(file) {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { toast('Images must be 5 MB or smaller', 'bad'); return; }
-    setUploadingBg(true);
-    try {
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      const up = await api.post('/api/uploads', { name: file.name, data: dataUrl });
-      set({ bgToken: up.token });
-      toast('Background image added');
-    } catch (err) {
-      toast(err.message, 'bad');
-    } finally {
-      setUploadingBg(false);
-      if (bgFileRef.current) bgFileRef.current.value = '';
-    }
-  }
-
-  // Read the current featured-image state as fixed slots — three normally, one
-  // on a wide template. Older flyers stored a single imageToken/imageCaption,
-  // so fold those into slot 0.
-  function imageSlots() {
-    const arr = Array.isArray(flyer.imageTokens) && flyer.imageTokens.length
-      ? flyer.imageTokens : (flyer.imageToken ? [flyer.imageToken] : []);
-    return Array.from({ length: slotCount }, (_, i) => arr[i] || '');
-  }
-  function captionSlots() {
-    const arr = Array.isArray(flyer.imageCaptions) && flyer.imageCaptions.length
-      ? flyer.imageCaptions : (flyer.imageCaption ? [flyer.imageCaption] : []);
-    return Array.from({ length: slotCount }, (_, i) => arr[i] || '');
-  }
-
-  function setImageAt(i, token) {
-    const tokens = imageSlots().map((t, k) => (k === i ? token : t));
-    const captions = captionSlots().map((c, k) => (k === i && !token ? '' : c));
-    writeImages(tokens, captions);
-  }
-  function setCaptionAt(i, caption) {
-    const captions = captionSlots().map((c, k) => (k === i ? caption : c));
-    writeImages(imageSlots(), captions);
+    onChange({ ...latest.current, ...patch });
   }
 
   if (!presets) return null;
-  const tokens = imageSlots();
-  const captions = captionSlots();
 
-  const templates = (
-    <Field label="Template" hint="Each template has its own fixed colors and layout.">
-      <div className="style-grid" role="radiogroup" aria-label="Flyer template">
-        {presets.styles.map((s) => (
-          <button key={s.id} type="button"
-            role="radio"
-            aria-checked={flyer.style === s.id}
-            className={`style-card ${flyer.style === s.id ? 'active' : ''}`}
-            onClick={() => set({ style: s.id })}>
-            <span className="seg-mark" aria-hidden="true" />
-            <div className="s-name">{s.label}{s.landscape ? <span className="s-tag">Wide</span> : null}</div>
-            <div className="s-desc">{s.description}</div>
-          </button>
-        ))}
-      </div>
-    </Field>
-  );
+  const style = presets.styles.find((s) => s.id === flyer.style) || presets.styles[0];
+  // The wide (landscape) templates put one tall photo down their right-hand
+  // side, so they take a single picture instead of three.
+  const wide = Boolean(style.landscape);
+  const maxPictures = wide ? 1 : 3;
+  // The photo templates (Dark, Light) take a full-bleed background photo too.
+  const takesBackground = Boolean(style.photo);
 
-  const preview = (
-    <div>
-      <iframe ref={frameRef} className="preview-frame" title="Flyer preview" scrolling="no"
-        style={{ height: previewHeight }} srcDoc={srcdoc} />
-      <p className="small muted" style={{ textAlign: 'center', marginTop: 6 }}>
-        {mode === 'broadcast'
-          ? 'Live preview — the masthead on the broadcast’s web version.'
-          : 'Live preview — exactly what guests see on the event page.'}
-      </p>
-    </div>
-  );
+  // The featured pictures as one list of { token, caption }, read the way the
+  // renderer reads them: an old single imageToken counts as the first, a gap
+  // an old flyer left closes up, and a wide template keeps only one.
+  function pictures(f = latest.current) {
+    const tokens = Array.isArray(f.imageTokens) && f.imageTokens.length ? f.imageTokens : (f.imageToken ? [f.imageToken] : []);
+    const captions = Array.isArray(f.imageCaptions) && f.imageCaptions.length ? f.imageCaptions : (f.imageCaption ? [f.imageCaption] : []);
+    return tokens.slice(0, maxPictures).map((token, i) => ({ token, caption: captions[i] || '' })).filter((p) => p.token);
+  }
 
-  const images = (
-    <Field label={wide ? 'Featured image' : 'Featured images'}
-      hint={wide
-        ? 'Optional. One photo, shown full height down the right-hand side. JPEG/PNG/GIF/WebP up to 5 MB.'
-        : 'Optional. Add up to three — one shows on its own, two or three sit side by side (e.g. featured speakers). JPEG/PNG/GIF/WebP up to 5 MB.'}>
-      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
-        style={{ display: 'none' }} onChange={(e) => uploadImage(e.target.files?.[0])} />
-      <div className="img-slots">
-        {tokens.map((tok, i) => (
-          <div className="img-slot" key={i}>
-            {wide ? null : <div className="img-slot-label">Image {i + 1}</div>}
-            <div className="row">
-              <button type="button" className="btn btn-sm" disabled={uploadingSlot !== -1}
-                onClick={() => pickImage(i)}>
-                <Icon name={tok ? 'refresh' : 'image'} size={14} />
-                {uploadingSlot === i ? 'Uploading…' : tok ? 'Replace' : 'Add image'}
-              </button>
-              {tok ? (
-                <button type="button" className="btn btn-sm btn-ghost" onClick={() => setImageAt(i, '')}>
-                  Remove
-                </button>
-              ) : null}
-            </div>
-            {tok ? (
-              <input className="img-cap input" value={captions[i] || ''} maxLength={160}
-                aria-label={`Caption for image ${i + 1}`}
-                placeholder="Caption / name (optional)"
-                onChange={(e) => setCaptionAt(i, e.target.value)} />
-            ) : null}
-          </div>
-        ))}
-      </div>
-    </Field>
-  );
+  // imageToken / imageCaption mirror the first picture so older readers still
+  // work, and imageColumns is how many there are.
+  function writePictures(list) {
+    set({
+      imageColumns: Math.max(1, list.length),
+      imageTokens: list.map((p) => p.token),
+      imageCaptions: list.map((p) => p.caption),
+      imageToken: list[0]?.token || '',
+      imageCaption: list[0]?.caption || '',
+    });
+  }
 
-  // The photo templates paint an uploaded photo across the flyer. Only they use
-  // it, so the field appears when one of them is selected.
-  const background = photoTone ? (
-    <Field label="Background image"
-      hint={`Sits behind the text and is ${photoTone === 'light' ? 'lightened' : 'darkened'} with a gradient so the words stay readable. Tall/portrait photos work best. JPEG/PNG/GIF/WebP up to 5 MB.`}>
-      <input ref={bgFileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
-        style={{ display: 'none' }} onChange={(e) => uploadBg(e.target.files?.[0])} />
-      <div className="row">
-        <button type="button" className="btn btn-sm" disabled={uploadingBg}
-          onClick={() => bgFileRef.current?.click()}>
-          <Icon name={flyer.bgToken ? 'refresh' : 'image'} size={14} />
-          {uploadingBg ? 'Uploading…' : flyer.bgToken ? 'Replace background' : 'Add background image'}
-        </button>
-        {flyer.bgToken ? (
-          <button type="button" className="btn btn-sm btn-ghost" onClick={() => set({ bgToken: '' })}>
-            Remove
-          </button>
-        ) : null}
-      </div>
-      {/* Wrapped in a div: as a direct child of .field the label would pick
-          up the field-label styling (block, bold) instead of .checkbox. */}
-      {flyer.bgToken ? (
-        <div>
-          <label className="checkbox">
-            <input type="checkbox" checked={!!flyer.bgTopHalf}
-              onChange={(e) => set({ bgTopHalf: e.target.checked })} />
-            <span><span className="cb-label">Overlay on top half only</span>
-              <div className="cb-sub">Fits the photo to the flyer’s width along the top and fades it into solid {shadeName} from halfway down, so the lower half is plain {shadeName}.</div></span>
-          </label>
+  function choose(kind) {
+    if (uploading) return;
+    fileFor.current = kind;
+    fileRef.current?.click();
+  }
+
+  async function upload(file) {
+    const kind = fileFor.current;
+    if (fileRef.current) fileRef.current.value = '';
+    if (!file || !kind) return;
+    if (file.size > MAX_MB * 1024 * 1024) { toast(`Pictures must be ${MAX_MB} MB or smaller`, 'bad'); return; }
+    setUploading(kind);
+    try {
+      const up = await api.post('/api/uploads', { name: file.name, data: await readFile(file) });
+      if (kind === 'background') set({ bgToken: up.token });
+      else writePictures([...pictures(), { token: up.token, caption: '' }]);
+    } catch (err) {
+      toast(err.message, 'bad');
+    } finally {
+      setUploading('');
+    }
+  }
+
+  // A line typed on the flyer: a field of its own, one picture's caption, or
+  // one of the Panel template's footnote bullets (note:0, note:1, …).
+  function setLine(key, value) {
+    const [field, at] = key.split(':');
+    const i = Number(at);
+    if (field === 'note' && at !== undefined) {
+      // The footnote is stored as one line, the points joined with ·, so a
+      // separator typed inside a point would split it in two.
+      const points = splitPoints(latest.current.note);
+      const point = value.replace(/[·•|;]/g, ',').replace(/\s+/g, ' ').trim();
+      if (point) points[i] = point;
+      else points.splice(i, 1);
+      set({ note: points.filter(Boolean).join(' · ').slice(0, 200) });
+      return;
+    }
+    if (field !== 'caption') { set({ [field]: value }); return; }
+    const list = pictures();
+    if (!list[i]) return;
+    list[i] = { ...list[i], caption: value };
+    writePictures(list);
+  }
+
+  function clearFlyer() {
+    set({
+      eyebrow: '', tagline: '', note: '', contact: '',
+      imageColumns: 1, imageTokens: [], imageCaptions: [], imageToken: '', imageCaption: '',
+      bgToken: '', bgTopHalf: false,
+    });
+    setResetting(false);
+    toast('Flyer cleared');
+  }
+
+  const empty = !flyer.eyebrow && !flyer.tagline && !flyer.note && !flyer.contact
+    && !pictures(flyer).length && !flyer.bgToken;
+
+  // Everything the drawing depends on. The email-picture fields are left out:
+  // re-making that picture changes them, and changes nothing that is drawn.
+  const { includeFlyerImage, flyerImageToken, ...look } = flyer;
+  const body = { event: eventBasics, flyer: look, mode };
+  const widths = presets.snapshotWidths || { portrait: 640, wide: 920 };
+
+  return (
+    <div className="designer-wrap">
+      <Field label="Template" hint="Each template has its own fixed colors and layout.">
+        <div className="style-grid" role="radiogroup" aria-label="Flyer template">
+          {presets.styles.map((s) => (
+            <button key={s.id} type="button"
+              role="radio"
+              aria-checked={flyer.style === s.id}
+              className={`style-card ${flyer.style === s.id ? 'active' : ''}`}
+              onClick={() => set({ style: s.id })}>
+              <span className="seg-mark" aria-hidden="true" />
+              <div className="s-name">{s.label}{s.landscape ? <span className="s-tag">Wide</span> : null}</div>
+              <div className="s-desc">{s.description}</div>
+            </button>
+          ))}
         </div>
-      ) : (
-        <p className="small muted" style={{ marginTop: 8 }}>
-          No image yet — the flyer shows a {photoTone === 'light' ? 'soft white' : 'deep navy'} gradient until you add one.
-        </p>
-      )}
-    </Field>
-  ) : null;
+      </Field>
 
-  const fields = (
-    <div className={wide ? 'field-cols' : ''}>
-      <div className="field-row">
+      <div className="designer-bar">
         <Field label="Fonts">
           <select value={flyer.font} onChange={(e) => set({ font: e.target.value })}>
             {presets.fonts.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
@@ -298,71 +172,55 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
             {presets.scales.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
         </Field>
+        {mode === 'event' ? (
+          <div className="designer-checks">
+            <label className="checkbox">
+              <input type="checkbox" checked={!!flyer.showHost}
+                onChange={(e) => set({ showHost: e.target.checked })} />
+              <span><span className="cb-label">Show host line</span></span>
+            </label>
+            <label className="checkbox">
+              <input type="checkbox" checked={!!flyer.showAddress}
+                onChange={(e) => set({ showAddress: e.target.checked })} />
+              <span><span className="cb-label">Show venue address</span></span>
+            </label>
+          </div>
+        ) : null}
       </div>
 
-      <Field label="Eyebrow line" hint="The short line above the title.">
-        <input value={flyer.eyebrow} maxLength={60} placeholder="You're invited"
-          onChange={(e) => set({ eyebrow: e.target.value })} />
-      </Field>
-      <Field label="Tagline" hint="One sentence under the title (optional).">
-        <input value={flyer.tagline} maxLength={140} placeholder="Dinner, dancing, and good company"
-          onChange={(e) => set({ tagline: e.target.value })} />
-      </Field>
-      <Field label="Footnote"
-        hint={wide && flyer.style === 'panel'
-          ? 'Small print at the bottom. Separate points with · to get up to three bullet rows.'
-          : 'Small print at the bottom (optional).'}>
-        <input value={flyer.note} maxLength={200} placeholder="Rain or shine · Free parking on 5th"
-          onChange={(e) => set({ note: e.target.value })} />
-      </Field>
-      <Field label="Contact" hint="Who to reach with questions — shown in the details (optional).">
-        <input value={flyer.contact || ''} maxLength={120} placeholder="Questions? Jane · (555) 100-2000"
-          onChange={(e) => set({ contact: e.target.value })} />
-      </Field>
+      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden
+        onChange={(e) => upload(e.target.files?.[0])} />
+      <FlyerStage body={body} previewing={previewing}
+        snapshotWidth={mode === 'event' ? widths[wide ? 'wide' : 'portrait'] : 0}
+        model={{ maxPictures, uploading, takesBackground, background: Boolean(flyer.bgToken), topHalf: Boolean(flyer.bgTopHalf) }}
+        onLine={setLine}
+        onAddPicture={() => choose('picture')}
+        onRemovePicture={(i) => writePictures(pictures().filter((_, k) => k !== i))}
+        onAddBackground={() => choose('background')}
+        onRemoveBackground={() => set({ bgToken: '', bgTopHalf: false })}
+        onTopHalf={(on) => set({ bgTopHalf: on })} />
 
-      {mode === 'event' ? (
-        <>
-          <label className="checkbox">
-            <input type="checkbox" checked={flyer.showHost}
-              onChange={(e) => set({ showHost: e.target.checked })} />
-            <span><span className="cb-label">Show host line</span>
-              <div className="cb-sub">Displays “Hosted by {eventBasics.host_name || '…'}” on the flyer.</div></span>
-          </label>
-          <label className="checkbox">
-            <input type="checkbox" checked={!!flyer.showAddress}
-              onChange={(e) => set({ showAddress: e.target.checked })} />
-            <span><span className="cb-label">Show venue address</span>
-              <div className="cb-sub">The venue name and time always show; turn this on to add the street address.</div></span>
-          </label>
-        </>
+      <div className="designer-foot">
+        <button type="button" className="btn" onClick={() => setResetting(true)} disabled={empty}>
+          <Icon name="refresh" size={14} /> Reset flyer
+        </button>
+        <button type="button" className="btn" aria-pressed={previewing} onClick={() => setPreviewing((p) => !p)}>
+          <Icon name="eye" size={14} /> Preview
+        </button>
+      </div>
+      <p className="small muted designer-hint">
+        {!previewing
+          ? 'Click a pencil to type on the flyer, then press Enter to keep it.'
+          : mode === 'broadcast'
+            ? 'This is the masthead as the web version shows it. Click Preview again to keep editing.'
+            : 'This is the flyer as the email picture shows it. Click Preview again to keep editing.'}
+      </p>
+
+      {resetting ? (
+        <ConfirmModal title="Clear the flyer?" danger confirmLabel="Clear flyer"
+          message={`This removes the lines you typed, the captions, the pictures and the background picture. The template, fonts${mode === 'event' ? ', title size and checkboxes stay' : ' and title size stay'} as they are.`}
+          onConfirm={clearFlyer} onClose={() => setResetting(false)} />
       ) : null}
-    </div>
-  );
-
-  // A wide template needs the full width for its preview, so it stacks:
-  // templates, preview, fields, image. The portrait templates keep the fields
-  // beside the preview.
-  if (wide) {
-    return (
-      <div className="designer-wrap">
-        {templates}
-        {preview}
-        <div style={{ marginTop: 16 }}>{fields}</div>
-        {background}
-        {images}
-      </div>
-    );
-  }
-
-  return (
-    <div className="designer-wrap">
-      {templates}
-      <div className="designer">
-        {fields}
-        {preview}
-      </div>
-      {background}
-      {images}
     </div>
   );
 }

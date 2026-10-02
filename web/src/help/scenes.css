@@ -379,14 +379,96 @@
 }
 
 /* --- the flyer designer, small ------------------------------------------- */
-.hs-designer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 214px;
-  gap: 16px;
-  align-items: start;
+/* Three templates to a row, and the checkboxes beside the two menus, so the
+   whole designer fits one picture. */
+.hs-screen .hs-tight .style-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.hs-screen .hs-tight .style-card { padding: 7px 28px 7px 10px; }
+.hs-screen .hs-tight .designer-bar { flex-wrap: nowrap; gap: 12px; margin: 6px 0 12px; }
+.hs-screen .hs-tight .designer-bar .field { flex: 0 0 130px; min-width: 0; }
+.hs-screen .hs-tight .designer-checks { flex-direction: column; gap: 4px; padding-bottom: 2px; }
+.hs-screen .hs-tight .designer-foot { margin-top: 10px; }
+/* The flyer sits on the same pale page as in the designer, with its pencils
+   and picture buttons drawn in the flyer-tool colours. */
+.hs-stage {
+  display: flex;
+  justify-content: center;
+  padding: 14px 10px;
+  border: 1px solid var(--c-line);
+  background: var(--c-tool-page);
 }
-.hs-preview { text-align: center; }
-.hs-preview .small { margin: 6px 0 0; font-size: 11px; line-height: 1.35; }
+.hs-flyer.hs-onflyer { width: 280px; height: auto; padding: 22px 22px 18px; gap: 5px; }
+.hs-onflyer .title { font-size: 14px; }
+.hs-onflyer .note { font-style: italic; }
+.hs-onflyer .ghost { opacity: 0.55; outline: 1px dashed currentColor; outline-offset: 2px; padding: 0 6px; }
+.hs-onflyer .typing {
+  display: inline-block;
+  min-width: 120px;
+  outline: 1.5px solid var(--c-tool-accent);
+  outline-offset: 3px;
+}
+.hs-tool {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 5px;
+  vertical-align: middle;
+  border-radius: 50%;
+  border: 1px solid var(--c-tool-line);
+  background: var(--c-tool);
+  color: var(--c-tool-ink);
+  box-shadow: var(--sh-tool);
+  letter-spacing: 0;
+}
+.hs-tool.accept,
+.hs-tool.add {
+  border-color: var(--c-tool-accent);
+  background: var(--c-tool-accent);
+  color: var(--c-tool-accent-ink);
+}
+.hs-tool.add { width: 22px; height: 22px; margin: 0; }
+.hs-tile {
+  display: grid;
+  place-items: center;
+  width: 150px;
+  height: 44px;
+  margin: 3px 0;
+  border: 1.5px dashed #b8963e;
+  border-radius: 4px;
+}
+/* The add button waits just to the right of the last picture. */
+.hs-pics { position: relative; display: flex; gap: 8px; margin: 3px 0; }
+.hs-pics > .hs-tool.add { position: absolute; left: 100%; top: 50%; margin: -11px 0 0 8px; }
+.hs-pic {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 78px;
+  height: 52px;
+  border: 2px solid #b8963e;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.hs-pic.one { background: linear-gradient(160deg, #5d7fae, #22365c); }
+.hs-pic.two { background: linear-gradient(160deg, #b0785a, #5a3324); }
+/* A picture on its own keeps its own shape: these are portrait photos. */
+.hs-pics.lone .hs-pic { width: 42px; height: 60px; }
+.hs-pic .x {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid var(--c-tool-strong-line);
+  background: var(--c-tool-strong);
+  color: var(--c-tool-strong-ink);
+}
 
 /* Flyers keep their own colours in either theme, as they do on the event
    page. */

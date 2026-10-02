@@ -15,8 +15,8 @@ import { formatDate, formatTimeRange } from './format.js';
 // which the designer uses to show the Background image field and word it.
 export const STYLES = [
   { id: 'classic', label: 'Classic', description: 'Ivory card in a fine gold double-frame — a star emblem, a large title-case headline and small-caps details. Formal and understated.' },
-  { id: 'dark', label: 'Dark', photo: 'dark', description: 'A full-bleed background photo under a dark gradient, with bright type and a gold accent. Add a background image below. Dramatic and modern.' },
-  { id: 'light', label: 'Light', photo: 'light', description: 'A full-bleed background photo under a white gradient, with dark type and a gold accent. Add a background image below. Bright and airy.' },
+  { id: 'dark', label: 'Dark', photo: 'dark', description: 'A full-bleed background photo under a dark gradient, with bright type and a gold accent. Dramatic and modern.' },
+  { id: 'light', label: 'Light', photo: 'light', description: 'A full-bleed background photo under a white gradient, with dark type and a gold accent. Bright and airy.' },
   { id: 'retro', label: 'Retro', description: 'Vintage navy, red and parchment stripes. All type — no photo needed.' },
   { id: 'spotlight', label: 'Spotlight', landscape: true, description: 'Wide. Bright-blue-to-midnight gradient, details on a white card, your photo standing at the right.' },
   { id: 'panel', label: 'Panel', landscape: true, description: 'Wide. Deep navy with a huge headline, an oversized date and a full-height photo panel.' },
@@ -187,39 +187,89 @@ function px(n) {
   return `${Math.round(n)}px`;
 }
 
+// --- editing marks ------------------------------------------------------------
+
+// Only the designer's own preview asks for `edit`. In it, every line the host
+// types on the flyer carries data-slot="<field>", so the designer can find
+// the line, put a pencil beside it and type into it in place. An empty line is
+// still drawn, faintly, with its name standing in for the text (data-ghost),
+// so there is somewhere to type. Pictures, the tile a first picture goes on and
+// the photo templates' background carry data-slot too, for the buttons that
+// add, remove and resize them. Nothing guests see is ever drawn in edit mode.
+const PLACEHOLDERS = {
+  eyebrow: 'Eyebrow line', tagline: 'Tagline', note: 'Footnote', contact: 'Contact', caption: 'Caption',
+};
+
+// One typed line. Out of edit mode an empty line has show: false and the
+// template leaves it out; in edit mode it shows its placeholder instead.
+function slot(edit, key, value, placeholder = PLACEHOLDERS[key.split(':')[0]]) {
+  const text = String(value || '');
+  if (!edit) return { show: Boolean(text), text, attrs: '' };
+  return {
+    show: true,
+    text: text || placeholder,
+    attrs: ` data-slot="${key}"${text ? '' : ' data-ghost'}`,
+  };
+}
+
+// The editing view's own styles: placeholders faint and outlined, the line
+// being typed in ringed, and pictures that can't be dragged out of the flyer.
+const EDIT_CSS = `[data-ghost] { opacity: 0.55; }
+[data-ghost]:not([data-slot^="image"]) { outline: 1px dashed currentColor; outline-offset: 3px; }
+[data-editing] { opacity: 1; outline: 2px solid #1f5fbf; outline-offset: 4px; box-shadow: 0 0 0 4px rgba(255,255,255,0.7); }
+span[data-editing] { display: inline-block; min-width: 2ch; }
+[data-slot^="eyebrow"], [data-slot^="tagline"], [data-slot^="note"], [data-slot^="contact"], [data-slot^="caption"] { cursor: text; }
+img { -webkit-user-drag: none; user-select: none; }`;
+
 // Optional caption rendered directly under a featured image.
-function captionHtml(text, colors, scale, color) {
-  if (!text) return '';
-  return `<div style="font-size:${px(12.5 * scale)}; line-height:1.4; color:${color || tint(colors.ink, 0.7)};
-    margin-top:7px; text-align:center; font-style:italic;">${esc(text)}</div>`;
+function captionHtml(text, colors, scale, color, edit, i) {
+  const s = slot(edit, `caption:${i}`, text);
+  if (!s.show) return '';
+  return `<div${s.attrs} style="font-size:${px(12.5 * scale)}; line-height:1.4; color:${color || tint(colors.ink, 0.7)};
+    margin-top:7px; text-align:center; font-style:italic;">${esc(s.text)}</div>`;
 }
 
 // One framed featured image. `bg` shows through where an uploaded image is
 // transparent, so a logo on a transparent PNG sits on the template's colour.
+// Pictures side by side are cropped to 3:2 so they match. A picture on its own
+// keeps its own shape instead: `natural` is the square (px) it shrinks to fit.
 function imageFrame(border, bg) {
-  return (url) => `<img src="${esc(url)}" alt="" style="display:block; width:100%; aspect-ratio:3/2;
-    object-fit:cover; border-radius:8px; border:3px solid ${border}; background:${bg};">`;
+  return (url, { key = '', natural = 0 } = {}) => {
+    const shape = natural
+      ? `width:auto; height:auto; max-width:100%; max-height:${px(natural)}; margin:0 auto;`
+      : 'width:100%; aspect-ratio:3/2; object-fit:cover;';
+    return `<img src="${esc(url)}" alt=""${key ? ` data-slot="${key}"` : ''} style="display:block; ${shape}
+      border-radius:8px; border:3px solid ${border}; background:${bg};">`;
+  };
 }
 
-// Render 1–3 featured images. One is centred; two sit side by side in equal
-// columns; three keep the first two side by side with the third centred below.
-function featuredImages(images, { scale, colors, frame, captionColor, marginTop = 22 }) {
+// Render 1–3 featured images. One is centred at its own proportions; two sit
+// side by side in equal columns; three keep the first two side by side with
+// the third centred below. With none, the editing view draws a faint tile
+// where the first one would go, for the designer's add button to sit on.
+function featuredImages(images, { scale, colors, frame, captionColor, marginTop = 22, edit = false, tile = colors.ink }) {
   const n = images.length;
-  if (!n) return '';
-  const gap = px(14 * scale);
-  const cap = (caption) => captionHtml(caption, colors, scale, captionColor);
-  const col = (im) => `<div style="flex:1 1 0; min-width:0; text-align:center;">${frame(im.url)}${cap(im.caption)}</div>`;
-  if (n === 1) {
-    return `<div style="max-width:${px(300 * scale)}; margin:${px(marginTop)} auto 4px; text-align:center;">${frame(images[0].url)}${cap(images[0].caption)}</div>`;
+  if (!n) {
+    return edit
+      ? `<div data-slot="image-add" data-ghost style="max-width:${px(300 * scale)}; height:${px(96 * scale)};
+          margin:${px(marginTop)} auto 4px; border:2px dashed ${tile}; border-radius:8px;"></div>`
+      : '';
   }
-  const topRow = `<div style="display:flex; gap:${gap}; justify-content:center; align-items:flex-start;">${col(images[0])}${col(images[1])}</div>`;
+  const gap = px(14 * scale);
+  const cap = (im, i) => captionHtml(im.caption, colors, scale, captionColor, edit, i);
+  const pic = (im, i, natural = 0) => frame(im.url, { key: edit ? `image:${i}` : '', natural });
+  const col = (im, i) => `<div style="flex:1 1 0; min-width:0; text-align:center;">${pic(im, i)}${cap(im, i)}</div>`;
+  if (n === 1) {
+    return `<div style="max-width:${px(300 * scale)}; margin:${px(marginTop)} auto 4px; text-align:center;">${pic(images[0], 0, 300 * scale)}${cap(images[0], 0)}</div>`;
+  }
+  const topRow = `<div style="display:flex; gap:${gap}; justify-content:center; align-items:flex-start;">${col(images[0], 0)}${col(images[1], 1)}</div>`;
   if (n === 2) {
     return `<div style="max-width:${px(430 * scale)}; margin:${px(marginTop)} auto 4px;">${topRow}</div>`;
   }
   return `<div style="max-width:${px(430 * scale)}; margin:${px(marginTop)} auto 4px;">
     ${topRow}
     <div style="display:flex; justify-content:center; margin-top:${gap};">
-      <div style="width:calc(50% - ${px(7 * scale)}); min-width:0; text-align:center;">${frame(images[2].url)}${cap(images[2].caption)}</div>
+      <div style="width:calc(50% - ${px(7 * scale)}); min-width:0; text-align:center;">${pic(images[2], 2)}${cap(images[2], 2)}</div>
     </div>
   </div>`;
 }
@@ -295,17 +345,31 @@ function iconDot(name, { size, bg, ink, border = 'none' }) {
 // The single featured image of a wide template. It sits in a column that
 // stretches to the card's full height, so a tall picture uses every pixel of it
 // and a short one is centred in the space instead of being stretched.
-function widePhoto(image, { minHeight, fit = 'cover', radius = 0, bg = 'transparent', scale, colors, captionColor }) {
-  if (!image) return '';
-  const cap = image.caption
-    ? `<div style="position:absolute; left:0; right:0; bottom:0; padding:${px(10 * scale)} ${px(14 * scale)};
+// With no picture, the editing view draws the column anyway, as a faint tile
+// for the designer's add button.
+function widePhoto(image, { minHeight, fit = 'cover', radius = 0, bg = 'transparent', scale, colors, captionColor, edit = false, tile = '#ffffff' }) {
+  if (!image) {
+    return edit
+      ? `<div data-slot="image-add" data-ghost style="align-self:stretch; width:100%; min-height:${px(minHeight)};
+          border:2px dashed ${tile}; border-radius:${px(Math.max(radius, 8 * scale))};"></div>`
+      : '';
+  }
+  const caption = slot(edit, 'caption:0', image.caption);
+  const cap = caption.show
+    ? `<div${caption.attrs} style="position:absolute; left:0; right:0; bottom:0; padding:${px(10 * scale)} ${px(14 * scale)};
         background:rgba(6,10,26,0.55); color:${captionColor || '#ffffff'}; font-size:${px(12.5 * scale)};
-        line-height:1.35; text-align:center;">${esc(image.caption)}</div>`
+        line-height:1.35; text-align:center;">${esc(caption.text)}</div>`
     : '';
   return `<div style="position:relative; align-self:stretch; width:100%; min-height:${px(minHeight)}; overflow:hidden;
     background:${bg}; border-radius:${px(radius)};">
-    <img src="${esc(image.url)}" alt="" style="position:absolute; top:0; left:0; width:100%; height:100%;
+    <img src="${esc(image.url)}" alt=""${edit ? ' data-slot="image:0"' : ''} style="position:absolute; top:0; left:0; width:100%; height:100%;
       object-fit:${fit}; object-position:center; display:block;">${cap}</div>`;
+}
+
+// The Panel template's footnote as up to three bullet points: the text split
+// on · • | or ;. The designer splits it the same way to edit one point.
+function splitPoints(note) {
+  return String(note || '').split(/\s*[·•|;]\s*/).map((s) => s.trim()).filter(Boolean).slice(0, 3);
 }
 
 // "2026-12-25" -> { day: '25', month: 'DEC' } for the Panel template's
@@ -319,17 +383,22 @@ function bigDateParts(iso) {
 
 // --- templates -------------------------------------------------------------
 
-function renderRetro({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta }) {
+function renderRetro({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, edit }) {
   const c = colors;
   const hasImg = images.length > 0;
+  const eb = slot(edit, 'eyebrow', flyer.eyebrow);
+  const tagline = slot(edit, 'tagline', flyer.tagline);
+  const note = slot(edit, 'note', flyer.note);
   const presents = hostLine ? `<div style="font-family:${font.heading}; font-weight:700; font-size:${px(13 * scale)};
     letter-spacing:0.22em; text-transform:uppercase; color:${c.parchment};">${esc(hostLine)}</div>` : '';
-  const eyebrow = flyer.eyebrow ? `<div style="display:flex; align-items:center; justify-content:center; gap:${px(14 * scale)}; margin-top:${px(16 * scale)};">
+  const eyebrow = eb.show ? `<div style="display:flex; align-items:center; justify-content:center; gap:${px(14 * scale)}; margin-top:${px(16 * scale)};">
     ${starRow(3, { size: 15 * scale, color: c.red, gap: 0.22 })}
-    <span style="font-family:${font.heading}; font-weight:800; font-size:${px(18 * scale)}; letter-spacing:0.08em;
-      text-transform:uppercase; color:${c.red};">${esc(flyer.eyebrow)}</span>
+    <span${eb.attrs} style="font-family:${font.heading}; font-weight:800; font-size:${px(18 * scale)}; letter-spacing:0.08em;
+      text-transform:uppercase; color:${c.red};">${esc(eb.text)}</span>
     ${starRow(3, { size: 15 * scale, color: c.red, gap: 0.22 })}</div>` : '';
-  const img = hasImg ? featuredImages(images, { scale, colors: c, frame: imageFrame(c.parchment, '#ffffff'), captionColor: tint(c.parchment, 0.9), marginTop: 18 }) : '';
+  // The editing view's add tile doesn't count as a picture: the stripes and
+  // spacing stay as they will be printed until a real one is added.
+  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.parchment, '#ffffff'), captionColor: tint(c.parchment, 0.9), marginTop: 18, edit, tile: c.parchment });
   const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp' ? rsvpBadge(scale, { bg: c.red, ink: c.parchment, marginTop: 14 }) : '';
   const topArea = `
     <div style="background:${c.navy}; color:${c.parchment}; text-align:center;
@@ -346,16 +415,17 @@ function renderRetro({ event, flyer, colors, font, scale, images, hostLine, hide
   const dividerRow = lineStarDivider({ color: c.navy, bg: c.parchment, scale, full: true, marginTop: 0 });
   // Stripes alternate red (parchment text) / parchment (navy text) down the page.
   const stripes = [];
-  if (flyer.tagline) stripes.push({ tone: 'red', html: `<div style="font-family:${font.body}; font-size:${px(fitSize(flyer.tagline, 18 * scale, 46, { min: 0.65 }))}; line-height:1.35; color:${c.parchment};">${esc(flyer.tagline)}</div>` });
+  if (tagline.show) stripes.push({ tone: 'red', html: `<div${tagline.attrs} style="font-family:${font.body}; font-size:${px(fitSize(tagline.text, 18 * scale, 46, { min: 0.65 }))}; line-height:1.35; color:${c.parchment};">${esc(tagline.text)}</div>` });
   if (!hasImg) stripes.push({ tone: 'parch', html: dividerRow });
-  if (flyer.note) stripes.push({ tone: 'red', html: `<div style="font-family:${font.body}; font-size:${px(fitSize(flyer.note, 15 * scale, 60, { min: 0.7 }))}; color:${c.parchment}; line-height:1.3;">${esc(flyer.note)}</div>` });
+  if (note.show) stripes.push({ tone: 'red', html: `<div${note.attrs} style="font-family:${font.body}; font-size:${px(fitSize(note.text, 15 * scale, 60, { min: 0.7 }))}; color:${c.parchment}; line-height:1.3;">${esc(note.text)}</div>` });
   if (!hideEventMeta) {
     const vb = venueTimeBits(event, flyer);
     const dt = [vb.date, vb.time].filter(Boolean).map((b, i) => `<span style="color:${i % 2 ? c.red : c.navy};">${esc(b)}</span>`).join(`<span style="color:${c.navy}; font-weight:800;"> // </span>`);
+    const contact = slot(edit, 'contact', flyer.contact);
     const lines = [];
     if (dt) lines.push(`<div style="font-family:${font.heading}; font-weight:800; font-size:${px(15 * scale)}; letter-spacing:0.02em; text-transform:uppercase;">${dt}</div>`);
     if (vb.venue) lines.push(`<div style="font-family:${font.heading}; font-weight:800; font-size:${px(15 * scale)}; letter-spacing:0.02em; text-transform:uppercase; color:${c.navy}; margin-top:${px(5 * scale)};">${esc(vb.venue)}</div>`);
-    if (flyer.contact) lines.push(`<div style="font-family:${font.body}; font-size:${px(13 * scale)}; color:${c.navy}; margin-top:${px(4 * scale)};">${esc(flyer.contact)}</div>`);
+    if (contact.show) lines.push(`<div${contact.attrs} style="font-family:${font.body}; font-size:${px(13 * scale)}; color:${c.navy}; margin-top:${px(4 * scale)};">${esc(contact.text)}</div>`);
     if (lines.length) stripes.push({ tone: 'parch', html: lines.join('') });
   }
   const stripeHtml = stripes.map((s) => `<div style="background:${s.tone === 'red' ? c.red : c.parchment}; text-align:center;
@@ -365,27 +435,31 @@ function renderRetro({ event, flyer, colors, font, scale, images, hostLine, hide
 
 // Wide: a blue gradient running bright-to-midnight left to right, the type on
 // the left with the details on a white card, and one tall photo down the right.
-function renderSpotlight({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta }) {
+function renderSpotlight({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, edit }) {
   const c = colors;
   const w = whenParts(event);
   const vb = venueTimeBits(event, flyer);
-  const photo = images[0]
-    ? `<div style="flex:1 1 34%; min-width:230px; box-sizing:border-box; display:flex;">${widePhoto(images[0], {
-      minHeight: 280 * scale, fit: 'contain', scale, colors: c })}</div>`
+  const eyebrow = slot(edit, 'eyebrow', flyer.eyebrow);
+  const tagline = slot(edit, 'tagline', flyer.tagline);
+  const note = slot(edit, 'note', flyer.note);
+  const well = widePhoto(images[0], { minHeight: 280 * scale, fit: 'contain', scale, colors: c, edit, tile: 'rgba(255,255,255,0.7)' });
+  const photo = well
+    ? `<div style="flex:1 1 34%; min-width:230px; box-sizing:border-box; display:flex;${images[0] ? '' : ` padding:${px(18 * scale)};`}">${well}</div>`
     : '';
 
   // Detail rows sit on a white card, venue/contact on the left of a hairline
   // rule and the date/time on its right — as many cells as there is content.
-  const row = (name, text) => `<div style="display:flex; align-items:center; gap:${px(10 * scale)};">
+  const row = (name, text, attrs = '') => `<div style="display:flex; align-items:center; gap:${px(10 * scale)};">
     ${iconDot(name, { size: 25 * scale, bg: c.accent, ink: '#ffffff' })}
-    <span style="font-family:${font.heading}; font-weight:700; color:#16203f; line-height:1.25;
+    <span${attrs} style="font-family:${font.heading}; font-weight:700; color:#16203f; line-height:1.25;
       font-size:${px(fitSize(text, 14 * scale, 24, { min: 0.72 }))};">${esc(text)}</span></div>`;
   const cell = (rows) => `<div style="flex:1 1 auto; min-width:0; display:grid; gap:${px(9 * scale)};">${rows.join('')}</div>`;
   const cells = [];
   if (!hideEventMeta) {
     const place = [];
+    const contact = slot(edit, 'contact', flyer.contact);
     if (vb.venue) place.push(row('pin', vb.venue));
-    if (flyer.contact) place.push(row('phone', flyer.contact));
+    if (contact.show) place.push(row('phone', contact.text, contact.attrs));
     const when = [];
     if (w.date) when.push(row('cal', w.date));
     if (w.time) when.push(row('clock', w.time));
@@ -401,19 +475,19 @@ function renderSpotlight({ event, flyer, colors, font, scale, images, hostLine, 
 
   const left = `<div style="flex:1 1 ${photo ? '55%' : '100%'}; min-width:300px; box-sizing:border-box;
       display:flex; flex-direction:column; justify-content:center; padding:${px(40 * scale)} ${px(34 * scale)};">
-    ${flyer.eyebrow ? `<div style="display:flex; align-items:center; gap:${px(9 * scale)};">
+    ${eyebrow.show ? `<div style="display:flex; align-items:center; gap:${px(9 * scale)};">
       <span style="color:${c.accent2}; font-size:${px(15 * scale)}; line-height:1;">&#9733;</span>
-      <span style="font-family:${font.heading}; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;
-        font-size:${px(fitSize(flyer.eyebrow, 15 * scale, 30, { min: 0.7 }))};">${esc(flyer.eyebrow)}</span></div>` : ''}
+      <span${eyebrow.attrs} style="font-family:${font.heading}; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;
+        font-size:${px(fitSize(eyebrow.text, 15 * scale, 30, { min: 0.7 }))};">${esc(eyebrow.text)}</span></div>` : ''}
     <div style="font-family:${font.heading}; font-weight:800; text-transform:uppercase; line-height:1.0;
-      font-size:${px(fitSize(event.title, 54 * scale, 14))}; margin-top:${px(flyer.eyebrow ? 14 : 0)};">${esc(event.title || 'Untitled event')}</div>
-    ${flyer.tagline ? `<div style="font-family:${font.heading}; font-weight:800; color:${c.accent2};
+      font-size:${px(fitSize(event.title, 54 * scale, 14))}; margin-top:${px(eyebrow.show ? 14 : 0)};">${esc(event.title || 'Untitled event')}</div>
+    ${tagline.show ? `<div${tagline.attrs} style="font-family:${font.heading}; font-weight:800; color:${c.accent2};
       text-transform:uppercase; letter-spacing:0.02em; line-height:1.15; margin-top:${px(8 * scale)};
-      font-size:${px(fitSize(flyer.tagline, 26 * scale, 22, { min: 0.5 }))};">${esc(flyer.tagline)}</div>` : ''}
+      font-size:${px(fitSize(tagline.text, 26 * scale, 22, { min: 0.5 }))};">${esc(tagline.text)}</div>` : ''}
     ${card}
     ${rsvp}
-    ${flyer.note ? `<div style="margin-top:${px(16 * scale)}; color:rgba(255,255,255,0.82);
-      font-size:${px(fitSize(flyer.note, 13.5 * scale, 66, { min: 0.75 }))}; line-height:1.4;">${esc(flyer.note)}</div>` : ''}
+    ${note.show ? `<div${note.attrs} style="margin-top:${px(16 * scale)}; color:rgba(255,255,255,0.82);
+      font-size:${px(fitSize(note.text, 13.5 * scale, 66, { min: 0.75 }))}; line-height:1.4;">${esc(note.text)}</div>` : ''}
     ${hostLine ? `<div style="margin-top:${px(16 * scale)}; font-style:italic; color:${c.accent2};
       font-size:${px(15 * scale)};">${esc(hostLine)}</div>` : ''}
   </div>`;
@@ -424,32 +498,40 @@ function renderSpotlight({ event, flyer, colors, font, scale, images, hostLine, 
 
 // Wide: a deep navy card — huge headline with outlined badges, the footnote
 // broken into pill rows beside an oversized date, and a full-height photo panel.
-function renderPanel({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta }) {
+function renderPanel({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, edit }) {
   const c = colors;
   const cream = c.ink;
   const soft = tint(cream, 0.62);
   const line = tint(cream, 0.34);
   const w = whenParts(event);
   const vb = venueTimeBits(event, flyer);
-  const photo = images[0]
-    ? `<div style="flex:1 1 36%; min-width:240px; box-sizing:border-box; display:flex; padding:${px(18 * scale)};">${widePhoto(images[0], {
-      minHeight: 300 * scale, fit: 'contain', radius: 6 * scale, scale, colors: c })}</div>`
+  const tagline = slot(edit, 'tagline', flyer.tagline);
+  const well = widePhoto(images[0], { minHeight: 300 * scale, fit: 'contain', radius: 6 * scale, scale, colors: c, edit, tile: line });
+  const photo = well
+    ? `<div style="flex:1 1 36%; min-width:240px; box-sizing:border-box; display:flex; padding:${px(18 * scale)};">${well}</div>`
     : '';
 
-  const badge = (text) => `<div style="width:${px(94 * scale)}; height:${px(94 * scale)}; border-radius:999px;
+  const badge = (text, attrs = '') => `<div${attrs} style="width:${px(94 * scale)}; height:${px(94 * scale)}; border-radius:999px;
     border:1px solid ${line}; display:flex; align-items:center; justify-content:center; text-align:center;
     padding:${px(10 * scale)}; font-family:${font.heading}; font-weight:700; text-transform:uppercase;
     letter-spacing:0.05em; line-height:1.25; font-size:${px(fitSize(text, 11.5 * scale, 15, { min: 0.68 }))};">${esc(text)}</div>`;
-  const badges = [flyer.eyebrow, hostLine].filter(Boolean).map(badge);
+  const eyebrow = slot(edit, 'eyebrow', flyer.eyebrow);
+  const badges = [];
+  if (eyebrow.show) badges.push(badge(eyebrow.text, eyebrow.attrs));
+  if (hostLine) badges.push(badge(hostLine));
 
   // The footnote doubles as a bullet list here: split it on · | ; so a couple of
-  // short points become their own pill rows, as the template is drawn for.
-  const points = String(flyer.note || '').split(/\s*[·•|;]\s*/).map((s) => s.trim()).filter(Boolean).slice(0, 3);
-  const pills = points.map((t) => `<div style="display:flex; align-items:center; gap:${px(12 * scale)};
+  // short points become their own pill rows, as the template is drawn for. In
+  // the editing view each point is typed on its own pill (note:0, note:1, …),
+  // and a faint extra pill stands ready for the next one, up to three.
+  const points = splitPoints(flyer.note);
+  const pill = (text, attrs = '') => `<div style="display:flex; align-items:center; gap:${px(12 * scale)};
     border:1px solid ${line}; border-radius:999px; padding:${px(9 * scale)} ${px(16 * scale)};">
     ${iconDot('arrow', { size: 26 * scale, bg: 'transparent', ink: cream, border: `1px solid ${line}` })}
-    <span style="font-family:${font.heading}; font-weight:700; text-transform:uppercase; line-height:1.25;
-      font-size:${px(fitSize(t, 13 * scale, 34, { min: 0.7 }))};">${esc(t)}</span></div>`);
+    <span${attrs} style="font-family:${font.heading}; font-weight:700; text-transform:uppercase; line-height:1.25;
+      font-size:${px(fitSize(text, 13 * scale, 34, { min: 0.7 }))};">${esc(text)}</span></div>`;
+  const pills = points.map((t, i) => pill(t, edit ? ` data-slot="note:${i}"` : ''));
+  if (edit && points.length < 3) pills.push(pill('Bullet point', ` data-slot="note:${points.length}" data-ghost`));
   const bd = hideEventMeta ? null : bigDateParts(event.date);
   const dateBlock = bd ? `<div style="flex:0 0 auto; text-align:center;">
     <div style="font-family:${font.heading}; font-weight:800; font-size:${px(54 * scale)}; line-height:0.88;">${esc(bd.day)}</div>
@@ -462,12 +544,15 @@ function renderPanel({ event, flyer, colors, font, scale, images, hostLine, hide
         ${dateBlock}</div>`
     : '';
   const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp' ? rsvpBadge(scale, { bg: c.accent2, ink: c.navy, marginTop: 18 }) : '';
-  const footBits = [flyer.contact, vb.venue].filter(Boolean);
+  const contact = slot(edit, 'contact', flyer.contact);
+  const footBits = [];
+  if (contact.show) footBits.push(`<span${contact.attrs}>${esc(contact.text)}</span>`);
+  if (vb.venue) footBits.push(`<span>${esc(vb.venue)}</span>`);
   const foot = !hideEventMeta && footBits.length
     ? `<div style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:${px(12 * scale)};
         margin-top:${px(24 * scale)}; padding-top:${px(14 * scale)}; border-top:1px solid ${line};
         font-family:${font.heading}; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;
-        font-size:${px(12.5 * scale)}; color:${soft};">${footBits.map((b) => `<span>${esc(b)}</span>`).join('')}</div>`
+        font-size:${px(12.5 * scale)}; color:${soft};">${footBits.join('')}</div>`
     : '';
 
   const left = `<div style="flex:1 1 ${photo ? '54%' : '100%'}; min-width:300px; box-sizing:border-box;
@@ -477,9 +562,9 @@ function renderPanel({ event, flyer, colors, font, scale, images, hostLine, hide
         line-height:0.95; font-size:${px(fitSize(event.title, 58 * scale, 12))};">${esc(event.title || 'Untitled event')}</div>
       ${badges.length ? `<div style="flex:0 0 auto; display:flex; flex-direction:column; gap:${px(10 * scale)};">${badges.join('')}</div>` : ''}
     </div>
-    ${flyer.tagline ? `<div style="margin-top:${px(18 * scale)}; font-family:${font.heading}; font-weight:700;
+    ${tagline.show ? `<div${tagline.attrs} style="margin-top:${px(18 * scale)}; font-family:${font.heading}; font-weight:700;
       text-transform:uppercase; line-height:1.35; color:${tint(cream, 0.9)};
-      font-size:${px(fitSize(flyer.tagline, 16 * scale, 74, { min: 0.72 }))};">${esc(flyer.tagline)}</div>` : ''}
+      font-size:${px(fitSize(tagline.text, 16 * scale, 74, { min: 0.72 }))};">${esc(tagline.text)}</div>` : ''}
     ${midRow}
     ${rsvp}
     ${foot}
@@ -493,10 +578,13 @@ function renderPanel({ event, flyer, colors, font, scale, images, hostLine, hide
 // star emblem, an elegant title-case headline (not shouted in all-caps like the
 // patriotic templates), an italic tagline, and small-caps details under a
 // hairline gold rule.
-function renderClassic({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta }) {
+function renderClassic({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, edit }) {
   const c = colors;
   const w = whenParts(event);
   const vb = venueTimeBits(event, flyer);
+  const eyebrow = slot(edit, 'eyebrow', flyer.eyebrow);
+  const tagline = slot(edit, 'tagline', flyer.tagline);
+  const note = slot(edit, 'note', flyer.note);
 
   // A thin gold ring holding a small star — a quiet emblem in place of a flag.
   const emblem = `<div style="width:${px(56 * scale)}; height:${px(56 * scale)}; margin:0 auto ${px(20 * scale)};
@@ -510,7 +598,7 @@ function renderClassic({ event, flyer, colors, font, scale, images, hostLine, hi
     <span style="color:${c.gold}; font-size:${px(10 * scale)}; line-height:1;">&#9670;</span>
     <div style="height:1px; width:${px(66 * scale)}; background:${c.gold};"></div></div>`;
 
-  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.gold, '#ffffff'), captionColor: tint(c.ink, 0.7), marginTop: 22 });
+  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.gold, '#ffffff'), captionColor: tint(c.ink, 0.7), marginTop: 22, edit, tile: c.gold });
 
   const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp'
     ? `<div style="margin-top:${px(20 * scale)};"><span style="display:inline-block; border:1.5px solid ${c.gold}; color:${c.ink};
@@ -526,7 +614,8 @@ function renderClassic({ event, flyer, colors, font, scale, images, hostLine, hi
     if (vb.venue) meta.push(`<div style="font-size:${px(15 * scale)}; margin-top:${px(10 * scale)}; color:${c.ink};">${esc(vb.venue)}</div>`);
     if (hostLine) meta.push(`<div style="font-family:${font.heading}; font-weight:700; font-size:${px(11 * scale)}; margin-top:${px(15 * scale)};
       letter-spacing:0.18em; text-transform:uppercase; color:${c.goldText};">${esc(hostLine)}</div>`);
-    if (flyer.contact) meta.push(`<div style="font-size:${px(12.5 * scale)}; margin-top:${px(8 * scale)}; color:${tint(c.ink, 0.7)};">${esc(flyer.contact)}</div>`);
+    const contact = slot(edit, 'contact', flyer.contact);
+    if (contact.show) meta.push(`<div${contact.attrs} style="font-size:${px(12.5 * scale)}; margin-top:${px(8 * scale)}; color:${tint(c.ink, 0.7)};">${esc(contact.text)}</div>`);
   }
   const metaBlock = meta.length ? `<div style="margin-top:${px(20 * scale)};">${meta.join('')}</div>` : '';
   const showDivider = !hideEventMeta && (meta.length || rsvp);
@@ -534,18 +623,18 @@ function renderClassic({ event, flyer, colors, font, scale, images, hostLine, hi
   const content = `
     <div style="text-align:center;">
       ${emblem}
-      ${flyer.eyebrow ? `<div style="font-family:${font.heading}; font-weight:700; font-size:${px(fitSize(flyer.eyebrow, 14 * scale, 34))};
-        letter-spacing:0.24em; text-transform:uppercase; color:${c.goldText};">${esc(flyer.eyebrow)}</div>` : ''}
+      ${eyebrow.show ? `<div${eyebrow.attrs} style="font-family:${font.heading}; font-weight:700; font-size:${px(fitSize(eyebrow.text, 14 * scale, 34))};
+        letter-spacing:0.24em; text-transform:uppercase; color:${c.goldText};">${esc(eyebrow.text)}</div>` : ''}
       <div style="font-family:${font.heading}; font-weight:800; font-size:${px(fitSize(event.title, 44 * scale, 15))}; line-height:1.08;
         color:${c.ink}; margin-top:${px(10 * scale)};">${esc(event.title || 'Untitled event')}</div>
-      ${flyer.tagline ? `<div style="font-size:${px(fitSize(flyer.tagline, 16.5 * scale, 48, { min: 0.7 }))}; font-style:italic; line-height:1.4;
-        color:${tint(c.ink, 0.78)}; margin:${px(10 * scale)} auto 0; max-width:${px(440 * scale)};">${esc(flyer.tagline)}</div>` : ''}
+      ${tagline.show ? `<div${tagline.attrs} style="font-size:${px(fitSize(tagline.text, 16.5 * scale, 48, { min: 0.7 }))}; font-style:italic; line-height:1.4;
+        color:${tint(c.ink, 0.78)}; margin:${px(10 * scale)} auto 0; max-width:${px(440 * scale)};">${esc(tagline.text)}</div>` : ''}
       ${img}
       ${showDivider ? divider : ''}
       ${rsvp}
       ${metaBlock}
-      ${flyer.note ? `<div style="margin-top:${px(16 * scale)}; font-size:${px(fitSize(flyer.note, 12.5 * scale, 64, { min: 0.75 }))};
-        font-style:italic; color:${tint(c.ink, 0.62)};">${esc(flyer.note)}</div>` : ''}
+      ${note.show ? `<div${note.attrs} style="margin-top:${px(16 * scale)}; font-size:${px(fitSize(note.text, 12.5 * scale, 64, { min: 0.75 }))};
+        font-style:italic; color:${tint(c.ink, 0.62)};">${esc(note.text)}</div>` : ''}
     </div>`;
 
   return `<div style="background:${c.bg}; padding:${px(12 * scale)}; font-family:${font.body};">
@@ -580,11 +669,14 @@ function fadeOutMask(band) {
 // `shade` from halfway down, with the same vignette over the part it shows in.
 // Every line also carries a soft glow. With no photo it falls back to a radial
 // ground, so the style still looks intentional on its own.
-function renderPhoto({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, bgUrl }) {
+function renderPhoto({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, bgUrl, edit }) {
   const c = colors;
   const w = whenParts(event);
   const vb = venueTimeBits(event, flyer);
   const bright = c.ink;
+  const eyebrow = slot(edit, 'eyebrow', flyer.eyebrow);
+  const tagline = slot(edit, 'tagline', flyer.tagline);
+  const note = slot(edit, 'note', flyer.note);
 
   // `shade` is what the vignette and the top-half fade both go to, and
   // `feather` the vignette's blur radius — shared so the two feather alike.
@@ -614,7 +706,7 @@ function renderPhoto({ event, flyer, colors, font, scale, images, hostLine, hide
   const band = 4 * feather;
   const mask = fadeOutMask(band);
   const photo = topHalf
-    ? `<div style="position:absolute; top:0; left:0; right:0; max-height:calc(50% + ${px(band)}); overflow:hidden; z-index:0;
+    ? `<div${edit ? ' data-slot="bg-photo"' : ''} style="position:absolute; top:0; left:0; right:0; max-height:calc(50% + ${px(band)}); overflow:hidden; z-index:0;
         -webkit-mask-image:${mask}; mask-image:${mask};">
         <img src="${esc(bgUrl)}" alt="" style="display:block; width:100%; height:auto;"></div>`
     : '';
@@ -645,7 +737,7 @@ function renderPhoto({ event, flyer, colors, font, scale, images, hostLine, hide
   // Featured images get a soft frame in the palette's tone — translucent white
   // on Dark, a faint ink hairline on Light — so they read as part of the flyer
   // rather than a hard block.
-  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.frame, c.frameBg), captionColor: c.muted, marginTop: 22 });
+  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.frame, c.frameBg), captionColor: c.muted, marginTop: 22, edit, tile: c.gold });
 
   const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp'
     ? `<div style="margin-top:${px(20 * scale)};"><span style="display:inline-block; border:1.5px solid ${c.gold}; color:${bright};
@@ -660,7 +752,8 @@ function renderPhoto({ event, flyer, colors, font, scale, images, hostLine, hide
     if (vb.venue) meta.push(`<div style="font-size:${px(15 * scale)}; margin-top:${px(10 * scale)}; font-weight:700; color:${bright};">${esc(vb.venue)}</div>`);
     if (hostLine) meta.push(`<div style="font-family:${font.heading}; font-weight:700; font-size:${px(11 * scale)}; margin-top:${px(14 * scale)};
       letter-spacing:0.18em; text-transform:uppercase; color:${c.goldText};">${esc(hostLine)}</div>`);
-    if (flyer.contact) meta.push(`<div style="font-size:${px(12.5 * scale)}; margin-top:${px(8 * scale)}; color:${c.muted};">${esc(flyer.contact)}</div>`);
+    const contact = slot(edit, 'contact', flyer.contact);
+    if (contact.show) meta.push(`<div${contact.attrs} style="font-size:${px(12.5 * scale)}; margin-top:${px(8 * scale)}; color:${c.muted};">${esc(contact.text)}</div>`);
   }
   const metaBlock = meta.length ? `<div style="margin-top:${px(20 * scale)};">${meta.join('')}</div>` : '';
   const showDivider = !hideEventMeta && (meta.length || rsvp);
@@ -668,21 +761,23 @@ function renderPhoto({ event, flyer, colors, font, scale, images, hostLine, hide
   const content = `
     <div style="position:relative; z-index:1; text-align:center; text-shadow:0 1px 3px ${c.glow};">
       ${emblem}
-      ${flyer.eyebrow ? `<div style="font-family:${font.heading}; font-weight:700; font-size:${px(fitSize(flyer.eyebrow, 14 * scale, 34))};
-        letter-spacing:0.24em; text-transform:uppercase; color:${c.goldText};">${esc(flyer.eyebrow)}</div>` : ''}
+      ${eyebrow.show ? `<div${eyebrow.attrs} style="font-family:${font.heading}; font-weight:700; font-size:${px(fitSize(eyebrow.text, 14 * scale, 34))};
+        letter-spacing:0.24em; text-transform:uppercase; color:${c.goldText};">${esc(eyebrow.text)}</div>` : ''}
       <div style="font-family:${font.heading}; font-weight:800; font-size:${px(fitSize(event.title, 46 * scale, 15))}; line-height:1.06;
         color:${bright}; margin-top:${px(10 * scale)};">${esc(event.title || 'Untitled event')}</div>
-      ${flyer.tagline ? `<div style="font-size:${px(fitSize(flyer.tagline, 16.5 * scale, 48, { min: 0.7 }))}; font-style:italic; line-height:1.4;
-        color:${c.muted}; margin:${px(10 * scale)} auto 0; max-width:${px(440 * scale)};">${esc(flyer.tagline)}</div>` : ''}
+      ${tagline.show ? `<div${tagline.attrs} style="font-size:${px(fitSize(tagline.text, 16.5 * scale, 48, { min: 0.7 }))}; font-style:italic; line-height:1.4;
+        color:${c.muted}; margin:${px(10 * scale)} auto 0; max-width:${px(440 * scale)};">${esc(tagline.text)}</div>` : ''}
       ${img}
       ${showDivider ? divider : ''}
       ${rsvp}
       ${metaBlock}
-      ${flyer.note ? `<div style="margin-top:${px(16 * scale)}; font-size:${px(fitSize(flyer.note, 12.5 * scale, 64, { min: 0.75 }))};
-        color:${c.faint};">${esc(flyer.note)}</div>` : ''}
+      ${note.show ? `<div${note.attrs} style="margin-top:${px(16 * scale)}; font-size:${px(fitSize(note.text, 12.5 * scale, 64, { min: 0.75 }))};
+        color:${c.faint};">${esc(note.text)}</div>` : ''}
     </div>`;
 
-  return `<div style="position:relative; overflow:hidden; ${bg} color:${bright}; font-family:${font.body};
+  // The card itself is the background's mark, for the designer's buttons in
+  // its corners.
+  return `<div${edit ? ' data-slot="bg"' : ''} style="position:relative; overflow:hidden; ${bg} color:${bright}; font-family:${font.body};
     padding:${px(68 * scale)} ${px(64 * scale)} ${px(64 * scale)}; min-height:${px(430 * scale)};">
     ${photo}
     ${core}
@@ -701,7 +796,9 @@ const RENDERERS = {
 // `snapshot` renders the card for the designer's picture-of-the-flyer capture:
 // a plain rectangle at a fixed width, with no page breakout, rounded corners or
 // shadow — those only make sense against a page, not inside a JPEG.
-export function renderFlyer({ event, flyer: rawFlyer, imageUrl = '', imageUrls = null, bgUrl = '', hideEventMeta = false, snapshot = false }) {
+// `edit` adds the designer's editing marks and placeholders (see slot()). The
+// picture capture never gets them, whatever the caller asks for.
+export function renderFlyer({ event, flyer: rawFlyer, imageUrl = '', imageUrls = null, bgUrl = '', hideEventMeta = false, snapshot = false, edit = false }) {
   const flyer = normalizeFlyer(rawFlyer);
   const colors = flyerColors(flyer);
   const font = fontOf(flyer);
@@ -712,7 +809,8 @@ export function renderFlyer({ event, flyer: rawFlyer, imageUrl = '', imageUrls =
   const resolved = Array.isArray(imageUrls) ? imageUrls : (imageUrl ? [imageUrl] : []);
   const images = [];
   resolved.forEach((u, i) => { if (u) images.push({ url: String(u), caption: flyer.imageCaptions[i] || '' }); });
-  const inner = (RENDERERS[flyer.style] || renderClassic)({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, bgUrl });
+  const marks = Boolean(edit) && !snapshot;
+  const inner = (RENDERERS[flyer.style] || renderClassic)({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, bgUrl, edit: marks });
   // The wide templates need more room than the 640px portrait card, and more
   // than the public page's text column: they break out of it and centre on the
   // viewport instead. On a phone the card simply fills the screen and its two
@@ -743,9 +841,11 @@ export function snapshotWidth(flyer) {
 
 // Standalone document for the designer's live preview iframe. In `snapshot`
 // mode the page furniture goes away so the document is exactly the flyer,
-// ready to be drawn onto a canvas.
-export function renderFlyerDocument({ event, flyer, imageUrl, imageUrls, bgUrl = '', hideEventMeta = false, snapshot = false }) {
-  const html = renderFlyer({ event, flyer, imageUrl, imageUrls, bgUrl, hideEventMeta, snapshot });
+// ready to be drawn onto a canvas. In `edit` mode it carries the editing marks
+// and the styles that go with them.
+export function renderFlyerDocument({ event, flyer, imageUrl, imageUrls, bgUrl = '', hideEventMeta = false, snapshot = false, edit = false }) {
+  const marks = Boolean(edit) && !snapshot;
+  const html = renderFlyer({ event, flyer, imageUrl, imageUrls, bgUrl, hideEventMeta, snapshot, edit: marks });
   // The same pale blue-gray canvas the guest pages sit on, so the preview is
   // the page as guests see it.
   const body = snapshot
@@ -754,7 +854,7 @@ export function renderFlyerDocument({ event, flyer, imageUrl, imageUrls, bgUrl =
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <style>*, *::before, *::after { box-sizing: border-box; }
-body { ${body} }</style>
+body { ${body} }${marks ? `\n${EDIT_CSS}` : ''}</style>
 </head><body>${html}</body></html>`;
 }
 
@@ -764,5 +864,7 @@ export function flyerPresets() {
     fonts: FONTS.map(({ id, label }) => ({ id, label })),
     scales: SCALES.map(({ id, label }) => ({ id, label })),
     defaults: DEFAULT_FLYER,
+    // The designer's Preview lays the flyer out at the picture's own width.
+    snapshotWidths: { portrait: SNAPSHOT_WIDTH, wide: SNAPSHOT_WIDE },
   };
 }

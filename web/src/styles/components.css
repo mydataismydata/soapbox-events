@@ -896,19 +896,98 @@ button.chip.active,
 /* === flyer designer ====================================================== */
 
 .designer-wrap { display: flex; flex-direction: column; }
-/* Fields stay compact so the preview keeps as much width as possible. */
-.designer {
-  display: grid;
-  grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
-  gap: var(--sp-5);
-  align-items: start;
+/* Fonts, title size and the event checkboxes, in one row above the flyer. */
+.designer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-3) var(--sp-5);
+  margin: var(--sp-2) 0 var(--sp-4);
 }
-/* Wide templates stack their blocks, so the fields spread across the width. */
-.field-cols {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 0 var(--sp-5);
-  align-items: start;
+.designer-bar .field { margin: 0; flex: 0 1 200px; min-width: 160px; }
+.designer-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-5);
+  padding-bottom: 10px;
+}
+.designer-checks .checkbox { margin: 0; }
+.designer-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+.designer-hint { text-align: center; margin: var(--sp-2) 0 0; }
+.btn[aria-pressed='true'] {
+  background: var(--c-accent-soft);
+  border-color: var(--c-accent);
+  color: var(--c-accent-text);
+  box-shadow: 0 0 0 1px var(--c-accent) inset;
+}
+
+/* The flyer, with the designer's buttons drawn over it. The buttons sit on
+   the flyer rather than the page, so they use the flyer-tool tokens, which
+   stay light in the dark theme just as the flyer does. */
+.flyer-stage { position: relative; }
+.flyer-tools { position: absolute; inset: 0; pointer-events: none; }
+.flyer-tool {
+  position: absolute;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--c-tool-line);
+  background: var(--c-tool);
+  color: var(--c-tool-ink);
+  box-shadow: var(--sh-tool);
+  cursor: pointer;
+  transition: transform var(--transition), filter var(--transition);
+}
+.flyer-tool:hover { filter: brightness(0.95); }
+.flyer-tool:active { transform: scale(0.94); }
+.flyer-tool:focus-visible { outline: 2px solid var(--c-tool-accent); outline-offset: 2px; }
+.flyer-tool:disabled { cursor: default; filter: none; transform: none; }
+.flyer-tool.accept,
+.flyer-tool.add {
+  background: var(--c-tool-accent);
+  border-color: var(--c-tool-accent);
+  color: var(--c-tool-accent-ink);
+}
+.flyer-tool.add { width: 34px; height: 34px; }
+.flyer-tool.remove {
+  width: 24px;
+  height: 24px;
+  background: var(--c-tool-strong);
+  border-color: var(--c-tool-strong-line);
+  color: var(--c-tool-strong-ink);
+}
+.flyer-tool-spin {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--c-tool-strong-line);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+/* Preview: the flyer drawn clean, on the same pale page as the editing view.
+   For an event it is laid out at the email picture's width and shrunk. */
+.flyer-preview {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  background: var(--c-tool-page);
+}
+.flyer-preview iframe { display: block; border: 0; background: var(--c-tool); }
+.flyer-preview iframe.snap {
+  position: absolute;
+  transform-origin: 0 0;
+  box-shadow: var(--sh-tool);
 }
 .style-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-2); }
 .style-card {
@@ -968,21 +1047,6 @@ button.chip.active,
   border-color: var(--c-accent-line);
   color: var(--c-accent-text);
 }
-
-.img-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
-.img-slot {
-  border: 1px solid var(--c-line);
-  border-radius: var(--r-md);
-  padding: var(--sp-3);
-  background: var(--c-surface-2);
-}
-.img-slot-label {
-  font-size: var(--fs-sm);
-  font-weight: 560;
-  color: var(--c-muted);
-  margin-bottom: 6px;
-}
-.img-slot .img-cap { margin-top: var(--sp-2); }
 
 /* Height is set from the rendered flyer so long designs need no scrollbar. */
 .preview-frame {
@@ -1264,9 +1328,7 @@ button.chip.active,
     gap: var(--sp-1);
   }
   .wiz-step { white-space: nowrap; }
-  .designer { grid-template-columns: minmax(0, 1fr); }
   .style-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .img-slots { grid-template-columns: minmax(0, 1fr); }
   .grid2,
   .grid3,
   .field-row,

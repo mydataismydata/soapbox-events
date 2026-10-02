@@ -68,6 +68,21 @@
   --c-side-faint: #8a95a8;
   --c-side-accent: #7fb0f2;
 
+  /* --- flyer tools ---------------------------------------------------------
+     The pencils and picture buttons the designer draws over the flyer, and
+     the page the flyer sits on. A flyer is always drawn light, whatever the
+     app's theme, so the dark theme leaves these alone. */
+  --c-tool: #ffffff;
+  --c-tool-ink: #172334;
+  --c-tool-line: rgba(23, 35, 52, 0.24);
+  --c-tool-accent: #1f5fbf;
+  --c-tool-accent-ink: #ffffff;
+  --c-tool-strong: rgba(15, 23, 36, 0.86);   /* the X on a picture */
+  --c-tool-strong-ink: #ffffff;
+  --c-tool-strong-line: rgba(255, 255, 255, 0.75);
+  --c-tool-page: #eff3f8;
+  --sh-tool: 0 1px 3px rgba(23, 35, 52, 0.3);
+
   /* --- focus ----------------------------------------------------------- */
   --c-focus: #1f5fbf;
   --ring: 0 0 0 3px color-mix(in srgb, var(--c-focus) 26%, transparent);

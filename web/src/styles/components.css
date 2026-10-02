@@ -951,7 +951,7 @@ button.chip.active,
   /* See-through at rest, so the flyer shows past the buttons instead of the
      buttons standing out from it. Pointing at one, or tabbing to it, brings
      it up full. The X on a picture stays solid. */
-  opacity: 0.7;
+  opacity: 0.35;
   transition: transform var(--transition), filter var(--transition), opacity var(--transition);
 }
 .flyer-tool:hover { filter: brightness(0.95); }

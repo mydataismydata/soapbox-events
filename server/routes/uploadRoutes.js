@@ -5,20 +5,11 @@ import { uploadsDir, insertId } from '../lib/db.js';
 import { wrap, v, ApiError } from '../lib/validate.js';
 import { randomToken } from '../lib/tokens.js';
 import { publicUrl } from '../lib/sending.js';
+import { sniffImage } from '../lib/images.js';
 
 export const uploadRouter = Router();
 
 const MAX_BYTES = 5 * 1024 * 1024;
-
-// Magic-byte sniffing: the claimed mime type is ignored; the actual file
-// signature decides. Only common web image formats are accepted.
-function sniffImage(buf) {
-  if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
-  if (buf.length > 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';
-  if (buf.length > 6 && buf.slice(0, 3).toString('ascii') === 'GIF') return 'image/gif';
-  if (buf.length > 12 && buf.slice(0, 4).toString('ascii') === 'RIFF' && buf.slice(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
-  return null;
-}
 
 // Images are uploaded as data URLs in a JSON body (keeps the dependency
 // footprint at zero); 5 MB decoded cap.

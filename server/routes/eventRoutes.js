@@ -10,6 +10,8 @@ import { contactInserter } from '../lib/contacts.js';
 import { orgApiKey, senderFor, sendEmail } from '../lib/email.js';
 import { getSetting } from '../lib/db.js';
 import { publishAndLog } from '../lib/websitePush.js';
+import { requireAdmin } from '../lib/auth.js';
+import { sniffImage, storeImage } from '../lib/images.js';
 import {
   parseFlyer, publicUrl, getInvitesForEvent, queueEmails, renderEmailFor,
   previewLinks, logTestEmail, inviteEmail, inviteName, INVITE_SELECT, DEFAULT_BODIES,
@@ -181,6 +183,106 @@ eventRouter.post('/events/:id/duplicate', wrap(async (req, res) => {
   ).run(randomSlug(10), title, req.user.id, ...copyKeys.map((k) => event[k]));
   const copy = req.db.prepare('SELECT * FROM events WHERE id = ?').get(insertId(info));
   res.status(201).json({ event: serializeEvent(req, copy) });
+}));
+
+// --- import from a website -------------------------------------------------
+
+// The address an imported meeting keeps. The website the file came from
+// already has a page for it at this address, so keeping it lets the next
+// delivery replace the website's own copy instead of adding a second one.
+const IMPORT_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,119}$/;
+const IMPORT_MAX_PICTURE = 5 * 1024 * 1024;
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Meetings that exist only on the chapter's website, from the file its
+// tools/export-meetings.php writes. Body: { file: <that JSON> }.
+//
+// A meeting whose address Soapbox already has is skipped, so importing the
+// same file twice adds nothing. A past meeting arrives with its RSVP deadline
+// on its own date, so its page here does not take new replies.
+eventRouter.post('/events/import', requireAdmin, wrap(async (req, res) => {
+  const file = req.body?.file;
+  if (!file || file.format !== 'rlc-meetings-export' || !Array.isArray(file.events)) {
+    throw new ApiError(400, 'That is not a meetings file from the website. Make one with tools/export-meetings.php.');
+  }
+
+  const today = todayIso();
+  const taken = req.db.prepare('SELECT 1 FROM events WHERE slug = ?');
+  const ready = [];
+  const skipped = [];
+
+  for (const row of file.events.slice(0, 500)) {
+    const label = `${row?.date || 'no date'} ${row?.title || 'untitled'}`;
+    try {
+      const fields = pickEventFields({
+        title: row.title,
+        description: row.description,
+        venue_name: row.venue?.name,
+        venue_address: row.venue?.address,
+        venue_phone: row.venue?.phone,
+        venue_map_url: row.venue?.map_url,
+        date: row.date,
+        start_time: row.start_time,
+        end_time: row.end_time,
+        timezone_note: row.timezone_note,
+        rsvp_mode: row.rsvp_mode,
+      });
+      if (!fields.title) throw new ApiError(400, 'it has no title');
+
+      let slug = String(row.slug || '').trim().toLowerCase();
+      if (slug && taken.get(slug)) {
+        skipped.push(`${label}: already here`);
+        continue;
+      }
+      if (!IMPORT_SLUG_RE.test(slug)) slug = randomSlug(10);
+
+      let picture = null;
+      if (row.picture?.data) {
+        const buf = Buffer.from(String(row.picture.data), 'base64');
+        const mime = buf.length <= IMPORT_MAX_PICTURE ? sniffImage(buf) : null;
+        if (mime) picture = { buf, mime, name: String(row.picture.name || '').slice(0, 300) };
+        else skipped.push(`${label}: picture left out (not a JPEG, PNG, GIF or WebP under 5 MB)`);
+      }
+
+      ready.push({
+        slug,
+        fields,
+        picture,
+        // Published needs a date, as it does for an event made here.
+        status: row.status === 'published' && fields.date ? 'published' : 'draft',
+        deadline: fields.date && fields.date < today ? fields.date : null,
+      });
+    } catch (err) {
+      skipped.push(`${label}: ${err.message}`);
+    }
+  }
+
+  // Pictures go to disk first, then every row goes in at once.
+  for (const item of ready) {
+    const token = item.picture
+      ? storeImage(req.db, req.org.slug, item.picture.buf, item.picture.mime, item.picture.name)
+      : '';
+    // The picture stands as the flyer's image and as the picture of the
+    // flyer, which is the one a delivery sends to the website.
+    item.fields.flyer = JSON.stringify(normalizeFlyer(token ? { imageTokens: [token], flyerImageToken: token } : {}));
+  }
+
+  withTx(req.db, () => {
+    for (const item of ready) {
+      const keys = Object.keys(item.fields);
+      req.db.prepare(
+        `INSERT INTO events (slug, status, rsvp_deadline, created_by, ${keys.join(', ')})
+         VALUES (?, ?, ?, ?, ${keys.map(() => '?').join(', ')})`
+      ).run(item.slug, item.status, item.deadline, req.user.id,
+        ...keys.map((k) => item.fields[k] === '' ? null : item.fields[k]));
+    }
+  });
+
+  if (ready.some((item) => item.status === 'published')) pushToWebsite(req, 'import');
+  res.json({ added: ready.length, skipped });
 }));
 
 function assertPublishable(event) {

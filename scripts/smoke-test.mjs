@@ -1386,6 +1386,67 @@ let guests = [];
       [...keys].join(','));
   }
 
+  // 5b. Meetings that exist only on the website come in through an import,
+  //     keep their web address and picture, and go straight back out.
+  {
+    const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+    // The smallest PNG there is: one transparent pixel.
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+    const file = {
+      format: 'rlc-meetings-export',
+      version: 1,
+      events: [
+        {
+          slug: 'monthly-meeting-with-a-speaker', title: 'Monthly Meeting with a Speaker',
+          description: '<p>We heard from a speaker.</p>', status: 'published', date: daysAgo(30),
+          start_time: '18:30', end_time: '20:00', timezone_note: '',
+          venue: { name: 'Caddyshack', address: '455 S Legacy Trail', phone: '', map_url: '' },
+          rsvp_mode: 'rsvp', picture: { name: 'speaker.png', data: png },
+        },
+        {
+          slug: 'Not A Valid Address!', title: 'A Meeting With An Odd Address', description: '',
+          status: 'published', date: daysAgo(10), start_time: '', end_time: '', timezone_note: '',
+          venue: { name: '', address: '', phone: '', map_url: '' }, rsvp_mode: 'rsvp', picture: null,
+        },
+      ],
+    };
+    const member = new Client();
+    await A.api('POST', '/api/users', { name: 'Import Member', email: 'import-member@alpha.test', role: 'member' });
+    check('importing meetings is admin-only',
+      (await member.api('POST', '/api/events/import', { file })).status === 401);
+    check('a file that is not a meetings export is refused',
+      (await A.api('POST', '/api/events/import', { file: { format: 'something-else', events: [] } })).status === 400);
+
+    const before = received.length;
+    const r = await A.api('POST', '/api/events/import', { file });
+    check('an import adds every meeting in the file', r.status === 200 && r.data.added === 2, JSON.stringify(r.data));
+    await settle();
+    check('an import delivers to the website', received.length === before + 1);
+    check('and the log says why', (await log()).deliveries[0]?.reason === 'import');
+    const sent = received.at(-1).doc;
+    check('an imported meeting keeps its web address',
+      sent.events.some((e) => e.slug === 'monthly-meeting-with-a-speaker'));
+    check('so its picture goes back to the website under that address',
+      sent.flyers?.['monthly-meeting-with-a-speaker']?.content_type === 'image/png');
+    const odd = sent.events.find((e) => e.title === 'A Meeting With An Odd Address');
+    check('an address Soapbox cannot use is replaced', odd && /^[a-z2-9]{10}$/.test(odd.slug), odd?.slug);
+
+    const list = (await A.api('GET', '/api/events')).data.events;
+    const speaker = list.find((e) => e.slug === 'monthly-meeting-with-a-speaker');
+    check('a past meeting takes no new RSVPs', speaker?.rsvp_deadline === speaker?.date);
+    check('and is published', speaker?.status === 'published');
+
+    const again = await A.api('POST', '/api/events/import', { file });
+    check('importing the same file again adds only what is new',
+      again.data.added === 1 && again.data.skipped.some((x) => x.includes('already here')), JSON.stringify(again.data));
+    for (const e of (await A.api('GET', '/api/events')).data.events) {
+      if (e.title.startsWith('Monthly Meeting with a Speaker') || e.title.startsWith('A Meeting With An Odd')) {
+        await A.api('DELETE', `/api/events/${e.id}`);
+      }
+    }
+    await settle(); // let those deletions' deliveries land before the next test
+  }
+
   // 6. A website that stops answering must never break Soapbox.
   await A.api('PUT', '/api/settings', { website_push_token: 'wrong-token' });
   await settle();

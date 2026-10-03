@@ -180,6 +180,7 @@ const PUSH_REASONS = {
   delete: 'Meeting deleted',
   settings: 'Connection saved',
   manual: 'Sent by hand',
+  import: 'Meetings imported',
 };
 
 // The advice after the error is a second sentence, so the error needs to end

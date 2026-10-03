@@ -192,6 +192,15 @@ export const HELP = {
         heading: 'Exporting',
         text: ['Export CSV downloads every event with its reply counts, for a spreadsheet.'],
       },
+      {
+        heading: 'Bringing in meetings from your website',
+        roles: ['admin'],
+        text: [
+          'Import meetings reads a file made on the chapter’s website, for meetings that are on the website but not here.',
+          'Each meeting comes in with its picture and keeps its web address, so the website shows it once. A meeting already here is skipped.',
+          'Past meetings are published with their RSVPs closed.',
+        ],
+      },
     ],
   },
 

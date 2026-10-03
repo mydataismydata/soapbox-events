@@ -87,7 +87,8 @@ const EVENT_WIZARD = {
       ],
       points: [
         'Sending puts the event page online and emails every guest who has not had an invitation yet.',
-        'Save without sending keeps the event and its guest list, and sends nothing.',
+        'Publish without sending puts the event page online, and on your website if one is connected, and emails nobody. Use it for a save-the-date. You can send invitations later.',
+        'Save draft keeps the event and its guest list, and sends nothing.',
       ],
       scene: 'wizard-send',
     },

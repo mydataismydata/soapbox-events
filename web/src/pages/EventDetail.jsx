@@ -226,11 +226,20 @@ export default function EventDetail() {
             <strong style={{ fontSize: 14 }}>This event isn’t finished yet</strong>
             <p className="small muted" style={{ margin: '2px 0 0' }}>
               It’s saved as a draft. Pick up where you left off to finish the details, design, and guest list, then send.
+              {ev.date ? ' Or publish it now with no invitations, as a save-the-date.' : ''}
             </p>
           </div>
-          <Link className="btn btn-primary" to={`/events/${ev.id}/edit`}>
-            Continue creating <Icon name="arrowRight" size={15} />
-          </Link>
+          <div className="row">
+            {ev.date ? (
+              <button className="btn" disabled={busy} onClick={() => act(
+                () => api.post(`/api/events/${ev.id}/publish`, {}),
+                'Published. No invitations were sent.',
+              )}><Icon name="eye" size={15} /> Publish without sending</button>
+            ) : null}
+            <Link className="btn btn-primary" to={`/events/${ev.id}/edit`}>
+              Continue creating <Icon name="arrowRight" size={15} />
+            </Link>
+          </div>
         </div>
       ) : null}
 

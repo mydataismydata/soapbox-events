@@ -175,6 +175,18 @@ export default function EventWizard() {
     } catch { /* shown */ }
   }
 
+  // A meeting can go live with nobody invited: a save-the-date, or one the
+  // chapter only announces on its event page and website.
+  async function publishNow() {
+    try {
+      const evId = await persist();
+      if (step >= 3) await persistGuests(evId);
+      await api.post(`/api/events/${evId}/publish`, {});
+      toast('Published. No invitations were sent.');
+      navigate(`/events/${evId}`);
+    } catch (err) { setError(err.message); }
+  }
+
   async function sendNow() {
     try {
       const evId = await persist();
@@ -455,13 +467,24 @@ export default function EventWizard() {
                   onClick={() => setConfirmSend(true)}>
                   <Icon name="send" size={15} /> Send invitations
                 </button>
+                {ev.status !== 'published' && ev.date ? (
+                  <button className="btn btn-lg" onClick={publishNow} disabled={saving}>
+                    <Icon name="eye" size={15} /> Publish without sending
+                  </button>
+                ) : null}
                 <button className="btn btn-lg" onClick={saveDraftAndExit} disabled={saving}>
-                  {ev.date ? 'Save without sending' : 'Save draft'}
+                  {ev.status === 'published' ? 'Save without sending' : 'Save draft'}
                 </button>
               </div>
+              {sendable === 0 && pendingSelection === 0 ? null : ev.status !== 'published' && ev.date ? (
+                <p className="small muted" style={{ marginTop: 8 }}>
+                  Publish without sending puts the event page live, and on your website if one is
+                  connected, with no emails. Use it for a save-the-date. You can send invitations later.
+                </p>
+              ) : null}
               {sendable === 0 && pendingSelection === 0 ? (
                 <p className="small muted" style={{ marginTop: 8 }}>
-                  No un-emailed guests yet — add guests in step 4, or save and share the event link instead.
+                  No un-emailed guests yet. Add guests in step 4, or publish without sending: the event page goes live, and on your website if one is connected, with no emails.
                 </p>
               ) : null}
 

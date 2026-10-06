@@ -4,6 +4,9 @@ import { Field, Banner, Icon } from '../ui.jsx';
 
 const NOBODY = new Set();
 
+// Someone an email can reach: they have an address and haven't unsubscribed.
+const reachable = (c) => Boolean(c.email) && !c.unsubscribed_at;
+
 // The same picker serves events and broadcasts, but the people it picks are
 // called different things in each: an event has guests, a broadcast goes to
 // contacts. Nothing else about the two differs, so only the words are keyed.
@@ -65,6 +68,7 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
     return set;
   }, [contacts, sel.group_ids]);
 
+  const picked = useMemo(() => new Set(sel.contact_ids), [sel.contact_ids]);
   const excluded = useMemo(() => new Set(sel.excluded_contact_ids || []), [sel.excluded_contact_ids]);
 
   const invitedIds = useMemo(() => {
@@ -76,6 +80,11 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
     }
     return set;
   }, [contacts, alreadyInvited]);
+
+  // A row is ticked when the person was picked or a group brought them, and
+  // nobody has unticked them since. A row for someone already on the event
+  // never is.
+  const isOn = (id) => !invitedIds.has(id) && (picked.has(id) || groupMemberIds.has(id)) && !excluded.has(id);
 
   // Split rather than summed: picking a group nearly always sweeps up people
   // who are already on the event, and a total that counts them would promise
@@ -94,9 +103,8 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
   // still bring them back, records the exclusion that keeps them out.
   function toggleContact(id) {
     if (invitedIds.has(id)) return; // already on the event — nothing to toggle
-    const on = (sel.contact_ids.includes(id) || groupMemberIds.has(id)) && !excluded.has(id);
     const rest = (sel.excluded_contact_ids || []).filter((x) => x !== id);
-    if (on) {
+    if (isOn(id)) {
       onChange({
         ...sel,
         contact_ids: sel.contact_ids.filter((x) => x !== id),
@@ -105,10 +113,41 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
     } else {
       onChange({
         ...sel,
-        contact_ids: sel.contact_ids.includes(id) ? sel.contact_ids : [...sel.contact_ids, id],
+        contact_ids: picked.has(id) ? sel.contact_ids : [...sel.contact_ids, id],
         excluded_contact_ids: rest,
       });
     }
+  }
+
+  // "Select all" ticks everyone shown whom an email can reach. People with no
+  // address, and people who have unsubscribed, stay as they were; they can
+  // still be ticked one at a time. After a search, it acts on the matches.
+  const searching = Boolean(q.trim());
+  const toTick = filtered.filter((c) => reachable(c) && !invitedIds.has(c.id) && !isOn(c.id));
+  const deselecting = toTick.length === 0 && filtered.some((c) => isOn(c.id));
+  function selectAllShown() {
+    const ids = new Set(toTick.map((c) => c.id));
+    onChange({
+      ...sel,
+      contact_ids: [...sel.contact_ids, ...toTick.filter((c) => !picked.has(c.id)).map((c) => c.id)],
+      excluded_contact_ids: (sel.excluded_contact_ids || []).filter((id) => !ids.has(id)),
+    });
+  }
+  // With nothing searched, "Deselect all" empties the list, and the groups
+  // above go with it. After a search, it unticks the matches the way
+  // unticking each one would, so a group keeps everyone else it brought.
+  function deselectAllShown() {
+    if (!searching) {
+      onChange({ ...sel, contact_ids: [], group_ids: [], excluded_contact_ids: [] });
+      return;
+    }
+    const off = filtered.filter((c) => isOn(c.id)).map((c) => c.id);
+    const ids = new Set(off);
+    onChange({
+      ...sel,
+      contact_ids: sel.contact_ids.filter((id) => !ids.has(id)),
+      excluded_contact_ids: [...(sel.excluded_contact_ids || []), ...off.filter((id) => groupMemberIds.has(id))],
+    });
   }
   function toggleGroup(id) {
     const has = sel.group_ids.includes(id);
@@ -153,6 +192,19 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
             value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
       </Field>
+      {filtered.length > 0 ? (
+        <div className="spread" style={{ marginBottom: 8 }}>
+          <span className="small muted">
+            {searching
+              ? `${filtered.length} match${filtered.length === 1 ? '' : 'es'}`
+              : `${filtered.length} contact${filtered.length === 1 ? '' : 's'}`}
+          </span>
+          <button type="button" className="btn btn-sm" disabled={!deselecting && toTick.length === 0}
+            onClick={deselecting ? deselectAllShown : selectAllShown}>
+            {deselecting ? 'Deselect all' : searching ? 'Select all matches' : 'Select all'}
+          </button>
+        </div>
+      ) : null}
       <div style={{
         maxHeight: 260, overflowY: 'auto',
         border: '1px solid var(--c-line)', borderRadius: 'var(--r-md)',
@@ -173,7 +225,7 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
                     <td style={{ width: 34 }}>
                       <input type="checkbox" disabled={invited}
                         aria-label={invited ? `${c.name} is already invited` : w.tick(c.name)}
-                        checked={!invited && (sel.contact_ids.includes(c.id) || viaGroup) && !isExcluded}
+                        checked={isOn(c.id)}
                         onChange={() => toggleContact(c.id)} />
                     </td>
                     <td>

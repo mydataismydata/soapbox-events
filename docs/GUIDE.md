@@ -144,8 +144,11 @@ leave and resume any time (it stays a draft until you send or publish).
    Long text shrinks and wraps automatically so it always stays inside the
    flyer.
 4. **Guests** — tick groups, tick individual contacts, and add brand-new
-   people inline (they're saved to your contacts too). People without an
-   email address can be invited but only reached by phone/link.
+   people inline (they're saved to your contacts too). **Select all**, over
+   the list, ticks every contact with an email address who hasn't
+   unsubscribed; after a search it ticks just the matches, and once they're
+   all ticked it reads **Deselect all**. People without an email address can
+   be invited but only reached by phone/link.
 5. **Review & send** — summary, warnings (e.g. missing date), **Send test
    email** to yourself, then **Send invitations** or **Save without
    sending**. Sending publishes the event page and queues one personalized
@@ -172,6 +175,7 @@ list, no date/venue.
    web version is on.
 3. **Recipients** — pick groups and individual contacts, or add new people
    inline (they're saved to your contacts, just like the event wizard).
+   **Select all** works the same way as in the event wizard.
 4. **Review & send** — send yourself a test first, then send. One email is
    queued per recipient who has an address and hasn't unsubscribed.
 

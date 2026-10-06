@@ -75,6 +75,9 @@ const EVENT_WIZARD = {
       text: [
         'The blue box underneath counts who will be added. Nobody is ever invited twice.',
       ],
+      points: [
+        'Select all, over the list, ticks everyone with an email address who has not unsubscribed. After a search, it ticks only the matches. Once they are all ticked, the button reads Deselect all.',
+      ],
       scene: 'wizard-guests',
     },
     {
@@ -123,12 +126,13 @@ const BROADCAST_WIZARD = {
     {
       heading: '3 and 4. Recipients, then send',
       steps: [
-        'Click a group, or tick people one at a time.',
+        'Click a group or Select all, or tick people one at a time.',
         'Click Continue.',
         'Check the number of recipients, and click Send broadcast.',
         'Click Yes, send.',
       ],
       points: [
+        'Select all, over the list, ticks everyone with an email address who has not unsubscribed. After a search, it ticks only the matches. Once they are all ticked, the button reads Deselect all.',
         'People who have unsubscribed are left out, and the count says how many.',
         'Send test email, on the last step, sends you a copy first.',
       ],
@@ -237,7 +241,7 @@ export const HELP = {
         heading: 'Adding guests later',
         steps: [
           'Click Add guests.',
-          'Pick a group or people, and click Add to event.',
+          'Pick a group or people, or click Select all, and click Add to event.',
           'Click the green Send invitations button.',
         ],
         text: [

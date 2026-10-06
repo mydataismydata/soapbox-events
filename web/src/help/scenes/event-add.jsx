@@ -23,7 +23,7 @@ const steps = [
 
 export default function EventAdd() {
   return (
-    <Scene width={560} height={524} length={13000} start={start} steps={steps}
+    <Scene width={560} height={597} length={13000} start={start} steps={steps}
       label="Adding guests to an event whose invitations have gone out. Three executive team members were invited first. Add guests opens the picker, and All members (7) selects the other 4, since 3 are already invited. Add to event puts them on the list unsent, and the green Send invitations to 4 new guests button emails only those four.">
       {(s) => {
         const people = PEOPLE.filter((p) => s.added || EXECUTIVE.includes(p.id));

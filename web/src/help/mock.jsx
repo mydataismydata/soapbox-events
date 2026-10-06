@@ -190,7 +190,8 @@ export const BROADCAST_STEPS = ['Details', 'Design & message', 'Recipients', 'Re
 // The people picker from the event and broadcast wizards and the Add guests
 // dialog. `groups` are the group ids picked, `out` the people unticked from
 // them, `ticked` people picked one by one, and `invited` the people already on
-// the event. The count underneath works the way the real one does.
+// the event. The count underneath, and the Select all button over the list,
+// work the way the real ones do.
 const WORDING = {
   guest: {
     one: 'guest', many: 'guests', groups: 'Invite whole groups',
@@ -205,6 +206,8 @@ const WORDING = {
 export function Picker({ noun = 'guest', groups = [], out = [], ticked = [], invited = [], listHeight = 150 }) {
   const w = WORDING[noun];
   const viaGroup = new Set(GROUPS.filter((g) => groups.includes(g.id)).flatMap((g) => g.members));
+  const isOn = (id) => !invited.includes(id) && (ticked.includes(id) || viaGroup.has(id)) && !out.includes(id);
+  const deselect = PEOPLE.every((p) => invited.includes(p.id) || isOn(p.id)) && PEOPLE.some((p) => isOn(p.id));
   const chosen = new Set([...ticked, ...viaGroup].filter((id) => !out.includes(id)));
   let onAlready = 0;
   for (const id of invited) if (chosen.delete(id)) onAlready++;
@@ -230,12 +233,16 @@ export function Picker({ noun = 'guest', groups = [], out = [], ticked = [], inv
           })}
         </div>
       </div>
-      <div className="field" style={{ marginBottom: 8 }}>
+      <div className="field">
         <label>Pick individual contacts</label>
         <div className="search-field">
           <Icon name="search" size={15} />
           <Input placeholder="Search contacts…" style={{ paddingLeft: 31 }} />
         </div>
+      </div>
+      <div className="spread" style={{ marginBottom: 8 }}>
+        <span className="small muted">{PEOPLE.length} contacts</span>
+        <span className="btn btn-sm" data-t="select-all">{deselect ? 'Deselect all' : 'Select all'}</span>
       </div>
       <div className="hs-list" style={{ height: listHeight }} data-t="list">
         <table className="table">
@@ -244,7 +251,7 @@ export function Picker({ noun = 'guest', groups = [], out = [], ticked = [], inv
               const already = invited.includes(p.id);
               const group = viaGroup.has(p.id);
               const isOut = out.includes(p.id);
-              const on = !already && (ticked.includes(p.id) || group) && !isOut;
+              const on = isOn(p.id);
               return (
                 <tr key={p.id} style={already ? { opacity: 0.55 } : undefined}>
                   <td style={{ width: 30 }}><Check on={on} off={already} t={`pick-${p.id}`} /></td>

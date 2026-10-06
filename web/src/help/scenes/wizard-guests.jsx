@@ -14,7 +14,7 @@ const steps = [
 
 export default function WizardGuests() {
   return (
-    <Scene width={560} height={528} length={10500} start={start} steps={steps}
+    <Scene width={560} height={572} length={10500} start={start} steps={steps}
       label="Step 4 of the event wizard. Clicking All members (7) ticks all seven people, each marked via group. Unticking Joe S. marks that row Removed, and the count underneath changes to 6 guests selected. Continue adds them to the guest list.">
       {(s) => (
         <Screen bare>

@@ -2,12 +2,12 @@ import React from 'react';
 import Scene from '../Scene.jsx';
 import { BROADCAST_STEPS, Modal, Picker, Screen, Toast, Wizard, WizardFoot } from '../mock.jsx';
 import { Card, Icon } from '../../ui.jsx';
-import { BOCC } from '../data.js';
+import { BOCC, PEOPLE } from '../data.js';
 
-const start = { step: 2, groups: [], confirm: false, toast: '' };
+const start = { step: 2, ticked: [], confirm: false, toast: '' };
 const steps = [
-  { at: 600, tap: 'grp-all', say: 'Pick who receives it', set: { groups: ['all'] } },
-  { at: 2300, point: 'list', say: 'Everyone in the group is ticked', side: 'above' },
+  { at: 600, tap: 'select-all', say: 'Select all picks everyone', side: 'left', set: { ticked: PEOPLE.map((p) => p.id) } },
+  { at: 2300, point: 'list', say: 'Everyone in the list is ticked', side: 'above' },
   { at: 4000, tap: 'continue', say: null, set: { step: 3 } },
   { at: 5000, point: 'recipients', say: 'Exactly how many will get it', side: 'above' },
   { at: 6700, tap: 'send', say: null, set: { confirm: true } },
@@ -21,15 +21,15 @@ function Kv({ k, children, t }) {
 
 export default function BroadcastSend() {
   return (
-    <Scene width={560} height={470} length={12000} start={start} steps={steps}
-      label="Steps 3 and 4 of the broadcast wizard. Clicking All members (7) picks all seven people, and Continue moves to Review & send, which says 7 recipients will be emailed. Send broadcast asks Send this broadcast now?, and Yes, send queues 7 emails.">
+    <Scene width={560} height={542} length={12000} start={start} steps={steps}
+      label="Steps 3 and 4 of the broadcast wizard. Clicking Select all ticks all seven contacts, and the button changes to Deselect all. Continue moves to Review & send, which says 7 recipients will be emailed. Send broadcast asks Send this broadcast now?, and Yes, send queues 7 emails.">
       {(s) => (
         <Screen bare>
           <Wizard labels={BROADCAST_STEPS} step={s.step}>
             {s.step === 2 ? (
               <>
                 <Card title="Who receives this?">
-                  <Picker noun="contact" groups={s.groups} listHeight={168} />
+                  <Picker noun="contact" ticked={s.ticked} listHeight={168} />
                 </Card>
                 <WizardFoot />
               </>

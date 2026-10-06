@@ -71,6 +71,8 @@ export const config = {
   sessionSecret: loadOrCreateSecret(),
   sessionDays: Math.max(1, Number(process.env.SESSION_DAYS || 14)),
   smtp2goApiKey: process.env.SMTP2GO_API_KEY || '',
+  // Only the smoke test changes this, to point sending at a stand-in it can read.
+  smtp2goApiBase: process.env.SMTP2GO_API_BASE || 'https://api.smtp2go.com/v3',
   emailsPerMinute: Math.max(1, Number(process.env.EMAILS_PER_MINUTE || 60)),
   trustProxy: process.env.TRUST_PROXY === '1',
   appName: process.env.APP_NAME || 'Soapbox',

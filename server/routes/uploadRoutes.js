@@ -6,17 +6,22 @@ import { wrap, v, ApiError } from '../lib/validate.js';
 import { randomToken } from '../lib/tokens.js';
 import { publicUrl } from '../lib/sending.js';
 import { sniffImage } from '../lib/images.js';
+import { sniffAttachment, attachmentFilename } from '../lib/attachments.js';
 
 export const uploadRouter = Router();
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
-// Images are uploaded as data URLs in a JSON body (keeps the dependency
-// footprint at zero); 5 MB decoded cap.
+// Files are uploaded as data URLs in a JSON body (keeps the dependency
+// footprint at zero); 5 MB decoded cap. Pictures are the default. `kind:
+// 'attachment'` is a broadcast's attached file, which may also be a PDF or
+// an Office document. The claimed type in the data URL is ignored either
+// way: the bytes decide, and a browser that knows no type sends none.
 uploadRouter.post('/uploads', wrap(async (req, res) => {
   const name = v.optStr(req.body.name, { label: 'File name', max: 300 });
   const dataUrl = v.str(req.body.data, { label: 'File data', max: 8_000_000 });
-  const match = /^data:([\w/+.-]+);base64,(.+)$/s.exec(dataUrl);
+  const attachment = req.body.kind === 'attachment';
+  const match = /^data:([\w/+.-]*);base64,(.+)$/s.exec(dataUrl);
   if (!match) throw new ApiError(400, 'Expected a base64 data URL.');
   let buf;
   try {
@@ -25,14 +30,27 @@ uploadRouter.post('/uploads', wrap(async (req, res) => {
     throw new ApiError(400, 'Could not decode the file.');
   }
   if (buf.length === 0) throw new ApiError(400, 'The file is empty.');
-  if (buf.length > MAX_BYTES) throw new ApiError(400, 'Images must be 5 MB or smaller.');
-  const mime = sniffImage(buf);
-  if (!mime) throw new ApiError(400, 'Only JPEG, PNG, GIF, and WebP images are supported.');
+  if (buf.length > MAX_BYTES) {
+    throw new ApiError(400, attachment ? 'Attachments must be 5 MB or smaller.' : 'Images must be 5 MB or smaller.');
+  }
+  let mime;
+  let storedName = name || null;
+  if (attachment) {
+    const found = sniffAttachment(buf);
+    if (!found) {
+      throw new ApiError(400, 'Attach a PDF, a Word, Excel or PowerPoint file, or a picture. Office files with macros are not accepted.');
+    }
+    mime = found.mime;
+    storedName = attachmentFilename(name, found.ext);
+  } else {
+    mime = sniffImage(buf);
+    if (!mime) throw new ApiError(400, 'Only JPEG, PNG, GIF, and WebP images are supported.');
+  }
 
   // `replace` overwrites an existing upload in place, keeping its token and
   // URL. The flyer designer re-renders its picture-of-the-flyer every time the
   // design changes, and this stops each re-render leaving a stale file behind.
-  const replace = String(req.body.replace || '');
+  const replace = attachment ? '' : String(req.body.replace || '');
   const existing = /^[A-Za-z0-9]{6,64}$/.test(replace)
     ? req.db.prepare('SELECT * FROM uploads WHERE token = ?').get(replace)
     : null;
@@ -44,16 +62,17 @@ uploadRouter.post('/uploads', wrap(async (req, res) => {
   let id = existing ? existing.id : 0;
   if (existing) {
     req.db.prepare('UPDATE uploads SET original_name = ?, mime = ?, bytes = ? WHERE id = ?')
-      .run(name || null, mime, buf.length, existing.id);
+      .run(storedName, mime, buf.length, existing.id);
   } else {
     id = insertId(req.db.prepare(
       'INSERT INTO uploads (token, original_name, mime, bytes) VALUES (?, ?, ?, ?)'
-    ).run(token, name || null, mime, buf.length));
+    ).run(token, storedName, mime, buf.length));
   }
   res.status(201).json({
     id,
     token,
     url: publicUrl(req.org.slug, `/files/${token}`),
+    name: storedName || '',
     bytes: buf.length,
     mime,
   });

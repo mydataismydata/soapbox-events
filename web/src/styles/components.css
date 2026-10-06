@@ -1353,3 +1353,37 @@ button.chip.active,
   .modal-foot { justify-content: stretch; }
   .modal-foot .btn { flex: 1; }
 }
+
+/* --- a broadcast's attached file ------------------------------------------ */
+.attach-file {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 100%;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+  color: var(--c-muted);
+}
+.attach-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-ink);
+  font-weight: 500;
+}
+.attach-size { flex: none; font-size: var(--fs-sm); }
+.attach-file .btn { flex: none; }
+/* Under a broadcast's subject. A file name keeps its own case, so this line
+   is not set in the subtitle's capitals. */
+.attach-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+}
+.attach-line a { color: var(--c-ink); font-weight: 500; }

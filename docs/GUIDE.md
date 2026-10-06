@@ -175,6 +175,13 @@ list, no date/venue.
 4. **Review & send** — send yourself a test first, then send. One email is
    queued per recipient who has an address and hasn't unsubscribed.
 
+**Attachment.** Attach a file, under the message, adds one file of up to 5 MB:
+a PDF, a Word, Excel or PowerPoint file, or a picture. Every email the
+broadcast sends carries it as an attachment, and so do test emails and copies.
+Office files with macros are refused. Each mail program shows the file where it
+shows any attachment. Mail on a Mac shows a PDF inside the message, and Gmail
+and Outlook list it with the email.
+
 **Web version.** With it on, the email includes a “View this email online” link
 to an unguessable page that renders the masthead and your message — handy when
 a mail client clips a long email. Turn it off for an email-only broadcast. It's

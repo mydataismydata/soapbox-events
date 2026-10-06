@@ -8,8 +8,6 @@
 import { config } from './env.js';
 import { getSetting } from './db.js';
 
-const API_BASE = 'https://api.smtp2go.com/v3';
-
 export function orgApiKey(db) {
   return getSetting(db, 'smtp2go_api_key', '') || config.smtp2goApiKey || '';
 }
@@ -53,22 +51,27 @@ export function senderHeader(sender) {
   return cleanName ? `${cleanName} <${sender.email}>` : sender.email;
 }
 
-async function apiPost(path, apiKey, body) {
-  const res = await fetch(`${API_BASE}${path}`, {
+async function apiPost(path, apiKey, body, timeoutMs = 20000) {
+  const res = await fetch(`${config.smtp2goApiBase}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Smtp2go-Api-Key': apiKey,
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   let data = null;
   try { data = await res.json(); } catch { /* non-JSON error body */ }
   return { status: res.status, data };
 }
 
-export async function sendEmail({ apiKey, sender, replyTo, toName, toEmail, subject, html, text, headers = [] }) {
+// `attachments` is a list of { filename, mimetype, fileblob } with the file
+// base64 in `fileblob`, the shape SMTP2GO's API takes. A broadcast has at
+// most one.
+export async function sendEmail({
+  apiKey, sender, replyTo, toName, toEmail, subject, html, text, headers = [], attachments = [],
+}) {
   if (!apiKey) {
     return { ok: true, simulated: true, id: null };
   }
@@ -85,8 +88,15 @@ export async function sendEmail({ apiKey, sender, replyTo, toName, toEmail, subj
   };
   if (replyTo) payload.custom_headers = [{ header: 'Reply-To', value: replyTo }];
   if (headers.length) payload.custom_headers = [...(payload.custom_headers || []), ...headers];
+  if (attachments.length) {
+    payload.attachments = attachments.map((a) => ({ filename: a.filename, fileblob: a.fileblob, mimetype: a.mimetype }));
+  }
+  // A 5 MB file is about 7 MB on the wire, which a slow uplink needs longer
+  // than 20 seconds to send. Allow eight more seconds per megabyte.
+  const wireBytes = attachments.reduce((n, a) => n + String(a.fileblob || '').length, 0);
+  const timeoutMs = 20000 + Math.ceil(wireBytes / 1_000_000) * 8000;
   try {
-    const { status, data } = await apiPost('/email/send', apiKey, payload);
+    const { status, data } = await apiPost('/email/send', apiKey, payload, timeoutMs);
     if (status === 200 && data?.data?.succeeded >= 1) {
       return { ok: true, simulated: false, id: data.data.email_id || '' };
     }

@@ -288,8 +288,8 @@ export function queueBroadcastEmails(db, { org, broadcast, recipients, subjectTe
   const skipped = { no_email: 0, unsubscribed: 0 };
   const viewUrl = broadcast.web_version ? broadcastViewUrl(org.slug, broadcast) : '';
   const insert = db.prepare(
-    `INSERT INTO email_log (broadcast_id, kind, to_name, to_email, subject, html, body_text)
-     VALUES (?, 'broadcast', ?, ?, ?, ?, ?)`
+    `INSERT INTO email_log (broadcast_id, kind, to_name, to_email, subject, html, body_text, attachment)
+     VALUES (?, 'broadcast', ?, ?, ?, ?, ?, ?)`
   );
   for (const r of recipients) {
     const email = (r.email || '').toLowerCase();
@@ -297,7 +297,7 @@ export function queueBroadcastEmails(db, { org, broadcast, recipients, subjectTe
     if (isUnsubscribed(db, email)) { skipped.unsubscribed++; continue; }
     const unsubUrl = broadcastUnsubUrl(org.slug, r.contact_id);
     const msg = renderBroadcastEmailFor({ org, broadcast, recipient: r, subjectTemplate, bodyTemplate, viewUrl, unsubUrl });
-    insert.run(broadcast.id, msg.toName || '', email, msg.subject, msg.html, msg.text);
+    insert.run(broadcast.id, msg.toName || '', email, msg.subject, msg.html, msg.text, broadcast.attachment || null);
     queued++;
   }
   return { queued, skipped };

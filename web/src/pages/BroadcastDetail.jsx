@@ -6,6 +6,7 @@ import {
   Banner, Card, StatGrid, Stat, Icon,
 } from '../ui.jsx';
 import EmailLog from '../components/EmailLog.jsx';
+import { fileSize } from '../components/AttachmentPicker.jsx';
 
 function BroadcastBadge({ status }) {
   if (status === 'sent') return <Badge tone="green" dot>Sent</Badge>;
@@ -87,6 +88,13 @@ export default function BroadcastDetail() {
             <BroadcastBadge status={b.status} />
           </div>
           <p className="page-sub">{b.subject || <em>no subject</em>}</p>
+          {b.attachment ? (
+            <p className="attach-line">
+              <Icon name="paperclip" size={13} />
+              <a href={b.attachment.url} target="_blank" rel="noopener noreferrer">{b.attachment.name}</a>
+              <span>{fileSize(b.attachment.bytes)}</span>
+            </p>
+          ) : null}
         </div>
         <div className="head-actions">
           <button className="btn" disabled={previewBusy} onClick={preview}>

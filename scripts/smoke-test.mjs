@@ -17,7 +17,13 @@ import { allScenes, helpFor, sectionsFor } from '../web/src/help/content.js';
 const PORT = 3870 + Math.floor(Math.random() * 100);
 const BASE = `http://localhost:${PORT}`;
 const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'soapbox-smoke-'));
-const ENV = { ...process.env, PORT: String(PORT), BASE_URL: BASE, DATA_DIR, NODE_ENV: 'test', SMTP2GO_API_KEY: '' };
+// Sending stays simulated unless a test sets an organization's API key, and
+// then it goes to a stand-in for SMTP2GO on this port that records each email.
+const SMTP_PORT = PORT + 600;
+const ENV = {
+  ...process.env, PORT: String(PORT), BASE_URL: BASE, DATA_DIR, NODE_ENV: 'test', SMTP2GO_API_KEY: '',
+  SMTP2GO_API_BASE: `http://127.0.0.1:${SMTP_PORT}/v3`,
+};
 
 let passed = 0;
 const failures = [];
@@ -1493,6 +1499,145 @@ let guests = [];
     check('the delivery log is admin-only',
       (await member.api('GET', '/api/settings/website/deliveries')).status === 401);
   }
+}
+
+// --- a broadcast's attached file --------------------------------------------
+{
+  const asData = (buf, type = 'application/octet-stream') => `data:${type};base64,${buf.toString('base64')}`;
+  const attach = (name, buf, type) => A.api('POST', '/api/uploads', { name, data: asData(buf, type), kind: 'attachment' });
+  // A zip holding empty files with these names: enough for the contents check,
+  // which reads only the zip's directory.
+  const zip = (names) => {
+    const locals = [];
+    const centrals = [];
+    let offset = 0;
+    for (const name of names) {
+      const n = Buffer.from(name);
+      const local = Buffer.alloc(30);
+      local.writeUInt32LE(0x04034b50, 0);
+      local.writeUInt16LE(n.length, 26);
+      locals.push(local, n);
+      const central = Buffer.alloc(46);
+      central.writeUInt32LE(0x02014b50, 0);
+      central.writeUInt16LE(n.length, 28);
+      central.writeUInt32LE(offset, 42);
+      centrals.push(central, n);
+      offset += 30 + n.length;
+    }
+    const dir = Buffer.concat(centrals);
+    const end = Buffer.alloc(22);
+    end.writeUInt32LE(0x06054b50, 0);
+    end.writeUInt16LE(names.length, 8);
+    end.writeUInt16LE(names.length, 10);
+    end.writeUInt32LE(dir.length, 12);
+    end.writeUInt32LE(offset, 16);
+    return Buffer.concat([...locals, dir, end]);
+  };
+  const pdf = Buffer.from('%PDF-1.4\n1 0 obj <<>> endobj\ntrailer <<>>\n%%EOF\n');
+
+  const up = await attach('Agenda.pdf', pdf, 'application/pdf');
+  check('a PDF can be attached', up.status === 201 && up.data?.mime === 'application/pdf' && up.data?.name === 'Agenda.pdf',
+    JSON.stringify(up.data));
+  const bare = await attach('minutes', pdf, '');
+  check('an attachment without an extension gets one', bare.data?.name === 'minutes.pdf', JSON.stringify(bare.data));
+  const misnamed = await attach('report.docx', pdf);
+  check('an attachment is named for what it is', misnamed.data?.name === 'report.pdf', JSON.stringify(misnamed.data));
+  const docx = await attach('Notes.docx', zip(['[Content_Types].xml', '_rels/.rels', 'word/document.xml']));
+  check('a Word file can be attached',
+    docx.status === 201 && docx.data?.mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    JSON.stringify(docx.data));
+  const macro = await attach('Notes.docm', zip(['[Content_Types].xml', 'word/document.xml', 'word/vbaProject.bin']));
+  check('an Office file with macros is refused', macro.status === 400);
+  const page = await attach('evil.pdf', Buffer.from('<html><script>alert(1)</script></html>'), 'application/pdf');
+  check('a web page named as a PDF is refused', page.status === 400);
+  const program = await attach('setup.pdf', Buffer.concat([Buffer.from('MZ'), Buffer.alloc(200)]));
+  check('a program is refused', program.status === 400);
+  const big = await attach('big.pdf', Buffer.concat([pdf, Buffer.alloc(5 * 1024 * 1024 + 1 - pdf.length)]));
+  check('an attachment over 5 MB is refused', big.status === 400 && /5 MB/.test(big.data?.error || ''), JSON.stringify(big.data));
+  const asPicture = await A.api('POST', '/api/uploads', { name: 'Agenda.pdf', data: asData(pdf) });
+  check('a picture upload still takes only pictures', asPicture.status === 400);
+
+  const served = await fetch(`${BASE}/o/alpha/files/${up.data.token}`);
+  check('an attached file downloads under its own name',
+    served.status === 200 && served.headers.get('content-type') === 'application/pdf'
+    && /^attachment; filename="Agenda\.pdf"/.test(served.headers.get('content-disposition') || ''),
+    served.headers.get('content-disposition'));
+
+  const cr = await A.api('POST', '/api/broadcasts', {
+    title: 'Agenda Notice', subject: 'The October agenda', body: 'The agenda is attached.', attachment: up.data.token,
+  });
+  const bId = cr.data?.broadcast?.id;
+  check('a broadcast keeps its attachment',
+    cr.status === 201 && cr.data.broadcast.attachment?.name === 'Agenda.pdf'
+    && cr.data.broadcast.attachment?.bytes === pdf.length && /\/o\/alpha\/files\//.test(cr.data.broadcast.attachment?.url || ''),
+    JSON.stringify(cr.data?.broadcast?.attachment));
+  const wrong = await A.api('PUT', `/api/broadcasts/${bId}`, { attachment: 'noSuchUpload123' });
+  check('only an uploaded file can be attached', wrong.status === 400);
+  check('another organization cannot attach this one\'s file',
+    (await B.api('POST', '/api/broadcasts', { title: 'Theft', attachment: up.data.token })).status === 400);
+
+  // Real sends from here on, to the stand-in, once earlier sends have drained.
+  await waitFor(async () => ((await A.api('GET', '/api/emails?status=queued')).data?.emails || []).length === 0,
+    'the queue is empty before sending for real');
+  const sends = [];
+  const smtp = http.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      if (!req.url.endsWith('/email/send')) return res.end('{"data":{}}');
+      sends.push({ key: req.headers['x-smtp2go-api-key'], body: JSON.parse(Buffer.concat(chunks).toString('utf8')) });
+      res.end(JSON.stringify({ data: { succeeded: 1, failed: 0, email_id: `stand-in-${sends.length}` } }));
+    });
+  });
+  await new Promise((r) => smtp.listen(SMTP_PORT, '127.0.0.1', r));
+  await A.api('PUT', '/api/settings', { sender_email: 'meetings@alpha.test', smtp2go_api_key: 'smoke-key' });
+  const carries = (mail) => mail?.body?.attachments?.length === 1
+    && mail.body.attachments[0].filename === 'Agenda.pdf'
+    && mail.body.attachments[0].mimetype === 'application/pdf'
+    && Buffer.from(mail.body.attachments[0].fileblob, 'base64').equals(pdf);
+
+  const test = await A.api('POST', `/api/broadcasts/${bId}/test-email`, { to: 'tester@alpha.test' });
+  const testMail = sends.find((m) => (m.body.to || []).some((t) => t.includes('tester@alpha.test')));
+  check('a test email carries the attachment', test.data?.status === 'sent' && carries(testMail), JSON.stringify(testMail?.body?.attachments?.map((a) => a.filename)));
+  check('the API key reaches SMTP2GO', testMail?.key === 'smoke-key');
+  await A.api('POST', `/api/broadcasts/${bId}/send-copy`, { to: 'copy@alpha.test' });
+  check('a copy carries the attachment', carries(sends.find((m) => (m.body.to || []).some((t) => t.includes('copy@alpha.test')))));
+
+  const people = [];
+  for (const [name, email] of [['Attach One', 'attach1@guest.test'], ['Attach Two', 'attach2@guest.test']]) {
+    people.push((await A.api('POST', '/api/contacts', { name, email })).data.contact.id);
+  }
+  const send = await A.api('POST', `/api/broadcasts/${bId}/send`, { contact_ids: people });
+  check('a broadcast with an attachment sends', send.data?.queued === 2, JSON.stringify(send.data));
+  // The copy has the same subject, so the two are told apart by address.
+  const toGuests = () => sends.filter((m) => (m.body.to || []).some((t) => /attach[12]@guest\.test/.test(t)));
+  await waitFor(() => toGuests().length === 2, 'the queue hands both emails to SMTP2GO');
+  const real = toGuests();
+  check('every email carries the attachment', real.length === 2 && real.every(carries));
+  await waitFor(async () => ((await A.api('GET', `/api/emails?broadcast_id=${bId}&kind=broadcast&status=sent`)).data?.emails || []).length === 2,
+    'both emails are marked sent');
+
+  const dup = await A.api('POST', `/api/broadcasts/${bId}/duplicate`);
+  check('a duplicate keeps the attachment', dup.data?.broadcast?.attachment?.name === 'Agenda.pdf');
+
+  await A.api('PUT', `/api/broadcasts/${bId}`, { attachment: '' });
+  check('removing the attachment clears it', (await A.api('GET', `/api/broadcasts/${bId}`)).data?.broadcast?.attachment === null);
+  const before = sends.length;
+  await A.api('POST', `/api/broadcasts/${bId}/test-email`, { to: 'tester@alpha.test' });
+  check('without an attachment an email has none', sends.length === before + 1 && !('attachments' in sends[before].body));
+
+  // A file that has gone missing stops the send instead of going out without it.
+  const dupId = dup.data.broadcast.id;
+  fs.rmSync(path.join(DATA_DIR, 'orgs', 'alpha', 'uploads', up.data.token));
+  const lost = await A.api('POST', `/api/broadcasts/${dupId}/send`, { contact_ids: people });
+  check('a missing attachment stops the send', lost.status === 400 && /missing/.test(lost.data?.error || ''), JSON.stringify(lost.data));
+  check('a missing attachment stops a test email',
+    (await A.api('POST', `/api/broadcasts/${dupId}/test-email`, {})).status === 400);
+
+  await A.api('PUT', '/api/settings', { smtp2go_api_key: '' });
+  check('sending is simulated again', (await A.api('GET', '/api/settings')).data?.settings?.smtp2go_key_set === false);
+  smtp.close();
 }
 
 // --- help: every page has help, and every picture it names exists ----------

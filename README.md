@@ -45,6 +45,8 @@ organizations from one installation**, with hard isolation between them.
   RSVP and guest tracking
 - A slimmed wizard (details → design & message → recipients → review & send);
   send to groups and individual contacts, add new people inline
+- One **attached file** per broadcast, up to 5 MB: a PDF, a Word, Excel or
+  PowerPoint file, or a picture. Every email carries it, test emails included.
 - Optional unguessable **web version** ("view this email online") per broadcast,
   rendered from the flyer masthead; per-send toggle. The email itself carries
   your message and nothing above it.
@@ -215,7 +217,10 @@ Public guest URLs are namespaced per organization and token-based:
 - Login and public RSVP endpoints are rate-limited
 - All SQL uses prepared statements; all HTML output is escaped
 - Uploads are validated by magic bytes (JPEG/PNG/GIF/WebP only, 5 MB cap) and
-  served with fixed content types from unguessable URLs
+  served with fixed content types from unguessable URLs. A broadcast's
+  attachment may also be a PDF or a Word, Excel or PowerPoint file, judged by
+  its contents; Office files with macros are refused, and documents are served
+  as downloads
 - Strict security headers (CSP, nosniff, frame-ancestors, referrer policy)
 - The email footer carries the recipient, the sending organization, and an
   unsubscribe link; invitations include a `List-Unsubscribe` header

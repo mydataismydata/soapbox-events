@@ -8,6 +8,7 @@ import { randomSlug } from '../lib/tokens.js';
 import { normalizeFlyer } from '../lib/flyer.js';
 import { broadcastStats } from '../lib/stats.js';
 import { orgApiKey, senderFor, sendEmail } from '../lib/email.js';
+import { attachmentInfo, attachmentRow, attachmentProblem, attachmentsFor } from '../lib/attachments.js';
 import {
   parseFlyer, publicUrl, resolveRecipients, queueBroadcastEmails,
   renderBroadcastEmailFor, broadcastViewUrl, broadcastUnsubUrl, previewUnsubUrl,
@@ -57,17 +58,37 @@ const BROADCAST_FIELDS = {
   audience: (x) => JSON.stringify(sanitizeAudience(x)),
 };
 
-function pickBroadcastFields(body) {
+// The attached file is an upload token, and only a file this organization
+// uploaded as something attachable may be named. An empty value removes it.
+function pickAttachment(db, value) {
+  const token = String(value ?? '').trim();
+  if (!token) return '';
+  if (!attachmentRow(db, token)) throw new ApiError(400, 'That file could not be found. Attach it again.');
+  return token;
+}
+
+function pickBroadcastFields(db, body) {
   const out = {};
   for (const [key, validate] of Object.entries(BROADCAST_FIELDS)) {
     if (body[key] !== undefined) out[key] = validate(body[key]);
   }
+  if (body.attachment !== undefined) out.attachment = pickAttachment(db, body.attachment);
   return out;
 }
 
+// The file a test or copy carries, read from disk. A missing file stops the
+// send with a reason the wizard can show.
+function filesFor(req, b) {
+  const attached = attachmentsFor(req.db, req.org.slug, b.attachment);
+  if (attached.error) throw new ApiError(400, attached.error);
+  return attached.files;
+}
+
 function serializeBroadcast(req, b) {
+  const attachment = attachmentInfo(req.db, b.attachment);
   return {
     ...b,
+    attachment: attachment && { ...attachment, url: publicUrl(req.org.slug, `/files/${attachment.token}`) },
     flyer: parseFlyer(b),
     audience: parseAudience(b),
     web_version: Boolean(b.web_version),
@@ -86,7 +107,7 @@ broadcastRouter.get('/broadcasts', wrap(async (req, res) => {
 }));
 
 broadcastRouter.post('/broadcasts', wrap(async (req, res) => {
-  const fields = pickBroadcastFields(req.body);
+  const fields = pickBroadcastFields(req.db, req.body);
   if (!fields.title) throw new ApiError(400, 'Title is required.');
   if (fields.flyer === undefined) fields.flyer = JSON.stringify(normalizeFlyer({}));
   const keys = Object.keys(fields);
@@ -104,7 +125,7 @@ broadcastRouter.get('/broadcasts/:id', wrap(async (req, res) => {
 
 broadcastRouter.put('/broadcasts/:id', wrap(async (req, res) => {
   const b = getBroadcast(req.db, req.params.id);
-  const fields = pickBroadcastFields(req.body);
+  const fields = pickBroadcastFields(req.db, req.body);
   if (Object.keys(fields).length === 0) return res.json({ broadcast: serializeBroadcast(req, b) });
   const sets = Object.keys(fields).map((k) => `${k} = ?`).join(', ');
   req.db.prepare(`UPDATE broadcasts SET ${sets}, updated_at = datetime('now') WHERE id = ?`)
@@ -120,7 +141,7 @@ broadcastRouter.delete('/broadcasts/:id', wrap(async (req, res) => {
 
 broadcastRouter.post('/broadcasts/:id/duplicate', wrap(async (req, res) => {
   const b = getBroadcast(req.db, req.params.id);
-  const copyKeys = ['subject', 'body', 'flyer', 'audience', 'web_version'];
+  const copyKeys = ['subject', 'body', 'flyer', 'audience', 'web_version', 'attachment'];
   const info = req.db.prepare(
     `INSERT INTO broadcasts (slug, title, status, created_by, ${copyKeys.join(', ')})
      VALUES (?, ?, 'draft', ?, ${copyKeys.map(() => '?').join(', ')})`
@@ -153,20 +174,22 @@ broadcastRouter.post('/broadcasts/:id/test-email', wrap(async (req, res) => {
     org: req.org, broadcast: b, recipient: { name: req.user.name, email: to },
     subjectTemplate: `[Test] ${b.subject || b.title}`, bodyTemplate: b.body || '', viewUrl, unsubUrl: '',
   });
+  const attachments = filesFor(req, b);
   const { sender, replyTo } = senderFor(req.db, req.org.name, 'broadcast');
   const result = await sendEmail({
     apiKey: orgApiKey(req.db),
     sender,
     replyTo,
     toName: req.user.name, toEmail: to, subject: msg.subject, html: msg.html, text: msg.text,
+    attachments,
   });
   const status = result.ok ? (result.simulated ? 'simulated' : 'sent') : 'failed';
   // Logged with kind='test' so it shows in the broadcast log but is excluded
   // from the recipient count.
   req.db.prepare(
-    `INSERT INTO email_log (broadcast_id, kind, to_name, to_email, subject, html, body_text, status, error, sent_at)
-     VALUES (?, 'test', ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
-  ).run(b.id, req.user.name, to, msg.subject, msg.html, msg.text, status, result.error || null);
+    `INSERT INTO email_log (broadcast_id, kind, to_name, to_email, subject, html, body_text, status, error, sent_at, attachment)
+     VALUES (?, 'test', ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)`
+  ).run(b.id, req.user.name, to, msg.subject, msg.html, msg.text, status, result.error || null, b.attachment || null);
   if (!result.ok) throw new ApiError(502, `Test email failed: ${result.error}`);
   res.json({ status });
 }));
@@ -192,6 +215,7 @@ broadcastRouter.post('/broadcasts/:id/send-copy', wrap(async (req, res) => {
     org: req.org, broadcast: b, recipient: { name: req.user.name, email: to },
     subjectTemplate: b.subject || b.title, bodyTemplate: b.body || '', viewUrl, unsubUrl,
   });
+  const attachments = filesFor(req, b);
   const { sender, replyTo } = senderFor(req.db, req.org.name, 'broadcast');
   const result = await sendEmail({
     apiKey: orgApiKey(req.db),
@@ -199,13 +223,14 @@ broadcastRouter.post('/broadcasts/:id/send-copy', wrap(async (req, res) => {
     replyTo,
     toName: req.user.name, toEmail: to, subject: msg.subject, html: msg.html, text: msg.text,
     headers: [{ header: 'List-Unsubscribe', value: `<${unsubUrl}>` }],
+    attachments,
   });
   const status = result.ok ? (result.simulated ? 'simulated' : 'sent') : 'failed';
   // Logged as a test so it stays out of the recipient counts.
   req.db.prepare(
-    `INSERT INTO email_log (broadcast_id, kind, to_name, to_email, subject, html, body_text, status, error, sent_at)
-     VALUES (?, 'test', ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
-  ).run(b.id, req.user.name, to, msg.subject, msg.html, msg.text, status, result.error || null);
+    `INSERT INTO email_log (broadcast_id, kind, to_name, to_email, subject, html, body_text, status, error, sent_at, attachment)
+     VALUES (?, 'test', ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)`
+  ).run(b.id, req.user.name, to, msg.subject, msg.html, msg.text, status, result.error || null, b.attachment || null);
   if (!result.ok) throw new ApiError(502, `Could not send the copy: ${result.error}`);
   res.json({ status, to });
 }));
@@ -213,6 +238,10 @@ broadcastRouter.post('/broadcasts/:id/send-copy', wrap(async (req, res) => {
 broadcastRouter.post('/broadcasts/:id/send', wrap(async (req, res) => {
   const b = getBroadcast(req.db, req.params.id);
   if (!b.title) throw new ApiError(400, 'Give the broadcast a title before sending.');
+  // Caught here, before anything is queued, rather than as a failure on
+  // every email.
+  const problem = attachmentProblem(req.db, req.org.slug, b.attachment);
+  if (problem) throw new ApiError(400, problem);
 
   // Prefer the selection posted by the wizard; fall back to the saved audience.
   const stored = parseAudience(b);

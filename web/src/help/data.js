@@ -55,6 +55,7 @@ export const BOCC = {
   title: 'Board of County Commissioners special meeting Oct 28',
   subject: 'Special meeting Oct 28 at 9 AM',
   blurb: 'The County Commissioners are having a special meeting on Oct 28 at 9 AM to reconsider approvals for Agricultural Enclaves.',
+  attachment: { name: 'Agenda Oct 28.pdf', size: '182 KB' },
 };
 
 export const SENT_BROADCASTS = [

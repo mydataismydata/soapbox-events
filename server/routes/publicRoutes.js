@@ -5,7 +5,7 @@
 //   /o/<org>/i/<token>       personal invite page (RSVP, change response)
 //   /o/<org>/i/<token>/accept|decline   one-click buttons from emails
 //   /o/<org>/u/<token>       unsubscribe
-//   /o/<org>/files/<token>   uploaded images (flyer photos)
+//   /o/<org>/files/<token>   uploaded images, and broadcasts' attached files
 import { Router } from 'express';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -24,6 +24,7 @@ import { randomToken } from '../lib/tokens.js';
 import { personName } from '../lib/contacts.js';
 import { take } from '../lib/ratelimit.js';
 import { isValidEmail } from '../lib/validate.js';
+import { downloadDisposition } from '../lib/attachments.js';
 
 export const publicRouter = Router({ mergeParams: true });
 
@@ -614,5 +615,8 @@ publicRouter.get('/files/:token', (req, res) => {
   res.setHeader('Content-Type', row.mime);
   res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  // A broadcast's attached PDF or Office file downloads under its own name
+  // rather than opening on this site's address.
+  if (!row.mime.startsWith('image/')) res.setHeader('Content-Disposition', downloadDisposition(row.original_name));
   res.sendFile(file);
 });

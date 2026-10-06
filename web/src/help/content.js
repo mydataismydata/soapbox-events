@@ -115,6 +115,7 @@ const BROADCAST_WIZARD = {
       ],
       points: [
         'Soapbox adds an unsubscribe link to the end of every broadcast.',
+        'Attach a file adds one file of up to 5 MB, such as a PDF. Every email the broadcast sends carries it.',
         'With the web version on, this step also designs the masthead at the top of the web page. You type its lines straight onto it, the same way as an event’s flyer.',
       ],
       scene: 'broadcast-message',

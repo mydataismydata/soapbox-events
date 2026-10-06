@@ -6,6 +6,7 @@ import FlyerDesigner from '../components/FlyerDesigner.jsx';
 import RecipientPicker from '../components/RecipientPicker.jsx';
 import TagButtons from '../components/TagButtons.jsx';
 import RichText, { looksLikeHtml, plainToHtml } from '../components/RichText.jsx';
+import AttachmentPicker, { fileSize } from '../components/AttachmentPicker.jsx';
 
 // The masthead only exists to front the web version, so an email-only
 // broadcast has nothing to design and the step says so.
@@ -28,7 +29,7 @@ Write your message here.
 — {{org_name}}`;
 
 const BLANK = {
-  title: '', subject: '', body: plainToHtml(DEFAULT_BODY), web_version: true,
+  title: '', subject: '', body: plainToHtml(DEFAULT_BODY), web_version: true, attachment: null,
   flyer: {
     style: 'classic', font: 'sans', scale: 'm',
     eyebrow: '', tagline: '', note: '', contact: '', showHost: false, showAddress: false,
@@ -69,6 +70,7 @@ export default function BroadcastWizard() {
           // editor needs markup or their line breaks vanish.
           body: looksLikeHtml(bc.body) ? bc.body : plainToHtml(bc.body),
           web_version: bc.web_version,
+          attachment: bc.attachment || null,
           flyer: { ...BLANK.flyer, ...bc.flyer },
         });
         setRecipients({
@@ -102,6 +104,7 @@ export default function BroadcastWizard() {
       const payload = {
         title: b.title, subject: b.subject, body: b.body,
         web_version: b.web_version, flyer: b.flyer, audience: audiencePayload(),
+        attachment: b.attachment?.token || '',
       };
       if (!broadcastId) {
         const d = await api.post('/api/broadcasts', payload);
@@ -270,6 +273,9 @@ export default function BroadcastWizard() {
                   <TagButtons tags={BROADCAST_TAGS}
                     onInsert={(snippet) => bodyRef.current?.insertText(snippet)} />
                 </Field>
+                <Field label="Attachment" hint="One file up to 5 MB, such as a PDF. Every email carries it.">
+                  <AttachmentPicker value={b.attachment} onChange={(attachment) => patch({ attachment })} />
+                </Field>
                 <button className="btn" onClick={previewEmail} disabled={saving}>
                   <Icon name="eye" size={14} /> Preview email
                 </button>
@@ -298,6 +304,10 @@ export default function BroadcastWizard() {
               <div className="kv"><span className="k">Subject</span><span>{b.subject || b.title || '—'}</span></div>
               <div className="kv"><span className="k">Web version</span>
                 <span>{b.web_version ? 'On — “view in browser” link included' : 'Off — email only'}</span></div>
+              {b.attachment ? (
+                <div className="kv"><span className="k">Attachment</span>
+                  <span>{b.attachment.name} ({fileSize(b.attachment.bytes)})</span></div>
+              ) : null}
               <div className="kv"><span className="k">Recipients</span>
                 <span>{recipientCount == null ? '…'
                   : recipientCount === 0 ? <em>None selected yet</em>
@@ -348,7 +358,10 @@ export default function BroadcastWizard() {
 
       {emailPreview ? (
         <Modal title={`Preview — ${emailPreview.subject}`} size="lg" onClose={() => setEmailPreview(null)}>
-          <p className="small muted" style={{ marginTop: 0 }}>Rendered for a sample recipient ({emailPreview.to}).</p>
+          <p className="small muted" style={{ marginTop: 0 }}>
+            Rendered for a sample recipient ({emailPreview.to}).
+            {b.attachment ? ` ${b.attachment.name} (${fileSize(b.attachment.bytes)}) is attached.` : ''}
+          </p>
           <iframe className="email-frame" title="Email preview" srcDoc={emailPreview.html} />
         </Modal>
       ) : null}

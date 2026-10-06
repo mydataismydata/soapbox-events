@@ -270,4 +270,12 @@ export const ORG_MIGRATIONS = [
   );
   CREATE INDEX idx_website_deliveries_sent ON website_deliveries(sent_at DESC);
   `,
+
+  // Migration 6: a broadcast can carry one attached file, held as its upload
+  // token. Each queued email keeps its own copy of the token, so what was
+  // queued is what goes out even if the broadcast is edited mid-send.
+  `
+  ALTER TABLE broadcasts ADD COLUMN attachment TEXT NOT NULL DEFAULT '';
+  ALTER TABLE email_log ADD COLUMN attachment TEXT;
+  `,
 ];

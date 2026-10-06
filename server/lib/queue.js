@@ -5,6 +5,7 @@ import { config } from './env.js';
 import { listOrgs, orgDb } from './db.js';
 import { sendEmail, orgApiKey, senderFor } from './email.js';
 import { buildLinks, publicUrl, signContactToken } from './sending.js';
+import { attachmentsFor } from './attachments.js';
 
 const TICK_MS = 2000;
 let timer = null;
@@ -35,7 +36,10 @@ async function processOne(db, org, row) {
   }
 
   const { sender, replyTo } = senderFor(db, org.name, row.broadcast_id ? 'broadcast' : 'event');
-  const result = await sendEmail({
+  // A broadcast's attached file is read from disk for every email. If it has
+  // gone, the email fails with that reason instead of going out without it.
+  const attached = attachmentsFor(db, org.slug, row.attachment);
+  const result = attached.error ? { ok: false, error: attached.error } : await sendEmail({
     apiKey: orgApiKey(db),
     sender,
     replyTo,
@@ -45,6 +49,7 @@ async function processOne(db, org, row) {
     html: row.html,
     text: row.body_text,
     headers,
+    attachments: attached.files,
   });
 
   if (result.ok) {

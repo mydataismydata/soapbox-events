@@ -69,6 +69,11 @@ const PATHS = {
   bold: <path d="M7 4.5h6a3.7 3.7 0 0 1 0 7.5H7Zm0 7.5h6.8a3.75 3.75 0 0 1 0 7.5H7Z" />,
   italic: <path d="M15.5 4.5h-5M13.5 19.5h-5M14.5 4.5l-5 15" />,
   underline: <><path d="M7 4.5v6.8a5 5 0 0 0 10 0V4.5" /><path d="M5.5 20.5h13" /></>,
+  alignLeft: <path d="M4 6h16M4 10h10M4 14h16M4 18h10" />,
+  alignCenter: <path d="M4 6h16M7 10h10M4 14h16M7 18h10" />,
+  alignRight: <path d="M4 6h16M10 10h10M4 14h16M10 18h10" />,
+  listBullet: <><path d="M9.5 6.5H20M9.5 12H20M9.5 17.5H20" /><circle cx="5" cy="6.5" r="1" /><circle cx="5" cy="12" r="1" /><circle cx="5" cy="17.5" r="1" /></>,
+  listNumber: <><path d="M10 6.5h10M10 12h10M10 17.5h10" /><path d="M4.5 4.8 5.6 4v5" /><path d="M4.3 10.6a1.2 1.2 0 0 1 2.1.8c0 .9-2.2 1.9-2.2 2.6h2.3" /><path d="M4.3 15.9h2l-1.1 1.3a1 1 0 1 1-.9 1.6" /></>,
   pasteText: <><rect x="4" y="5.5" width="11" height="14" rx="2" /><path d="M7.5 5.5A1.5 1.5 0 0 1 9 4h1a1.5 1.5 0 0 1 1.5 1.5v.8h-4Z" /><path d="M14 11.5h6M17 11.5v8" /></>,
 };
 

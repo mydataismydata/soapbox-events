@@ -59,6 +59,7 @@ const EVENT_WIZARD = {
         'Faint lines such as Tagline and Footnote stand in for lines you have not written yet.',
         'The picture button adds up to three photos to a tall flyer, such as the candidates who are speaking. The X on a photo removes it.',
         'On Dark and Light, the button in the top-left corner adds a background photo. The arrow at the bottom left shrinks it into the top half.',
+        'Text block instead of pictures puts formatted text where the photos go. Paste it from a document, an email or a web page into the box above the flyer. Bold, sizes, lists, links and pictures come with it.',
         'Preview shows the flyer the way the email picture looks, without the pencils and placeholders. Click it again to keep editing.',
         'Reset flyer clears every line and photo, once you confirm.',
       ],

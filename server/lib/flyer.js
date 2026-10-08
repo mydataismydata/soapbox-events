@@ -1,12 +1,14 @@
 // The flyer engine. A flyer is described by a small JSON object (style, fonts,
-// size scale, short text slots, optional featured images) and rendered to
-// self-contained HTML with inline styles only. Each style is a self-contained
+// size scale, short text slots, optional featured images, or a block of
+// formatted text in their place) and rendered to self-contained HTML with
+// inline styles only. Each style is a self-contained
 // template with its own fixed colours — there is no separate palette to pick.
 // The Dark and Light styles additionally take an uploaded background photo. The
 // same renderer backs the designer's live preview and the public event landing
 // page, so what you design is exactly what guests see.
 import { esc } from './html.js';
 import { formatDate, formatTimeRange } from './format.js';
+import { sanitizeRichText } from './sanitizeHtml.js';
 
 // `landscape: true` marks the wide templates: they run side-on, with the type
 // on the left and a single tall photo down the right, so they take one image
@@ -89,7 +91,30 @@ export const DEFAULT_FLYER = {
   flyerImageToken: '', // upload token of that picture, rendered by the designer
   bgToken: '', // full-bleed background image, used by the photo templates (Dark, Light)
   bgTopHalf: false, // photo templates: fit that image to the width along the top, fading out from halfway down
+  textBlock: false, // show textHtml where the featured images go, instead of them
+  textHtml: '', // the text block: rich text, sanitized to the same allowlist as an event description
 };
+
+// The longest the text block's HTML may run. Pictures in it are addresses, not
+// data, so this is a great deal of text.
+const TEXT_MAX = 30000;
+
+// The text block as stored: sanitized, with this installation's own picture
+// addresses cut down to their path so the flyer survives a change of site
+// address, and empty when there are no words and no pictures in it.
+function cleanTextHtml(raw) {
+  let html = String(raw ?? '');
+  if (html.length > TEXT_MAX) {
+    html = html.slice(0, TEXT_MAX);
+    // Don't leave half a tag at the end to be shown as text.
+    const lt = html.lastIndexOf('<');
+    if (lt > html.lastIndexOf('>')) html = html.slice(0, lt);
+  }
+  html = sanitizeRichText(html, { maxLength: TEXT_MAX })
+    .replace(/(<img src=")https?:\/\/[^/"]+(\/o\/)/g, '$1$2');
+  const words = html.replace(/<[^>]*>/g, '').replace(/&nbsp;|&#160;|\s/g, '');
+  return words || /<img\b/.test(html) ? html : '';
+}
 
 export function normalizeFlyer(raw) {
   const f = { ...DEFAULT_FLYER, ...(raw && typeof raw === 'object' ? raw : {}) };
@@ -127,6 +152,8 @@ export function normalizeFlyer(raw) {
   f.flyerImageToken = validToken(f.flyerImageToken);
   f.bgToken = validToken(f.bgToken);
   f.bgTopHalf = Boolean(f.bgTopHalf);
+  f.textBlock = Boolean(f.textBlock);
+  f.textHtml = cleanTextHtml(f.textHtml);
   return f;
 }
 
@@ -198,6 +225,7 @@ function px(n) {
 // add, remove and resize them. Nothing guests see is ever drawn in edit mode.
 const PLACEHOLDERS = {
   eyebrow: 'Eyebrow line', tagline: 'Tagline', note: 'Footnote', contact: 'Contact', caption: 'Caption',
+  text: 'Text block',
 };
 
 // One typed line. Out of edit mode an empty line has show: false and the
@@ -219,6 +247,7 @@ const EDIT_CSS = `[data-ghost] { opacity: 0.55; }
 [data-editing] { opacity: 1; outline: 2px solid #1f5fbf; outline-offset: 4px; box-shadow: 0 0 0 4px rgba(255,255,255,0.7); }
 span[data-editing] { display: inline-block; min-width: 2ch; }
 [data-slot^="eyebrow"], [data-slot^="tagline"], [data-slot^="note"], [data-slot^="contact"], [data-slot^="caption"] { cursor: text; }
+[data-slot=text] { cursor: pointer; }
 img { -webkit-user-drag: none; user-select: none; }`;
 
 // Optional caption rendered directly under a featured image.
@@ -271,6 +300,20 @@ function featuredImages(images, { scale, colors, frame, captionColor, marginTop 
       <div style="width:calc(50% - ${px(7 * scale)}); min-width:0; text-align:center;">${pic(images[2], 2)}${cap(images[2], 2)}</div>
     </div>
   </div>`;
+}
+
+// The text block, drawn where the featured images would go. It is set in the
+// template's body face and `color`, its ink; `align` is the template's own
+// alignment, which a paragraph's alignment overrides. Without a `maxWidth` it
+// fills its column. In the editing view an empty block is drawn faintly, for
+// its pencil.
+function textBlock(flyer, { font, scale, color, align = 'center', maxWidth = 0, marginTop = 22, edit = false }) {
+  const html = flyer.textHtml ? sanitizeRichText(flyer.textHtml, { maxLength: TEXT_MAX, mode: 'flyer' }) : '';
+  const box = `${maxWidth ? `max-width:${px(maxWidth)};` : 'width:100%;'} margin:${px(marginTop)} auto 4px; text-align:${align};`
+    + ` color:${color}; font-family:${font.body}; font-size:${px(15 * scale)}; line-height:1.5;`;
+  if (html) return `<div${edit ? ' data-slot="text"' : ''} style="${box}">${html}</div>`;
+  if (!edit) return '';
+  return `<div data-slot="text" data-ghost style="${box} padding:${px(14 * scale)};">${PLACEHOLDERS.text}</div>`;
 }
 
 // A horizontal rule broken by a centred star. `full` spans the whole width as a
@@ -383,7 +426,7 @@ function bigDateParts(iso) {
 
 function renderRetro({ event, flyer, colors, font, scale, images, hostLine, hideEventMeta, edit }) {
   const c = colors;
-  const hasImg = images.length > 0;
+  const hasImg = flyer.textBlock ? Boolean(flyer.textHtml) : images.length > 0;
   const eb = slot(edit, 'eyebrow', flyer.eyebrow);
   const tagline = slot(edit, 'tagline', flyer.tagline);
   const note = slot(edit, 'note', flyer.note);
@@ -395,8 +438,11 @@ function renderRetro({ event, flyer, colors, font, scale, images, hostLine, hide
       text-transform:uppercase; color:${c.red};">${esc(eb.text)}</span>
     ${starRow(3, { size: 15 * scale, color: c.red, gap: 0.22 })}</div>` : '';
   // The editing view's add-picture spot doesn't count as a picture: the stripes and
-  // spacing stay as they will be printed until a real one is added.
-  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.parchment, '#ffffff'), captionColor: tint(c.parchment, 0.9), marginTop: 18, edit });
+  // spacing stay as they will be printed until a real one is added. The same
+  // goes for an empty text block's placeholder.
+  const img = flyer.textBlock
+    ? textBlock(flyer, { font, scale, color: c.parchment, maxWidth: 460 * scale, marginTop: 18, edit })
+    : featuredImages(images, { scale, colors: c, frame: imageFrame(c.parchment, '#ffffff'), captionColor: tint(c.parchment, 0.9), marginTop: 18, edit });
   const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp' ? rsvpBadge(scale, { bg: c.red, ink: c.parchment, marginTop: 14 }) : '';
   const topArea = `
     <div style="background:${c.navy}; color:${c.parchment}; text-align:center;
@@ -440,10 +486,14 @@ function renderSpotlight({ event, flyer, colors, font, scale, images, hostLine, 
   const eyebrow = slot(edit, 'eyebrow', flyer.eyebrow);
   const tagline = slot(edit, 'tagline', flyer.tagline);
   const note = slot(edit, 'note', flyer.note);
-  const well = widePhoto(images[0], { minHeight: 280 * scale, fit: 'contain', scale, colors: c, edit });
-  const photo = well
-    ? `<div style="flex:1 1 34%; min-width:230px; box-sizing:border-box; display:flex;">${well}</div>`
-    : '';
+  // The text block takes the photo's column, ranged left like the rest.
+  const well = flyer.textBlock
+    ? textBlock(flyer, { font, scale, color: c.ink, align: 'left', marginTop: 0, edit })
+    : widePhoto(images[0], { minHeight: 280 * scale, fit: 'contain', scale, colors: c, edit });
+  const photo = !well ? '' : flyer.textBlock
+    ? `<div style="flex:1 1 34%; min-width:230px; box-sizing:border-box; display:flex; flex-direction:column;
+        justify-content:center; padding:${px(36 * scale)} ${px(30 * scale)};">${well}</div>`
+    : `<div style="flex:1 1 34%; min-width:230px; box-sizing:border-box; display:flex;">${well}</div>`;
 
   // Detail rows sit on a white card, venue/contact on the left of a hairline
   // rule and the date/time on its right — as many cells as there is content.
@@ -504,10 +554,13 @@ function renderPanel({ event, flyer, colors, font, scale, images, hostLine, hide
   const w = whenParts(event);
   const vb = venueTimeBits(event, flyer);
   const tagline = slot(edit, 'tagline', flyer.tagline);
-  const well = widePhoto(images[0], { minHeight: 300 * scale, fit: 'contain', radius: 6 * scale, scale, colors: c, edit });
-  const photo = well
-    ? `<div style="flex:1 1 36%; min-width:240px; box-sizing:border-box; display:flex; padding:${px(18 * scale)};">${well}</div>`
-    : '';
+  const well = flyer.textBlock
+    ? textBlock(flyer, { font, scale, color: cream, align: 'left', marginTop: 0, edit })
+    : widePhoto(images[0], { minHeight: 300 * scale, fit: 'contain', radius: 6 * scale, scale, colors: c, edit });
+  const photo = !well ? '' : flyer.textBlock
+    ? `<div style="flex:1 1 36%; min-width:240px; box-sizing:border-box; display:flex; flex-direction:column;
+        justify-content:center; padding:${px(34 * scale)} ${px(32 * scale)};">${well}</div>`
+    : `<div style="flex:1 1 36%; min-width:240px; box-sizing:border-box; display:flex; padding:${px(18 * scale)};">${well}</div>`;
 
   const badge = (text, attrs = '') => `<div${attrs} style="width:${px(94 * scale)}; height:${px(94 * scale)}; border-radius:999px;
     border:1px solid ${line}; display:flex; align-items:center; justify-content:center; text-align:center;
@@ -596,7 +649,9 @@ function renderClassic({ event, flyer, colors, font, scale, images, hostLine, hi
     <span style="color:${c.gold}; font-size:${px(10 * scale)}; line-height:1;">&#9670;</span>
     <div style="height:1px; width:${px(66 * scale)}; background:${c.gold};"></div></div>`;
 
-  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.gold, '#ffffff'), captionColor: tint(c.ink, 0.7), marginTop: 22, edit });
+  const img = flyer.textBlock
+    ? textBlock(flyer, { font, scale, color: c.ink, maxWidth: 460 * scale, marginTop: 22, edit })
+    : featuredImages(images, { scale, colors: c, frame: imageFrame(c.gold, '#ffffff'), captionColor: tint(c.ink, 0.7), marginTop: 22, edit });
 
   const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp'
     ? `<div style="margin-top:${px(20 * scale)};"><span style="display:inline-block; border:1.5px solid ${c.gold}; color:${c.ink};
@@ -735,7 +790,9 @@ function renderPhoto({ event, flyer, colors, font, scale, images, hostLine, hide
   // Featured images get a soft frame in the palette's tone — translucent white
   // on Dark, a faint ink hairline on Light — so they read as part of the flyer
   // rather than a hard block.
-  const img = featuredImages(images, { scale, colors: c, frame: imageFrame(c.frame, c.frameBg), captionColor: c.muted, marginTop: 22, edit });
+  const img = flyer.textBlock
+    ? textBlock(flyer, { font, scale, color: bright, maxWidth: 440 * scale, marginTop: 22, edit })
+    : featuredImages(images, { scale, colors: c, frame: imageFrame(c.frame, c.frameBg), captionColor: c.muted, marginTop: 22, edit });
 
   const rsvp = !hideEventMeta && event.rsvp_mode === 'rsvp'
     ? `<div style="margin-top:${px(20 * scale)};"><span style="display:inline-block; border:1.5px solid ${c.gold}; color:${bright};

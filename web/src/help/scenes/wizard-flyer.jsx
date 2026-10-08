@@ -88,7 +88,7 @@ function Flyer({ s }) {
 export default function WizardFlyer() {
   return (
     <Scene width={560} height={694} length={13000} start={start} steps={steps}
-      label="Step 3 of the event wizard, designing the flyer. The templates, fonts, title size and two checkboxes sit above the flyer. Clicking the pencil beside the tagline lets you type Hear from the candidates right on the flyer, and the return button keeps it. The add picture button puts one speaker's photo on the flyer, then a second beside it. Preview shows the flyer without the pencils and placeholders.">
+      label="Step 3 of the event wizard, designing the flyer. The templates, fonts, title size and three checkboxes sit above the flyer. Clicking the pencil beside the tagline lets you type Hear from the candidates right on the flyer, and the return button keeps it. The add picture button puts one speaker's photo on the flyer, then a second beside it. Preview shows the flyer without the pencils and placeholders.">
       {(s) => (
         <Screen bare>
           <Card title="Design the flyer" className="hs-tight">
@@ -108,6 +108,7 @@ export default function WizardFlyer() {
               <div className="designer-checks">
                 <label className="checkbox"><Check on /><span><span className="cb-label">Show host line</span></span></label>
                 <label className="checkbox"><Check on={false} /><span><span className="cb-label">Show venue address</span></span></label>
+                <label className="checkbox"><Check on={false} /><span><span className="cb-label">Text block instead of pictures</span></span></label>
               </div>
             </div>
             <div className="hs-stage"><Flyer s={s} /></div>

@@ -14,6 +14,10 @@ organizations from one installation**, with hard isolation between them.
   color scheme, 5 font pairings, adjustable title sizes, and featured
   images: up to three side by side on the portrait templates (e.g. featured
   speakers), or one full-height photo down the side on the wide ones
+- Text block instead of pictures: formatted text pasted from a document, an
+  email or a web page fills the pictures' place, keeping its bold, sizes,
+  lists, links and pictures (the server copies each pasted picture in, and
+  never from a private network address)
 - Optional "include flyer in email": the designer renders the flyer to a JPEG
   in the browser (no headless browser on the server) and the invitation carries
   it under the Accept / Decline buttons

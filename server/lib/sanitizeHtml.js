@@ -1,6 +1,7 @@
-// A deliberately tiny, allowlist-only HTML sanitizer for the rich-text event
-// description. The description is authored by a signed-in member but rendered
-// on public pages, so it must be safe by construction.
+// A deliberately tiny, allowlist-only HTML sanitizer for rich text: the event
+// description, broadcast bodies and the flyer's text block. Each is authored by
+// a signed-in member but rendered on public pages, so it must be safe by
+// construction.
 //
 // The rule is simple: only a fixed set of formatting tags survive, the only
 // attribute kept is `class` (and only class tokens from a fixed allowlist —
@@ -8,12 +9,13 @@
 // dropped. Text between tags is HTML-escaped. There is no path for scripts,
 // event handlers, styles, urls, or unknown tags to pass through.
 
-const ALLOWED_TAGS = new Set(['b', 'strong', 'i', 'em', 'u', 'br', 'p', 'div', 'span', 'a', 'img']);
+const ALLOWED_TAGS = new Set(['b', 'strong', 'i', 'em', 'u', 'br', 'p', 'div', 'span', 'a', 'img', 'ul', 'ol', 'li']);
 const VOID_TAGS = new Set(['br', 'img']);
 const ALLOWED_CLASSES = new Set([
   'rt-ff-serif', 'rt-ff-sans', 'rt-ff-mono',
   'rt-fs-sm', 'rt-fs-lg', 'rt-fs-xl',
   'rt-img-half', 'rt-img-small',
+  'rt-al-left', 'rt-al-center', 'rt-al-right',
 ]);
 
 // Email has no stylesheet to lean on, so the same classes are re-emitted as
@@ -26,8 +28,32 @@ const EMAIL_STYLES = {
   'rt-fs-sm': 'font-size:13px;',
   'rt-fs-lg': 'font-size:19px;',
   'rt-fs-xl': 'font-size:25px;',
+  'rt-al-left': 'text-align:left;',
+  'rt-al-center': 'text-align:center;',
+  'rt-al-right': 'text-align:right;',
 };
 const EMAIL_LINK_STYLE = 'color:#1f5fbf;';
+
+// The flyer has no stylesheet either: it is drawn into the designer's frame,
+// the event page and the picture-of-the-flyer alike. Sizes there are relative,
+// so the text block follows the flyer's Title size, and colours are left out
+// so the text takes the template's own ink.
+const FLYER_STYLES = {
+  ...EMAIL_STYLES,
+  'rt-fs-sm': 'font-size:0.85em;',
+  'rt-fs-lg': 'font-size:1.25em;',
+  'rt-fs-xl': 'font-size:1.6em;',
+};
+// Per-tag spacing in the flyer. A list is an inline block, so a centred
+// template centres the list as a whole while its points stay ranged left.
+const FLYER_TAG_STYLES = {
+  p: 'margin:0 0 0.6em;',
+  ul: 'display:inline-block; max-width:100%; margin:0 0 0.6em; padding-left:1.4em; text-align:left;',
+  ol: 'display:inline-block; max-width:100%; margin:0 0 0.6em; padding-left:1.6em; text-align:left;',
+  li: 'margin:0.15em 0;',
+};
+const FLYER_LINK_STYLE = 'color:inherit; text-decoration:underline;';
+const FLYER_IMAGE_WIDTHS = { 'rt-img-small': '33%', 'rt-img-half': '50%' };
 // Widths mirror the marker syntax: the body column is 600px.
 const IMAGE_WIDTHS = { 'rt-img-small': 200, 'rt-img-half': 300 };
 
@@ -74,27 +100,36 @@ function attrEscape(value) {
     .replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function classAttr(cls, email) {
-  if (!cls) return '';
-  if (!email) return ` class="${cls}"`;
-  const style = cls.split(/\s+/).map((c) => EMAIL_STYLES[c] || '').join('');
+function classAttr(tag, cls, mode) {
+  if (mode === 'page') return cls ? ` class="${cls}"` : '';
+  const table = mode === 'flyer' ? FLYER_STYLES : EMAIL_STYLES;
+  const style = (mode === 'flyer' ? FLYER_TAG_STYLES[tag] || '' : '')
+    + (cls ? cls.split(/\s+/).map((c) => table[c] || '').join('') : '');
   return style ? ` style="${style}"` : '';
 }
 
-function imageHtml(src, cls, email) {
+function imageHtml(src, cls, mode) {
+  if (mode === 'flyer') {
+    const width = FLYER_IMAGE_WIDTHS[cls.split(/\s+/).find((c) => FLYER_IMAGE_WIDTHS[c])] || '100%';
+    return `<img src="${attrEscape(src)}" alt="" style="display:block; width:auto; max-width:${width};`
+      + ' height:auto; margin:0.4em auto 0.7em; border-radius:4px;">';
+  }
   const width = IMAGE_WIDTHS[cls.split(/\s+/).find((c) => IMAGE_WIDTHS[c])] || 600;
-  if (!email) return `<img src="${attrEscape(src)}" alt=""${cls ? ` class="${cls}"` : ''}>`;
+  if (mode !== 'email') return `<img src="${attrEscape(src)}" alt=""${cls ? ` class="${cls}"` : ''}>`;
   const centre = width < 600 ? ' margin-left:auto; margin-right:auto;' : '';
   return `<img src="${attrEscape(src)}" alt="" width="${width}" style="width:100%;`
     + ` max-width:${width}px; height:auto; display:block; border:0;${centre}">`;
 }
 
 // `mode: 'email'` swaps the stylesheet's classes for inline styles, which is
-// the only thing an email client will honour.
+// the only thing an email client will honour. `mode: 'flyer'` does the same
+// for the flyer's text block, with sizes relative to the flyer's own type.
 export function sanitizeRichText(input, { maxLength = 20000, mode = 'page' } = {}) {
-  const email = mode === 'email';
+  if (mode !== 'email' && mode !== 'flyer') mode = 'page';
   let html = String(input ?? '');
   if (html.length > maxLength) html = html.slice(0, maxLength);
+  // What sits inside these is code or page furniture, never words to keep.
+  html = html.replace(/<(script|style|head|title|template)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '');
 
   let out = '';
   let last = 0;
@@ -118,7 +153,7 @@ export function sanitizeRichText(input, { maxLength = 20000, mode = 'page' } = {
     } else if (VOID_TAGS.has(tag)) {
       if (tag === 'img') {
         const src = safeSrc(m[3] || '');
-        if (src) out += imageHtml(src, safeClass(m[3] || ''), email);
+        if (src) out += imageHtml(src, safeClass(m[3] || ''), mode);
       } else {
         out += '<br>';
       }
@@ -128,12 +163,12 @@ export function sanitizeRichText(input, { maxLength = 20000, mode = 'page' } = {
       const href = safeHref(m[3] || '');
       out += href
         ? `<a href="${attrEscape(href)}" target="_blank" rel="noopener noreferrer"`
-          + `${email ? ` style="${EMAIL_LINK_STYLE}"` : ''}>`
+          + `${mode === 'page' ? '' : ` style="${mode === 'flyer' ? FLYER_LINK_STYLE : EMAIL_LINK_STYLE}"`}>`
         : '<a>';
       open.push('a');
     } else {
       const cls = safeClass(m[3] || '');
-      out += `<${tag}${classAttr(cls, email)}>`;
+      out += `<${tag}${classAttr(tag, cls, mode)}>`;
       open.push(tag);
     }
   }
@@ -147,7 +182,7 @@ export function sanitizeRichText(input, { maxLength = 20000, mode = 'page' } = {
 export function stripHtml(input) {
   return String(input ?? '')
     .replace(/<\s*br\s*\/?>/gi, '\n')
-    .replace(/<\/\s*(p|div)\s*>/gi, '\n')
+    .replace(/<\/\s*(p|div|li)\s*>/gi, '\n')
     .replace(/<[^>]*>/g, '')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')

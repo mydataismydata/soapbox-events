@@ -5,8 +5,10 @@ import { uploadsDir, insertId } from '../lib/db.js';
 import { wrap, v, ApiError } from '../lib/validate.js';
 import { randomToken } from '../lib/tokens.js';
 import { publicUrl } from '../lib/sending.js';
-import { sniffImage } from '../lib/images.js';
+import { sniffImage, storeImage } from '../lib/images.js';
 import { sniffAttachment, attachmentFilename } from '../lib/attachments.js';
+import { fetchRemoteImage, RemoteImageError } from '../lib/remoteImage.js';
+import { take } from '../lib/ratelimit.js';
 
 export const uploadRouter = Router();
 
@@ -76,4 +78,25 @@ uploadRouter.post('/uploads', wrap(async (req, res) => {
     bytes: buf.length,
     mime,
   });
+}));
+
+// Copy a picture in from another website, by its address. Text pasted into
+// the flyer's text block brings its pictures as addresses; each one becomes
+// an ordinary upload, so the flyer only ever shows pictures kept here.
+uploadRouter.post('/uploads/remote', wrap(async (req, res) => {
+  const url = v.str(req.body.url, { label: 'Picture address', max: 4000 });
+  if (!take(`remote-image:${req.org.slug}`, 120, 10 * 60 * 1000)) {
+    throw new ApiError(429, 'Too many pictures copied at once. Wait a few minutes and paste again.');
+  }
+  let got;
+  try {
+    got = await fetchRemoteImage(url);
+  } catch (err) {
+    throw new ApiError(400, err instanceof RemoteImageError ? err.message : 'The picture could not be fetched.');
+  }
+  const name = (() => {
+    try { return decodeURIComponent(new URL(url).pathname.split('/').pop() || '').slice(0, 300); } catch { return ''; }
+  })();
+  const token = storeImage(req.db, req.org.slug, got.buf, got.mime, name);
+  res.status(201).json({ token, url: publicUrl(req.org.slug, `/files/${token}`), mime: got.mime, bytes: got.buf.length });
 }));

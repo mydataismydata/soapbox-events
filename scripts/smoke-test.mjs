@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { sendQueue, sendLabel, sendSummary } from '../web/src/components/sendQueue.js';
 import { personName, splitPersonName } from '../server/lib/contacts.js';
+import { fetchRemoteImage } from '../server/lib/remoteImage.js';
 import { allScenes, helpFor, sectionsFor } from '../web/src/help/content.js';
 
 const PORT = 3870 + Math.floor(Math.random() * 100);
@@ -513,6 +514,63 @@ let guests = [];
     check(`${style}: renders a wide side-by-side card`,
       whtml.includes('flex-wrap:wrap') && whtml.includes('min(920px'));
   }
+
+  // "Text block instead of pictures": formatted text where the featured
+  // pictures go, cut down to the rich-text allowlist, showing only this
+  // installation's own pictures, in every template.
+  const textHtml = '<p class="rt-al-left">Hello <b>friends</b><script>alert(1)</script></p>'
+    + '<ul><li>Raffle</li></ul><img src="https://elsewhere.example/x.png">'
+    + `<img src="${BASE}/o/alpha/files/txtIMGone" class="rt-img-half">`;
+  for (const style of ids) {
+    const th = await (await A.raw('POST', '/api/flyer/preview', {
+      body: { event: { title: 'Text Night', date: future },
+        flyer: { style, textBlock: true, textHtml, imageTokens: ['prevIMGone'] } },
+    })).text();
+    check(`${style}: text block takes the pictures' place`,
+      th.includes('Hello <b>friends</b>') && th.includes('/files/txtIMGone') && !th.includes('/files/prevIMGone'));
+    check(`${style}: text block is sanitized`, !/<script|alert\(1\)|elsewhere\.example/.test(th));
+  }
+  const tc = await (await A.raw('POST', '/api/flyer/preview', {
+    body: { event: { title: 'Text Night', date: future }, flyer: { style: 'classic', textBlock: true, textHtml } },
+  })).text();
+  check('text block styles its paragraphs, lists and pictures inline',
+    tc.includes('text-align:left;') && tc.includes('<ul style="display:inline-block;')
+      && /<img src="\/o\/alpha\/files\/txtIMGone"[^>]*max-width:50%/.test(tc));
+  const off = await (await A.raw('POST', '/api/flyer/preview', {
+    body: { event: { title: 'Text Night', date: future }, flyer: { style: 'classic', textBlock: false, textHtml, imageTokens: ['prevIMGone'] } },
+  })).text();
+  check('text block unticked shows the pictures again', off.includes('/files/prevIMGone') && !off.includes('friends'));
+  const ghost = await (await A.raw('POST', '/api/flyer/preview', {
+    body: { event: { title: 'Text Night', date: future }, flyer: { style: 'classic', textBlock: true }, edit: true },
+  })).text();
+  const bare = await (await A.raw('POST', '/api/flyer/preview', {
+    body: { event: { title: 'Text Night', date: future }, flyer: { style: 'classic', textBlock: true } },
+  })).text();
+  check('empty text block is a placeholder only while editing',
+    ghost.includes('data-slot="text" data-ghost') && !bare.includes('data-slot') && !bare.includes('Text block'));
+
+  const before = (await A.api('GET', `/api/events/${eventId}`)).data?.event?.flyer;
+  const stored = (await A.api('PUT', `/api/events/${eventId}`, { flyer: { ...before, textBlock: true, textHtml } })).data?.event?.flyer || {};
+  check('flyer stores the text block, sanitized',
+    stored.textBlock === true && String(stored.textHtml).includes('<b>friends</b>') && !/script|elsewhere/.test(stored.textHtml));
+  check('text block keeps its own pictures by path', String(stored.textHtml).includes('src="/o/alpha/files/txtIMGone"'));
+  const blank = (await A.api('PUT', `/api/events/${eventId}`, { flyer: { ...before, textHtml: '<p><br></p> <div>&nbsp;</div>' } })).data?.event?.flyer || {};
+  check('text block with no words or pictures is stored empty', blank.textHtml === '');
+  await A.api('PUT', `/api/events/${eventId}`, { flyer: before });
+
+  // Pictures in pasted text are copied in by the server, which must never be
+  // pointed at itself or the network it sits on.
+  for (const url of [`http://127.0.0.1:${PORT}/o/alpha/files/${up.data.token}`, 'http://localhost/x.png',
+    'http://169.254.169.254/latest/meta-data/', 'http://[::1]/x.png', 'http://10.0.0.8/x.png',
+    'file:///etc/passwd', 'ftp://example.org/x.png']) {
+    const r = await A.api('POST', '/api/uploads/remote', { url });
+    check(`picture copier refuses ${url}`, r.status === 400, JSON.stringify(r.data));
+  }
+  const copied = await fetchRemoteImage(`${BASE}/o/alpha/files/${up.data.token}`, { allowPrivate: true });
+  check('picture copier fetches and checks a picture', copied.mime === 'image/gif' && copied.buf.length > 0);
+  let notPicture = '';
+  try { await fetchRemoteImage(`${BASE}/api/health`, { allowPrivate: true }); } catch (err) { notPicture = err.message; }
+  check('picture copier refuses what is not a picture', /not a JPEG, PNG, GIF or WebP/.test(notPicture), notPicture);
 
   // Snapshot mode is what the designer rasterizes into the email's JPEG: a
   // plain rectangle, no page breakout, no shadow, no page background.

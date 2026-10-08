@@ -215,6 +215,9 @@ const PUBLIC_CSS = `
   .rt-fs-sm { font-size: 0.85em; }
   .rt-fs-lg { font-size: 1.25em; }
   .rt-fs-xl { font-size: 1.6em; }
+  .rt-al-left { text-align: left; }
+  .rt-al-center { text-align: center; }
+  .rt-al-right { text-align: right; }
   @media (max-width: 480px) {
     .pub-card { padding: 20px 16px; }
     .pub-actions .pub-btn { flex: 1 1 100%; }

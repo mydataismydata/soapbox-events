@@ -920,6 +920,8 @@ button.chip.active,
   margin-top: var(--sp-3);
 }
 .designer-hint { text-align: center; margin: var(--sp-2) 0 0; }
+/* The text block's editor, between the checkboxes and the flyer it fills. */
+.designer-text { margin: 0 0 var(--sp-4); }
 .btn[aria-pressed='true'] {
   background: var(--c-accent-soft);
   border-color: var(--c-accent);
@@ -1141,12 +1143,25 @@ button.chip.active,
 .rt-editor img.rt-img-half { max-width: 50%; margin-left: auto; margin-right: auto; }
 .rt-editor img.rt-img-small { max-width: 200px; margin-left: auto; margin-right: auto; }
 .rt-editor a { color: var(--c-accent-text); }
+.rt-editor p { margin: 0 0 0.6em; }
+/* The flyer's portrait templates centre their text block: a list there is
+   centred as a whole, its points still ranged left, as the flyer draws it. */
+.rt-editor.rt-centered { text-align: center; }
+.rt-editor.rt-centered ul, .rt-editor.rt-centered ol { display: inline-block; text-align: left; margin: 0 0 0.6em; }
+.rt-editor.rt-centered img { margin-left: auto; margin-right: auto; }
+.rt-status { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 0 6px;
+  font-size: var(--fs-sm); color: var(--c-muted); }
+.rt-spin { width: 12px; height: 12px; border: 2px solid var(--c-line-strong); border-top-color: var(--c-accent);
+  border-radius: 50%; animation: spin 0.7s linear infinite; }
 .rt-ff-serif { font-family: Georgia, 'Times New Roman', serif; }
 .rt-ff-sans { font-family: 'Helvetica Neue', Arial, sans-serif; }
 .rt-ff-mono { font-family: var(--font-mono); }
 .rt-fs-sm { font-size: 0.85em; }
 .rt-fs-lg { font-size: 1.25em; }
 .rt-fs-xl { font-size: 1.6em; }
+.rt-al-left { text-align: left; }
+.rt-al-center { text-align: center; }
+.rt-al-right { text-align: right; }
 
 /* === misc ================================================================ */
 

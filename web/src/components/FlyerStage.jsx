@@ -8,7 +8,8 @@
 // the background's buttons on the photo templates. A pencil (or a click on the
 // line) turns the line into a text box right there on the flyer, in the
 // flyer's own type. Enter or the ⏎ button keeps the text, and Esc puts the
-// line back.
+// line back. The text block is written in the designer's own editor instead;
+// its pencil (or a click on it) hands over to that.
 //
 // Preview swaps in a second frame, drawn with no marks at all. For an event
 // that is the picture the invitation email carries, laid out at that picture's
@@ -134,7 +135,7 @@ function rightOf(r, card, size) {
 
 export default function FlyerStage({
   body, previewing, snapshotWidth = 0, model,
-  onLine, onAddPicture, onRemovePicture, onAddBackground, onRemoveBackground, onTopHalf,
+  onLine, onAddPicture, onRemovePicture, onAddBackground, onRemoveBackground, onTopHalf, onEditText,
 }) {
   const editFrame = useRef(null);
   const previewFrame = useRef(null);
@@ -325,8 +326,11 @@ export default function FlyerStage({
       if (cur.current && e.target === cur.current.el) finishTyping(true);
     },
     click(e) {
+      // A link in the text block would take the frame away from the flyer.
+      if (e.target?.closest?.('a')) e.preventDefault();
       const slotKey = e.target?.closest?.('[data-slot]')?.getAttribute('data-slot');
       if (slotKey && lineOf(slotKey)) startTyping(slotKey);
+      else if (slotKey === 'text') onEditText?.();
     },
     blur() { finishTyping(true); },
   };
@@ -490,6 +494,15 @@ export default function FlyerStage({
       } else if (pics.length) {
         tools.push({ ...add, ...rightOf(pics[pics.length - 1].box, card, ADD) });
       }
+    }
+
+    // The text block's pencil sits in front of its first line.
+    const text = find('text');
+    if (text && onEditText) {
+      tools.push({
+        id: 'text', kind: 'pencil', icon: 'pencil', label: `${text.ghost ? 'Add' : 'Change'} the text block`,
+        ...before({ ...text.box, h: Math.min(text.box.h, 30) }, card, TOOL), press: onEditText,
+      });
     }
 
     // The photo templates' background: add or remove it from the flyer's

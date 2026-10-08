@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { ConfirmModal, Field, useToast, Icon } from '../ui.jsx';
 import FlyerStage from './FlyerStage.jsx';
+import RichText from './RichText.jsx';
 
 let cachedPresets = null;
 
@@ -22,9 +23,12 @@ function readFile(file) {
   });
 }
 
-// The flyer designer. The template, fonts, title size and the two event
+// The flyer designer. The template, fonts, title size and the event
 // checkboxes sit above the flyer; everything else is set on the flyer itself
-// (FlyerStage draws it and its pencils and picture buttons). Reset flyer clears
+// (FlyerStage draws it and its pencils and picture buttons). The one exception
+// is the text block, which takes the pictures' place when its box is ticked:
+// formatted text needs a toolbar, so it is written in an editor just above the
+// flyer, and its pencil on the flyer brings you to it. Reset flyer clears
 // what is on the flyer, and Preview shows it without any of the editing marks.
 export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'event' }) {
   const [presets, setPresets] = useState(cachedPresets);
@@ -34,6 +38,7 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
   const toast = useToast();
   const fileRef = useRef(null);
   const fileFor = useRef('');
+  const textRef = useRef(null);
   // Writes start from the newest flyer, not the one this render saw: an upload
   // can finish after the host has typed something else on the flyer.
   const latest = useRef(flyer);
@@ -128,14 +133,15 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
     set({
       eyebrow: '', tagline: '', note: '', contact: '',
       imageColumns: 1, imageTokens: [], imageCaptions: [], imageToken: '', imageCaption: '',
-      bgToken: '', bgTopHalf: false,
+      bgToken: '', bgTopHalf: false, textHtml: '',
     });
     setResetting(false);
     toast('Flyer cleared');
   }
 
   const empty = !flyer.eyebrow && !flyer.tagline && !flyer.note && !flyer.contact
-    && !pictures(flyer).length && !flyer.bgToken;
+    && !pictures(flyer).length && !flyer.bgToken && !flyer.textHtml;
+  const textBlock = mode === 'event' && Boolean(flyer.textBlock);
 
   // Everything the drawing depends on. The email-picture fields are left out:
   // re-making that picture changes them, and changes nothing that is drawn.
@@ -184,15 +190,32 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
                 onChange={(e) => set({ showAddress: e.target.checked })} />
               <span><span className="cb-label">Show venue address</span></span>
             </label>
+            <label className="checkbox">
+              <input type="checkbox" checked={!!flyer.textBlock}
+                onChange={(e) => set({ textBlock: e.target.checked })} />
+              <span><span className="cb-label">Text block instead of pictures</span></span>
+            </label>
           </div>
         ) : null}
       </div>
+
+      {textBlock ? (
+        <div className="designer-text">
+          <Field label="Text block"
+            hint="Paste from a document, an email or a web page. Bold, sizes, lists, links and pictures come along. Fonts and colors follow the template.">
+            <RichText ref={textRef} value={flyer.textHtml || ''} onChange={(html) => set({ textHtml: html })}
+              placeholder="Paste or type the text for the middle of the flyer"
+              keepFormatting links images align={wide ? undefined : 'center'} />
+          </Field>
+        </div>
+      ) : null}
 
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden
         onChange={(e) => upload(e.target.files?.[0])} />
       <FlyerStage body={body} previewing={previewing}
         snapshotWidth={mode === 'event' ? widths[wide ? 'wide' : 'portrait'] : 0}
         model={{ maxPictures, uploading, takesBackground, background: Boolean(flyer.bgToken), topHalf: Boolean(flyer.bgTopHalf) }}
+        onEditText={() => textRef.current?.focus()}
         onLine={setLine}
         onAddPicture={() => choose('picture')}
         onRemovePicture={(i) => writePictures(pictures().filter((_, k) => k !== i))}
@@ -218,7 +241,7 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
 
       {resetting ? (
         <ConfirmModal title="Clear the flyer?" danger confirmLabel="Clear flyer"
-          message={`This removes the lines you typed, the captions, the pictures and the background picture. The template, fonts${mode === 'event' ? ', title size and checkboxes stay' : ' and title size stay'} as they are.`}
+          message={`This removes the lines you typed, the captions, the pictures${mode === 'event' ? ', the text block' : ''} and the background picture. The template, fonts${mode === 'event' ? ', title size and checkboxes stay' : ' and title size stay'} as they are.`}
           onConfirm={clearFlyer} onClose={() => setResetting(false)} />
       ) : null}
     </div>

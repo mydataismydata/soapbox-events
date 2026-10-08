@@ -90,7 +90,7 @@ export const DEFAULT_FLYER = {
   includeFlyerImage: false, // show a picture of the flyer in the invitation email
   flyerImageToken: '', // upload token of that picture, rendered by the designer
   bgToken: '', // full-bleed background image, used by the photo templates (Dark, Light)
-  bgTopHalf: false, // photo templates: fit that image to the width along the top, fading out from halfway down
+  bgTopHalf: false, // photo templates: that image fills the top half, fading out just past halfway down
   textBlock: false, // show textHtml where the featured images go, instead of them
   textHtml: '', // the text block: rich text, sanitized to the same allowlist as an event description
 };
@@ -718,7 +718,7 @@ function fadeOutMask(band) {
 // rectangular "reverse vignette" — a blurred solid core of `shade` (black on
 // Dark, white on Light) inset from the edges — hides the photo behind the text
 // and reveals it only in a frame around the card. With "Overlay on top half
-// only" the photo is instead fitted to the width along the top and fades into
+// only" the photo instead fills the top half and fades into
 // `shade` from halfway down, with the same vignette over the part it shows in.
 // Every line also carries a soft glow. With no photo it falls back to a radial
 // ground, so the style still looks intentional on its own.
@@ -747,21 +747,21 @@ function renderPhoto({ event, flyer, colors, font, scale, images, hostLine, hide
   else if (bgUrl) bg = `background-color:${c.bg}; background-image:url('${esc(bgUrl)}'); background-size:cover; background-position:center; background-repeat:no-repeat;`;
   else bg = `background-color:${c.bg}; background-image:${c.ground};`;
 
-  // Top half only: the photo sits in its own box at the top, the card's full
-  // width at its natural height, and fades out over the vignette's feather —
-  // four blur radii, the visible span of a blurred edge — into the card's plain
-  // `shade`. The box is capped at halfway down plus that fade, so a tall photo
-  // starts fading exactly halfway; a short one fades out before its own bottom
-  // edge instead, so there is never a hard line where the photo ends. It is a
-  // mask rather than a black overlay: the box can end on a fraction of a pixel,
-  // and an overlay lets a sliver of the photo bleed through on that last row as
-  // a faint visible line, whereas a mask makes the photo itself transparent.
-  const band = 4 * feather;
+  // Top half only: the photo sits in its own box across the top, which always
+  // runs to just past halfway down and then fades out over six blur radii of
+  // the vignette's feather into the card's plain `shade`, so the photo is
+  // fully gone a little below halfway. A photo taller than the box is cropped
+  // at the bottom; a shorter one is scaled up to fill it and cropped at the
+  // sides, so it never ends above the fade with a hard line. It is a mask
+  // rather than a black overlay: the box can end on a fraction of a pixel, and
+  // an overlay lets a sliver of the photo bleed through on that last row as a
+  // faint visible line, whereas a mask makes the photo itself transparent.
+  const band = 6 * feather;
   const mask = fadeOutMask(band);
   const photo = topHalf
-    ? `<div${edit ? ' data-slot="bg-photo"' : ''} style="position:absolute; top:0; left:0; right:0; max-height:calc(50% + ${px(band)}); overflow:hidden; z-index:0;
+    ? `<div${edit ? ' data-slot="bg-photo"' : ''} style="position:absolute; top:0; left:0; right:0; height:calc(50% + ${px(band)}); overflow:hidden; z-index:0;
         -webkit-mask-image:${mask}; mask-image:${mask};">
-        <img src="${esc(bgUrl)}" alt="" style="display:block; width:100%; height:auto;"></div>`
+        <img src="${esc(bgUrl)}" alt="" style="display:block; width:100%; height:100%; object-fit:cover; object-position:center top;"></div>`
     : '';
 
   // The reverse vignette: a solid rounded rectangle of `shade` inset from the

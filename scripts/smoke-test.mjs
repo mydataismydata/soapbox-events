@@ -454,17 +454,18 @@ let guests = [];
   const darkPlainHtml = await darkPlain.text();
   check('dark flyer with no image uses a gradient ground',
     darkPlain.status === 200 && !darkPlainHtml.includes('/files/') && darkPlainHtml.includes('radial-gradient'));
-  // "Overlay on top half only": the photo is fitted to the width along the top
-  // (an <img> in a box capped at halfway plus the fade), not a covering
-  // background, and the vignette still sits over it.
+  // "Overlay on top half only": the photo fills a box across the top that runs
+  // to halfway plus the fade (an <img> covering it, not a covering background),
+  // fades out over that last stretch, and the vignette still sits over it.
   const darkTop = await A.raw('POST', '/api/flyer/preview', {
     body: { event: { title: 'Gala Evening', date: future },
       flyer: { style: 'dark', bgToken: 'bgIMGxxxx', bgTopHalf: true } },
   });
   const darkTopHtml = await darkTop.text();
-  check('dark top-half fits the photo to the width and fades it out from halfway',
-    /<img src="[^"]*\/files\/bgIMGxxxx"[^>]*width:100%; height:auto/.test(darkTopHtml)
-      && darkTopHtml.includes('max-height:calc(50% + ') && darkTopHtml.includes('mask-image:linear-gradient')
+  check('dark top-half fills past halfway and fades the photo out there',
+    /<img src="[^"]*\/files\/bgIMGxxxx"[^>]*width:100%; height:100%; object-fit:cover; object-position:center top/.test(darkTopHtml)
+      && darkTopHtml.includes(' height:calc(50% + 168px)') && darkTopHtml.includes('mask-image:linear-gradient')
+      && darkTopHtml.includes('rgba(0,0,0,1) calc(100% - 168px)') && darkTopHtml.includes('rgba(0,0,0,0) calc(100% - 0px)')
       && !darkTopHtml.includes("background-image:url('"));
   check('dark top-half keeps the vignette over the photo', darkTopHtml.includes('filter:blur('));
   // Light is Dark with white for black: the same vignette core and the same
@@ -473,7 +474,7 @@ let guests = [];
     body: { event: { title: 'Gala Evening', date: future }, flyer: { style, bgToken: 'bgIMGxxxx', ...extra } },
   })).text();
   const coreOf = (h) => (h.match(/<div style="position:absolute; inset:[^"]*filter:blur\([^)]*\);"><\/div>/) || [''])[0];
-  const boxOf = (h) => (h.match(/<div style="position:absolute; top:0; left:0; right:0; max-height:[^"]*">/) || [''])[0];
+  const boxOf = (h) => (h.match(/<div style="position:absolute; top:0; left:0; right:0; height:[^"]*">/) || [''])[0];
   const [darkCover, lightCover] = [await renderStyle('dark'), await renderStyle('light')];
   check('light has the same vignette core as dark, in white', coreOf(lightCover) !== ''
     && coreOf(lightCover) === coreOf(darkCover).replace('rgba(6,9,16,1)', '#ffffff'));

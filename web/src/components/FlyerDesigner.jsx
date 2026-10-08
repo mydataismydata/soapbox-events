@@ -3,6 +3,7 @@ import { api } from '../api.js';
 import { ConfirmModal, Field, useToast, Icon } from '../ui.jsx';
 import FlyerStage from './FlyerStage.jsx';
 import RichText from './RichText.jsx';
+import { trimPlainEdges } from './trimEdges.js';
 
 let cachedPresets = null;
 
@@ -97,7 +98,10 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
     if (file.size > MAX_MB * 1024 * 1024) { toast(`Pictures must be ${MAX_MB} MB or smaller`, 'bad'); return; }
     setUploading(kind);
     try {
-      const up = await api.post('/api/uploads', { name: file.name, data: await readFile(file) });
+      // A background loses any plain white or black strip along its edges,
+      // which would otherwise show where the flyer fades the photo out.
+      const data = (kind === 'background' && await trimPlainEdges(file)) || await readFile(file);
+      const up = await api.post('/api/uploads', { name: file.name, data });
       if (kind === 'background') set({ bgToken: up.token });
       else writePictures([...pictures(), { token: up.token, caption: '' }]);
     } catch (err) {

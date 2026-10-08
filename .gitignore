@@ -16,3 +16,6 @@ server/public/app/
 .design/
 .DS_Store
 *.log
+
+# local notes, not part of the app
+docs/soapbox-push/

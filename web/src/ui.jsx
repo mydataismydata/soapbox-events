@@ -194,20 +194,22 @@ export function StatGrid({ children, style }) {
   return <div className="stat-grid" style={style}>{children}</div>;
 }
 
-// With `to`, the whole tile is a link to the page its number is counted from.
-export function Stat({ icon, label, value, sub, tone, to }) {
+// With `to`, the whole tile is a link to the page its number is counted from;
+// with `onClick`, a button that shows what it counts on the same page, and
+// `title` says what. The parts are spans, which a button may hold.
+export function Stat({ icon, label, value, sub, tone, to, onClick, title }) {
   const cls = `stat${tone ? ` tone-${tone}` : ''}`;
   const body = (
     <>
-      {icon ? <div className="stat-ico"><Icon name={icon} size={15} /></div> : null}
-      <div className="label">{label}</div>
-      <div className="value">{value}</div>
-      {sub != null ? <div className="sub">{sub}</div> : null}
+      {icon ? <span className="stat-ico"><Icon name={icon} size={15} /></span> : null}
+      <span className="label">{label}</span>
+      <span className="value">{value}</span>
+      {sub != null ? <span className="sub">{sub}</span> : null}
     </>
   );
-  return to
-    ? <Link className={cls} to={to}>{body}</Link>
-    : <div className={cls}>{body}</div>;
+  if (to) return <Link className={cls} to={to} title={title}>{body}</Link>;
+  if (onClick) return <button type="button" className={cls} onClick={onClick} title={title}>{body}</button>;
+  return <div className={cls}>{body}</div>;
 }
 
 // A selectable option card with a radio mark — used for RSVP mode and the

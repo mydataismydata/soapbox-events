@@ -78,6 +78,27 @@ export default function EventDetail() {
   const [composePreview, setComposePreview] = useState(null);
   const [busy, setBusy] = useState(false);
   const composeBodyRef = useRef(null);
+  const guestsRef = useRef(null);
+  const filterRef = useRef(null);
+  const [jump, setJump] = useState(0);
+
+  // The summary tiles open the guest list on the guests each one counts:
+  // the Guests tab, that filter chosen in the list at the top right, and any
+  // name typed in the search cleared so the whole count shows.
+  function showGuests(next) {
+    setTab('guests');
+    setFilter(next);
+    setGuestQuery('');
+    setJump((n) => n + 1);
+  }
+
+  // Once that has drawn, bring the list into view and put the focus on the
+  // filter, which shows which one is on.
+  useEffect(() => {
+    if (!jump) return;
+    guestsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    filterRef.current?.focus({ preventScroll: true });
+  }, [jump]);
 
   const load = useCallback(async (quiet = false) => {
     try {
@@ -249,12 +270,16 @@ export default function EventDetail() {
 
       <StatGrid>
         <Stat icon="user" label="Invited" value={stats.invited}
-          sub={`${stats.emails_sent} emailed · ${stats.emails_queued} queued`} />
+          sub={`${stats.emails_sent} emailed · ${stats.emails_queued} queued`}
+          onClick={() => showGuests('all')} title="Show all guests" />
         <Stat icon="checkCircle" tone="ok" label="Attending" value={stats.guests_attending}
-          sub={`${stats.accepted} accepted RSVP${stats.accepted === 1 ? '' : 's'}`} />
-        <Stat icon="xCircle" tone="bad" label="Declined" value={stats.declined} sub="&nbsp;" />
+          sub={`${stats.accepted} accepted RSVP${stats.accepted === 1 ? '' : 's'}`}
+          onClick={() => showGuests('yes')} title="Show the guests who accepted" />
+        <Stat icon="xCircle" tone="bad" label="Declined" value={stats.declined} sub="&nbsp;"
+          onClick={() => showGuests('no')} title="Show the guests who declined" />
         <Stat icon="clipboard" tone="warn" label="Awaiting reply" value={stats.awaiting}
-          sub={`${stats.not_reached} not yet emailed`} />
+          sub={`${stats.not_reached} not yet emailed`}
+          onClick={() => showGuests('pending')} title="Show the guests who have not replied" />
       </StatGrid>
 
       {ev.capacity ? (
@@ -281,7 +306,8 @@ export default function EventDetail() {
         </Card>
       ) : null}
 
-      <div className="tabs" role="tablist">
+      <div className="tabs" role="tablist" ref={guestsRef}
+        style={{ scrollMarginTop: 'calc(var(--topbar-h) + var(--sp-4))' }}>
         <button role="tab" aria-selected={tab === 'guests'}
           className={`tab ${tab === 'guests' ? 'active' : ''}`} onClick={() => setTab('guests')}>
           Guests ({guests.length})
@@ -323,7 +349,7 @@ export default function EventDetail() {
                   aria-label="Filter guests by name, email or phone"
                   onChange={(e) => setGuestQuery(e.target.value)} />
               </div>
-              <select className="search-input" style={{ width: 185 }} value={filter}
+              <select ref={filterRef} className="search-input" style={{ width: 185 }} value={filter}
                 aria-label="Filter guests"
                 onChange={(e) => setFilter(e.target.value)}>
                 <option value="all">All guests</option>

@@ -222,7 +222,7 @@ export const HELP = {
       {
         heading: 'Who is coming',
         text: [
-          'The four numbers count the guests invited, attending, declined and still to answer. Attending includes the people guests are bringing.',
+          'The four numbers count the guests invited, attending, declined and still to answer. Attending includes the people guests are bringing. Click one to see those guests in the list below.',
           'The Guests tab lists everyone invited, with their invitation and their reply.',
         ],
         points: [

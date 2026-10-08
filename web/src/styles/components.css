@@ -91,6 +91,7 @@
   padding: var(--sp-3) var(--sp-4) var(--sp-4);
   min-width: 0;
 }
+.stat .label, .stat .value, .stat .sub { display: block; }
 .stat .label {
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
@@ -122,18 +123,26 @@
 .stat.tone-bad .value { color: var(--c-bad); }
 .stat.tone-warn .value { color: var(--c-warn); }
 
-/* A stat that links somewhere. It keeps its own colours rather than turning
-   into link text, and lifts on hover the way a table row does. The strip
-   clips its tiles, so the focus ring is drawn inside the edge, square. */
-a.stat {
+/* A stat that links somewhere, or a button that shows what it counts. It
+   keeps its own colours rather than turning into link text, and lifts on
+   hover the way a table row does. The strip clips its tiles, so the focus
+   ring is drawn inside the edge, square. */
+a.stat, button.stat {
   color: var(--c-ink);
   text-decoration: none;
   transition: background var(--transition);
 }
-a.stat:hover { background: var(--c-surface-2); text-decoration: none; }
-a.stat .stat-ico { transition: background var(--transition), color var(--transition); }
-a.stat:hover .stat-ico { background: var(--c-accent-soft); color: var(--c-accent-text); }
-a.stat:focus-visible { outline-offset: -2px; border-radius: 0; }
+button.stat {
+  border: 0;
+  border-radius: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+a.stat:hover, button.stat:hover { background: var(--c-surface-2); text-decoration: none; }
+a.stat .stat-ico, button.stat .stat-ico { transition: background var(--transition), color var(--transition); }
+a.stat:hover .stat-ico, button.stat:hover .stat-ico { background: var(--c-accent-soft); color: var(--c-accent-text); }
+a.stat:focus-visible, button.stat:focus-visible { outline-offset: -2px; border-radius: 0; }
 
 /* Compact per-row counters (dashboard event rows). */
 .mini-tiles {

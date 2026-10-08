@@ -61,6 +61,7 @@ const EVENT_WIZARD = {
         'On Dark and Light, the button in the top-left corner adds a background photo. The arrow at the bottom left shrinks it into the top half.',
         'Text block instead of pictures puts formatted text where the photos go. Paste it from a document, an email or a web page into the box above the flyer. Bold, sizes, lists, links and pictures come with it.',
         'Preview shows the flyer the way the email picture looks, without the pencils and placeholders. Click it again to keep editing.',
+        'Export saves the flyer as a PNG picture, sharp enough to print or post.',
         'Reset flyer clears every line and photo, once you confirm.',
       ],
       scene: 'wizard-flyer',

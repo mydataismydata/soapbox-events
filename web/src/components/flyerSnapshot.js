@@ -112,7 +112,16 @@ function loadImage(src, timeoutMs = 15000) {
 // Render `srcdoc` (a snapshot-mode flyer document) to a JPEG data URL. The
 // frame is laid out at the widest a flyer can be; each template caps itself
 // below that, so measuring the card is what decides the picture's size.
-export async function flyerToJpeg(srcdoc) {
+export function flyerToJpeg(srcdoc) {
+  return flyerToImage(srcdoc);
+}
+
+// The same, as a picture of any type the canvas can write: `ratio` is how
+// many pixels per point (capped so the picture is no wider than `maxWidth`),
+// and `blob` hands back a Blob instead of a data URL.
+export async function flyerToImage(srcdoc, {
+  type = 'image/jpeg', quality = 0.86, ratio = 2, maxWidth = MAX_PIXEL_WIDTH, blob = false,
+} = {}) {
   const frame = openFrame(srcdoc, LAYOUT_WIDTH);
   try {
     const doc = await frameReady(frame);
@@ -139,17 +148,20 @@ export async function flyerToJpeg(srcdoc) {
 
     const img = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
 
-    const ratio = Math.min(2, MAX_PIXEL_WIDTH / width);
+    const k = Math.min(ratio, maxWidth / width);
     const canvas = document.createElement('canvas');
-    canvas.width = Math.round(width * ratio);
-    canvas.height = Math.round(height * ratio);
+    canvas.width = Math.round(width * k);
+    canvas.height = Math.round(height * k);
     const ctx = canvas.getContext('2d');
     // JPEG has no transparency; paint the page white first so any gap in the
     // design comes out white rather than black.
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', 0.86);
+    if (!blob) return canvas.toDataURL(type, quality);
+    return await new Promise((resolve, reject) => canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('The picture could not be made.'))), type, quality,
+    ));
   } finally {
     frame.remove();
   }

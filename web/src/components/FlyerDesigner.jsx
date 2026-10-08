@@ -4,6 +4,7 @@ import { ConfirmModal, Field, useToast, Icon } from '../ui.jsx';
 import FlyerStage from './FlyerStage.jsx';
 import RichText from './RichText.jsx';
 import { trimPlainEdges } from './trimEdges.js';
+import { flyerToImage } from './flyerSnapshot.js';
 
 let cachedPresets = null;
 
@@ -13,6 +14,25 @@ const MAX_MB = 5;
 // server's renderer splits it (splitPoints in server/lib/flyer.js).
 function splitPoints(note) {
   return String(note || '').split(/\s*[·•|;]\s*/).map((s) => s.trim()).filter(Boolean).slice(0, 3);
+}
+
+// Hand a file to the browser to save.
+function saveFile(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Give the download a moment to start before the blob goes away.
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+// "Fall Fundraiser!" -> "fall-fundraiser-flyer.png"
+function exportName(title) {
+  const slug = String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+  return `${slug ? `${slug}-` : ''}flyer.png`;
 }
 
 function readFile(file) {
@@ -30,12 +50,14 @@ function readFile(file) {
 // is the text block, which takes the pictures' place when its box is ticked:
 // formatted text needs a toolbar, so it is written in an editor just above the
 // flyer, and its pencil on the flyer brings you to it. Reset flyer clears
-// what is on the flyer, and Preview shows it without any of the editing marks.
+// what is on the flyer, Export saves it as a picture, and Preview shows it
+// without any of the editing marks.
 export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'event' }) {
   const [presets, setPresets] = useState(cachedPresets);
   const [previewing, setPreviewing] = useState(false);
   const [uploading, setUploading] = useState(''); // '' | 'picture' | 'background'
   const [resetting, setResetting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const toast = useToast();
   const fileRef = useRef(null);
   const fileFor = useRef('');
@@ -153,6 +175,29 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
   const body = { event: eventBasics, flyer: look, mode };
   const widths = presets.snapshotWidths || { portrait: 640, wide: 920 };
 
+  // Export draws the flyer the way the email picture is drawn, without any
+  // editing marks, but as a PNG at three pixels per point: sharp enough to
+  // print or post.
+  async function exportFlyer() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const res = await fetch('/api/flyer/preview', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-requested-with': 'sjc-vite' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ ...body, snapshot: true }),
+      });
+      if (!res.ok) throw new Error('The flyer could not be drawn.');
+      const png = await flyerToImage(await res.text(), { type: 'image/png', ratio: 3, maxWidth: 3000, blob: true });
+      saveFile(png, exportName(eventBasics?.title));
+    } catch (err) {
+      toast(err.message || 'The flyer could not be exported.', 'bad');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="designer-wrap">
       <Field label="Template" hint="Each template has its own fixed colors and layout.">
@@ -230,6 +275,9 @@ export default function FlyerDesigner({ eventBasics, flyer, onChange, mode = 'ev
       <div className="designer-foot">
         <button type="button" className="btn" onClick={() => setResetting(true)} disabled={empty}>
           <Icon name="refresh" size={14} /> Reset flyer
+        </button>
+        <button type="button" className="btn" onClick={exportFlyer} disabled={exporting}>
+          <Icon name="download" size={14} /> {exporting ? 'Exporting…' : 'Export'}
         </button>
         <button type="button" className="btn" aria-pressed={previewing} onClick={() => setPreviewing((p) => !p)}>
           <Icon name="eye" size={14} /> Preview

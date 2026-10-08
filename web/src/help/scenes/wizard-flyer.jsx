@@ -114,6 +114,7 @@ export default function WizardFlyer() {
             <div className="hs-stage"><Flyer s={s} /></div>
             <div className="designer-foot">
               <span className="btn"><Icon name="refresh" size={14} /> Reset flyer</span>
+              <span className="btn"><Icon name="download" size={14} /> Export</span>
               <span className="btn" aria-pressed={s.preview} data-t="preview"><Icon name="eye" size={14} /> Preview</span>
             </div>
           </Card>

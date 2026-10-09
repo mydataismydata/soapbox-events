@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
-import { Field, Banner, Icon } from '../ui.jsx';
+import { Field, Banner, Icon, useToast } from '../ui.jsx';
 
 const NOBODY = new Set();
 
@@ -41,13 +41,20 @@ const WORDING = {
 // rather than what was ticked.
 export default function RecipientPicker({ value, onChange, alreadyInvited = NOBODY, noun = 'guest' }) {
   const w = WORDING[noun] || WORDING.guest;
+  const toast = useToast();
   const [contacts, setContacts] = useState([]);
   const [groups, setGroups] = useState([]);
   const [q, setQ] = useState('');
+  const [adding, setAdding] = useState(-1); // the new-person row being saved
   const sel = value; // { contact_ids: [], group_ids: [], new_contacts: [] }
 
+  const loadContacts = () => api.get('/api/contacts').then((d) => {
+    setContacts(d.contacts);
+    return d.contacts;
+  });
+
   useEffect(() => {
-    api.get('/api/contacts').then((d) => setContacts(d.contacts)).catch(() => {});
+    loadContacts().catch(() => {});
     api.get('/api/groups').then((d) => setGroups(d.groups)).catch(() => {});
   }, []);
 
@@ -164,6 +171,49 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
     onChange({ ...sel, new_contacts: sel.new_contacts.filter((_, j) => j !== i) });
   }
 
+  // Add saves the person to the contacts straight away, ticks them in the
+  // list above and clears the row. Someone whose email is already in the
+  // contacts is ticked instead of saved twice. A row left without pressing Add
+  // is still saved when the selection is used, as before.
+  async function addNewPerson(i) {
+    const row = sel.new_contacts[i];
+    const name = row.name.trim();
+    if (!name || adding !== -1) return;
+    setAdding(i);
+    try {
+      let id;
+      let already = false;
+      try {
+        id = (await api.post('/api/contacts', { name, email: row.email.trim() })).contact.id;
+      } catch (err) {
+        if (err.status !== 409) throw err;
+        already = true;
+      }
+      const list = await loadContacts();
+      if (already) {
+        const email = row.email.trim().toLowerCase();
+        id = list.find((c) => (c.email || '').toLowerCase() === email)?.id;
+      }
+      const rest = (sel.excluded_contact_ids || []).filter((x) => x !== id);
+      onChange({
+        ...sel,
+        contact_ids: id && !sel.contact_ids.includes(id) ? [...sel.contact_ids, id] : sel.contact_ids,
+        excluded_contact_ids: rest,
+        new_contacts: sel.new_contacts.filter((_, j) => j !== i),
+      });
+      const email = row.email.trim();
+      toast(email && alreadyInvited.has(email.toLowerCase())
+        ? `${email} is already invited.`
+        : already
+          ? `${email} is already in your contacts, so they are ticked in the list.`
+          : `${name} is saved to your contacts and ticked in the list.`);
+    } catch (err) {
+      toast(err.message, 'bad');
+    } finally {
+      setAdding(-1);
+    }
+  }
+
   return (
     <div>
       {groups.length > 0 ? (
@@ -249,20 +299,28 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
         )}
       </div>
 
-      <Field label="Add new people" hint="They'll also be saved to your contact list.">
-        {sel.new_contacts.map((n, i) => (
-          <div key={i} className="row" style={{ marginBottom: 8, flexWrap: 'nowrap' }}>
-            <input className="input" style={{ flex: 1 }} placeholder="Name" value={n.name}
-              aria-label={`Name of new person ${i + 1}`}
-              onChange={(e) => setNew(i, { name: e.target.value })} />
-            <input className="input" style={{ flex: 1.2 }} placeholder="email@example.com" type="email"
-              aria-label={`Email of new person ${i + 1}`} value={n.email}
-              onChange={(e) => setNew(i, { email: e.target.value })} />
-            <button type="button" className="btn btn-ghost btn-sm btn-icon"
-              aria-label="Remove this row" title="Remove this row"
-              onClick={() => removeNewRow(i)}><Icon name="x" size={15} /></button>
-          </div>
-        ))}
+      <Field label="Add new people" hint="Add saves them to your contact list and ticks them above.">
+        {sel.new_contacts.map((n, i) => {
+          const onEnter = (e) => { if (e.key === 'Enter') { e.preventDefault(); addNewPerson(i); } };
+          return (
+            <div key={i} className="row" style={{ marginBottom: 8, flexWrap: 'nowrap' }}>
+              <input className="input" style={{ flex: 1 }} placeholder="Name" value={n.name}
+                aria-label={`Name of new person ${i + 1}`} onKeyDown={onEnter}
+                onChange={(e) => setNew(i, { name: e.target.value })} />
+              <input className="input" style={{ flex: 1.2 }} placeholder="email@example.com" type="email"
+                aria-label={`Email of new person ${i + 1}`} value={n.email} onKeyDown={onEnter}
+                onChange={(e) => setNew(i, { email: e.target.value })} />
+              <button type="button" className="btn btn-sm"
+                disabled={!n.name.trim() || adding !== -1}
+                onClick={() => addNewPerson(i)}>
+                {adding === i ? 'Adding…' : 'Add'}
+              </button>
+              <button type="button" className="btn btn-ghost btn-sm btn-icon"
+                aria-label="Remove this row" title="Remove this row"
+                onClick={() => removeNewRow(i)}><Icon name="x" size={15} /></button>
+            </div>
+          );
+        })}
         <button type="button" className="btn btn-sm" onClick={addNewRow}>
           <Icon name="plus" size={14} /> Add a person
         </button>

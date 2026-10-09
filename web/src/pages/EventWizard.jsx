@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, formatDate, formatTime } from '../api.js';
 import { useAuth } from '../App.jsx';
 import {
-  Field, Modal, Spinner, useToast, insertAtCursor, Banner, Card, OptionCard, Icon,
+  Field, Modal, Spinner, useToast, insertAtCursor, Banner, Card, OptionCard, Icon, useDelayedSend,
 } from '../ui.jsx';
 import FlyerDesigner from '../components/FlyerDesigner.jsx';
 import FlyerSnapshotKeeper from '../components/useFlyerSnapshot.js';
@@ -41,6 +41,7 @@ export default function EventWizard() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const delayed = useDelayedSend();
   const { org } = useAuth();
   const editing = Boolean(id);
 
@@ -57,6 +58,11 @@ export default function EventWizard() {
   const [confirmSend, setConfirmSend] = useState(false);
   const [testTo, setTestTo] = useState('');
   const bodyRef = useRef(null);
+  const subjectRef = useRef(null);
+  // The placeholder buttons serve the subject and the message. A tag goes in
+  // wherever the cursor was last, which is the message until the subject has
+  // been clicked into.
+  const tagTarget = useRef('body');
 
   useEffect(() => {
     api.get('/api/templates').then((d) => setTemplates(d.templates)).catch(() => {});
@@ -404,15 +410,18 @@ export default function EventWizard() {
                   </Field>
                 ) : null}
                 <Field label="Subject">
-                  <input value={ev.email_subject} maxLength={300}
+                  <input ref={subjectRef} value={ev.email_subject} maxLength={300}
+                    onFocus={() => { tagTarget.current = 'subject'; }}
                     onChange={(e) => patch({ email_subject: e.target.value })} />
                 </Field>
                 <Field label="Message"
-                  hint="Placeholders fill in per guest. Accept / Decline buttons and event details are added automatically below your message.">
+                  hint="Placeholders go in where your cursor is, in the subject or the message, and fill in per guest. Accept / Decline buttons and event details are added automatically below your message.">
                   <textarea ref={bodyRef} rows={8} value={ev.email_body} maxLength={20000}
+                    onFocus={() => { tagTarget.current = 'body'; }}
                     onChange={(e) => patch({ email_body: e.target.value })} />
-                  <TagButtons onInsert={(snippet) =>
-                    insertAtCursor(bodyRef, ev.email_body, snippet, (val) => patch({ email_body: val }))} />
+                  <TagButtons onInsert={(snippet) => (tagTarget.current === 'subject'
+                    ? insertAtCursor(subjectRef, ev.email_subject, snippet, (val) => patch({ email_subject: val }))
+                    : insertAtCursor(bodyRef, ev.email_body, snippet, (val) => patch({ email_body: val })))} />
                 </Field>
                 <FlyerEmailOption eventBasics={basics} flyer={ev.flyer}
                   onChange={(flyer) => patch({ flyer })} />
@@ -525,8 +534,9 @@ export default function EventWizard() {
           footer={
             <>
               <button className="btn" onClick={() => setConfirmSend(false)}>Cancel</button>
-              <button className="btn btn-green" onClick={sendNow} disabled={saving}>
-                {saving ? 'Sending…' : 'Yes, send'}
+              <button className="btn btn-green" disabled={saving}
+                onClick={() => { setConfirmSend(false); delayed.start('invitations', sendNow); }}>
+                Yes, send
               </button>
             </>
           }>
@@ -537,6 +547,7 @@ export default function EventWizard() {
           </p>
         </Modal>
       ) : null}
+      {delayed.popup}
     </div>
   );
 }

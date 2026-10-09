@@ -15,6 +15,10 @@ function TemplateModal({ template, onClose, onSaved }) {
   });
   const [busy, setBusy] = useState(false);
   const bodyRef = useRef(null);
+  const subjectRef = useRef(null);
+  // Which of the subject and message a placeholder button types into: the
+  // one the cursor was in last.
+  const tagTarget = useRef('body');
 
   async function save() {
     setBusy(true);
@@ -45,15 +49,18 @@ function TemplateModal({ template, onClose, onSaved }) {
           onChange={(e) => setForm({ ...form, name: e.target.value })} />
       </Field>
       <Field label="Email subject">
-        <input value={form.subject} maxLength={300}
+        <input ref={subjectRef} value={form.subject} maxLength={300}
+          onFocus={() => { tagTarget.current = 'subject'; }}
           onChange={(e) => setForm({ ...form, subject: e.target.value })} />
       </Field>
       <Field label="Message body"
-        hint="Click a placeholder to insert it at the cursor — it fills in automatically for each event and guest.">
+        hint="Click a placeholder to insert it at the cursor, in the subject or the message — it fills in automatically for each event and guest.">
         <textarea ref={bodyRef} rows={10} value={form.body} maxLength={20000}
+          onFocus={() => { tagTarget.current = 'body'; }}
           onChange={(e) => setForm({ ...form, body: e.target.value })} />
-        <TagButtons onInsert={(snippet) =>
-          insertAtCursor(bodyRef, form.body, snippet, (val) => setForm((f) => ({ ...f, body: val })))} />
+        <TagButtons onInsert={(snippet) => (tagTarget.current === 'subject'
+          ? insertAtCursor(subjectRef, form.subject, snippet, (val) => setForm((f) => ({ ...f, subject: val })))
+          : insertAtCursor(bodyRef, form.body, snippet, (val) => setForm((f) => ({ ...f, body: val }))))} />
       </Field>
     </Modal>
   );

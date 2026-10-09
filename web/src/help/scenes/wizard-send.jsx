@@ -1,16 +1,26 @@
 import React from 'react';
 import Scene from '../Scene.jsx';
-import { EVENT_STEPS, Input, Modal, Screen, Toast, Wizard } from '../mock.jsx';
+import { EVENT_STEPS, Input, Modal, Screen, SendCountdown, Toast, Wizard } from '../mock.jsx';
 import { Card, Icon } from '../../ui.jsx';
 import { OCTOBER, VENUE } from '../data.js';
 
-const start = { confirm: false, toast: '' };
+// A second of the countdown, shortened for the scene. The count starts when
+// the press on the send button lands, which is 600ms after the tap begins.
+const TICK = 700;
+const COUNT = 7400 + 600;
+
+const start = { confirm: false, count: 0, toast: '' };
 const steps = [
   { at: 600, point: 'summary', say: 'A last look before anything goes out' },
   { at: 2500, tap: 'test', say: 'Send yourself a test first', side: 'above', set: { toast: 'Test email sent — check your inbox' } },
   { at: 4700, tap: 'send', say: null, set: { confirm: true, toast: '' } },
   { at: 5700, point: 'yes', say: 'Nothing goes out until you confirm', side: 'below' },
-  { at: 7400, tap: 'yes', say: null, set: { confirm: false, toast: '6 invitations queued for sending' } },
+  { at: 7400, tap: 'yes', say: null, set: { confirm: false, count: 5 } },
+  { at: COUNT + TICK, point: 'cancel-send', say: 'Five seconds to change your mind', side: 'below', set: { count: 4 } },
+  { at: COUNT + TICK * 2, set: { count: 3 } },
+  { at: COUNT + TICK * 3, set: { count: 2 } },
+  { at: COUNT + TICK * 4, set: { count: 1 } },
+  { at: COUNT + TICK * 5, hide: true, say: null, set: { count: 0, toast: '6 invitations queued for sending' } },
 ];
 
 function Kv({ k, children }) {
@@ -19,8 +29,8 @@ function Kv({ k, children }) {
 
 export default function WizardSend() {
   return (
-    <Scene width={560} height={480} length={10500} start={start} steps={steps}
-      label="Step 5 of the event wizard. The summary lists the event, when and where, the RSVP deadline, and 6 guests to be emailed. Send test email sends a copy first. Send invitations asks Send invitations now?, and Yes, send queues 6 invitations.">
+    <Scene width={560} height={480} length={13500} start={start} steps={steps}
+      label="Step 5 of the event wizard. The summary lists the event, when and where, the RSVP deadline, and 6 guests to be emailed. Send test email sends a copy first. Send invitations asks Send invitations now?, and Yes, send opens a popup that counts down five seconds with a Cancel sending button. When the count runs out, 6 invitations are queued.">
       {(s) => (
         <Screen bare>
           <Wizard labels={EVENT_STEPS} step={4}>
@@ -58,6 +68,7 @@ export default function WizardSend() {
               </p>
             </Modal>
           ) : null}
+          {s.count ? <SendCountdown what="invitations" count={s.count} tick={TICK} /> : null}
           <Toast text={s.toast} />
         </Screen>
       )}

@@ -283,7 +283,7 @@ function WebsiteCard({ data, isAdmin, onSaved }) {
         : null}>
       <p className="small muted" style={{ marginTop: 0 }}>
         {connected
-          ? 'Every published meeting is sent to this address whenever one is published, edited, cancelled or deleted. The website replaces its copy with what arrives. Guests, replies and email addresses are never included.'
+          ? 'Every published meeting is sent to this address a few seconds after one is published, edited, cancelled or deleted. Changes made close together go in one delivery, and nothing is sent unless something changed. The website replaces its copy with what arrives. Guests, replies and email addresses are never included.'
           : 'Optional. Give a website address here and Soapbox will keep its meetings calendar up to date by itself. Leave it empty and nothing is ever sent.'}
       </p>
 

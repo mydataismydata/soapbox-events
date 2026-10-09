@@ -72,8 +72,9 @@ flag manually when someone asks in person.
 **Templates** hold reusable invitation wording. The **default** template
 (star it on the Templates page) pre-fills the wizard for new events.
 
-Write with **placeholders** — click a chip to insert one at the cursor; each
-fills in per event and per guest at send time:
+Write with **placeholders** — click a chip to insert one at the cursor, in
+the subject or the message, whichever you were last typing in; each fills in
+per event and per guest at send time:
 
 | Placeholder | Becomes |
 | --- | --- |
@@ -144,7 +145,8 @@ leave and resume any time (it stays a draft until you send or publish).
    Long text shrinks and wraps automatically so it always stays inside the
    flyer.
 4. **Guests** — tick groups, tick individual contacts, and add brand-new
-   people inline (they're saved to your contacts too). **Select all**, over
+   people inline. **Add** on a new person's row saves them to your contacts,
+   ticks them in the list and clears the row. **Select all**, over
    the list, ticks every contact with an email address who hasn't
    unsubscribed; after a search it ticks just the matches, and once they're
    all ticked it reads **Deselect all**. People without an email address can
@@ -152,7 +154,10 @@ leave and resume any time (it stays a draft until you send or publish).
 5. **Review & send** — summary, warnings (e.g. missing date), **Send test
    email** to yourself, then **Send invitations** or **Save without
    sending**. Sending publishes the event page and queues one personalized
-   email per guest.
+   email per guest. Nothing goes out for five seconds after **Yes, send**:
+   a popup counts down with a **Cancel sending** button, and cancelling
+   sends nothing. The same pause applies on the event page, to **Send** and
+   to the envelope button that resends one guest's invitation.
 
 ## Broadcasts (email blasts, no event)
 

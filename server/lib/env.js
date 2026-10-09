@@ -74,6 +74,9 @@ export const config = {
   // Only the smoke test changes this, to point sending at a stand-in it can read.
   smtp2goApiBase: process.env.SMTP2GO_API_BASE || 'https://api.smtp2go.com/v3',
   emailsPerMinute: Math.max(1, Number(process.env.EMAILS_PER_MINUTE || 60)),
+  // How long a meeting change waits for more changes before the website is
+  // sent the batch. Only the smoke test changes this, so it need not wait.
+  websitePushSettleMs: Math.max(0, Number(process.env.WEBSITE_PUSH_SETTLE_MS || 10_000)),
   trustProxy: process.env.TRUST_PROXY === '1',
   appName: process.env.APP_NAME || 'Soapbox',
 };

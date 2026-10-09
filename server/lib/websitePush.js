@@ -1,9 +1,10 @@
 // Publishing an organization's meetings to its website.
 //
 // An organization can name a website address and a token in Settings. When it
-// does, every change that alters what a visitor would see sends the whole
-// current set of published meetings to that address. The receiving site
-// replaces its copy with what arrived.
+// does, a change that alters what a visitor would see sends the whole current
+// set of published meetings to that address, batched with any other changes
+// made within a few seconds of it. The receiving site replaces its copy with
+// what arrived.
 //
 // The payload is the complete set rather than a delta. A delivery that is
 // missed, duplicated or applied out of order still converges on the right
@@ -19,6 +20,7 @@
 // should show a red row someone can act on, not generate a thousand log
 // entries nobody reads.
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from './env.js';
@@ -186,14 +188,30 @@ function unreachable(err) {
   return `Could not reach the website: ${detail}.`;
 }
 
+// What the website was last sent successfully, per organization, so a
+// delivery that would carry exactly the same thing can be left out. It lives
+// in memory: after a restart the first change simply sends.
+const lastDelivered = new Map(); // org slug -> { url, digest }
+
+// `sent_at` changes on every build, so it is left out of the comparison.
+function digestOf(payload) {
+  return crypto.createHash('sha256')
+    .update(JSON.stringify({ ...payload, sent_at: '' }))
+    .digest('hex');
+}
+
 /**
  * Send the current set of meetings to the organization's website.
  *
  * Returns a result describing what happened, which the caller records in the
  * delivery log. It never throws: publishing an event must not fail because a
  * website is down.
+ *
+ * `skipUnchanged` leaves out a delivery identical to the last one that
+ * landed. Changes to meetings ask for it. The Resend button and a settings
+ * save do not, because their whole point is to send.
  */
-export async function publishEvents(orgSlug, org, { reason = 'manual' } = {}) {
+export async function publishEvents(orgSlug, org, { reason = 'manual', skipUnchanged = false } = {}) {
   const db = orgDb(orgSlug);
   if (!db) return { skipped: true, reason: 'no-org' };
 
@@ -210,6 +228,14 @@ export async function publishEvents(orgSlug, org, { reason = 'manual' } = {}) {
   } catch (err) {
     return { ok: false, status: 0, reason, error: `Could not build the payload: ${err.message}`, retryable: false };
   }
+
+  const digest = digestOf(payload);
+  const last = lastDelivered.get(orgSlug);
+  if (skipUnchanged && last && last.url === url && last.digest === digest) {
+    return { skipped: true, reason: 'unchanged' };
+  }
+  // Until this attempt is known to have landed, nothing is known to be there.
+  lastDelivered.delete(orgSlug);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -232,6 +258,7 @@ export async function publishEvents(orgSlug, org, { reason = 'manual' } = {}) {
     const text = await res.text();
     let body = null;
     try { body = JSON.parse(text); } catch { /* not JSON; keep the text */ }
+    if (res.ok) lastDelivered.set(orgSlug, { url, digest });
 
     return {
       ok: res.ok,
@@ -318,10 +345,57 @@ export function recentDeliveries(db, limit = 10) {
  * the first acceptance criterion: an organization with no website configured
  * leaves no trace at all.
  */
-export async function publishAndLog(org, { reason = 'manual' } = {}) {
-  const result = await publishEvents(org.slug, org, { reason });
+export async function publishAndLog(org, { reason = 'manual', skipUnchanged = false } = {}) {
+  const result = await publishEvents(org.slug, org, { reason, skipUnchanged });
   if (result.skipped) return result;
   const db = orgDb(org.slug);
   if (db) recordDelivery(db, result);
   return result;
+}
+
+// --- batching changes ------------------------------------------------------
+//
+// The event wizard saves on every step, and a published meeting used to send
+// the whole set on each of those saves. One editing session put a dozen
+// deliveries into the website within minutes, every one carrying all the
+// meetings and all their flyers.
+//
+// A change now books a delivery instead of making one. The delivery goes out
+// once the organization's meetings have been left alone for the settle time,
+// so a run of saves becomes one delivery. MAX_WAIT_MS caps the wait for
+// somebody who never stops editing. The delivery also skips itself when it
+// would carry exactly what the website already has, so clicking through the
+// wizard without changing anything sends nothing.
+
+const MAX_WAIT_MS = 60_000;
+
+// When a batch holds more than one kind of change, the log names the one a
+// visitor would care about most.
+const REASON_RANK = ['edit', 'import', 'publish', 'cancel', 'delete'];
+
+const booked = new Map(); // org slug -> { org, reason, firstAt, timer }
+
+/**
+ * Book a delivery for an organization whose meetings have just changed.
+ *
+ * Returns at once. The delivery reads the table when it goes out, not now,
+ * so a deleted meeting is long gone from it by then.
+ */
+export function schedulePublish(org, { reason = 'edit' } = {}) {
+  const now = Date.now();
+  const entry = booked.get(org.slug) || { reason, firstAt: now };
+  clearTimeout(entry.timer);
+  entry.org = org;
+  if (REASON_RANK.indexOf(reason) > REASON_RANK.indexOf(entry.reason)) entry.reason = reason;
+
+  const wait = Math.max(0, Math.min(config.websitePushSettleMs, entry.firstAt + MAX_WAIT_MS - now));
+  entry.timer = setTimeout(() => {
+    booked.delete(org.slug);
+    // Nothing is waiting on this promise, so a throw would otherwise become
+    // an unhandled rejection.
+    publishAndLog(entry.org, { reason: entry.reason, skipUnchanged: true })
+      .catch((err) => console.error('website push failed', err));
+  }, wait);
+  entry.timer.unref?.();
+  booked.set(org.slug, entry);
 }

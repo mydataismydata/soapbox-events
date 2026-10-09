@@ -166,6 +166,89 @@ export function ConfirmModal({ title, message, confirmLabel = 'Confirm', danger,
   );
 }
 
+// --- a pause before sending ------------------------------------------------
+
+export const SEND_DELAY_MS = 5000;
+
+// Pressing Send starts a short count in a popup instead of sending. Nothing
+// is asked of the server until the count runs out, so Cancel sending leaves
+// nothing behind. Leaving the page during the count cancels it too, and says
+// so. A send nobody watched go out should not go out.
+//
+// `start(what, run)` begins the count. `what` finishes the popup's title
+// ("Sending invitations"), and `run` does the sending. The popup stays up,
+// reading "Sending…", until `run` settles. Render `popup` on the page.
+export function useDelayedSend() {
+  const toast = useToast();
+  const [pending, setPending] = useState(null); // { what, endsAt, running }
+  const timer = useRef(null);
+  const counting = useRef(false);
+
+  const start = useCallback((what, run) => {
+    clearTimeout(timer.current);
+    counting.current = true;
+    setPending({ what, endsAt: Date.now() + SEND_DELAY_MS, running: false });
+    timer.current = setTimeout(() => {
+      counting.current = false;
+      setPending((p) => (p ? { ...p, running: true } : p));
+      Promise.resolve().then(run).finally(() => setPending(null));
+    }, SEND_DELAY_MS);
+  }, []);
+
+  const cancel = useCallback(() => {
+    if (!counting.current) return;
+    clearTimeout(timer.current);
+    counting.current = false;
+    setPending(null);
+    toast('Sending cancelled. Nothing was sent.');
+  }, [toast]);
+
+  useEffect(() => () => {
+    if (!counting.current) return;
+    clearTimeout(timer.current);
+    toast('Sending was cancelled when you left the page. Nothing was sent.', 'bad');
+  }, [toast]);
+
+  // Closing the tab mid-count would cancel the send without a word, so the
+  // browser asks first.
+  const waiting = Boolean(pending && !pending.running);
+  useEffect(() => {
+    if (!waiting) return undefined;
+    const onLeave = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', onLeave);
+    return () => window.removeEventListener('beforeunload', onLeave);
+  }, [waiting]);
+
+  const popup = pending ? <SendCountdown {...pending} onCancel={cancel} /> : null;
+  return { start, popup };
+}
+
+function SendCountdown({ what, endsAt, running, onCancel }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (running) return undefined;
+    const t = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(t);
+  }, [running]);
+  const msLeft = running ? 0 : Math.max(0, endsAt - now);
+  const seconds = Math.ceil(msLeft / 1000);
+  return (
+    <Modal title={`Sending ${what}`} onClose={running ? undefined : onCancel}
+      footer={running ? null : (
+        <button className="btn btn-danger" autoFocus onClick={onCancel}>Cancel sending</button>
+      )}>
+      <p style={{ marginTop: 0 }} aria-live="polite">
+        {running
+          ? 'Sending…'
+          : <>Going out in <strong>{seconds}</strong> second{seconds === 1 ? '' : 's'}. Cancel now and nothing is sent.</>}
+      </p>
+      <div className="send-countdown" aria-hidden="true">
+        <span style={{ transform: `scaleX(${msLeft / SEND_DELAY_MS})` }} />
+      </div>
+    </Modal>
+  );
+}
+
 // --- layout pieces ---------------------------------------------------------
 
 // A card with an optional header strip: title on the left, actions on the

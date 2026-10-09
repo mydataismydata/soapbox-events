@@ -9,7 +9,7 @@ import { buildEventExport } from '../lib/wpExport.js';
 import { contactInserter } from '../lib/contacts.js';
 import { orgApiKey, senderFor, sendEmail } from '../lib/email.js';
 import { getSetting } from '../lib/db.js';
-import { publishAndLog } from '../lib/websitePush.js';
+import { schedulePublish } from '../lib/websitePush.js';
 import { requireAdmin } from '../lib/auth.js';
 import { sniffImage, storeImage } from '../lib/images.js';
 import {
@@ -21,24 +21,11 @@ export const eventRouter = Router();
 
 // Tell the organization's website that its meetings have changed.
 //
-// Fire and forget, so a slow website never delays the reply. The microtask is
-// scheduled after the handler's own database work has run, which matters for
-// the delete below: the payload is built from the table, so the row has to be
-// gone before it is read.
-//
-// The try/catch is load-bearing. `wrap()` catches rejections from the
-// handler's own promise, and a microtask scheduled inside it is outside that
-// promise — a throw here would become an unhandled rejection rather than a
-// 500. An organization with no website configured does nothing at all: it
-// reads one setting and returns.
+// This only books a delivery, so a slow website never delays the reply. It
+// goes out once the meetings have been left alone for a few seconds, and only
+// if the website would see a difference. See schedulePublish().
 function pushToWebsite(req, reason) {
-  queueMicrotask(async () => {
-    try {
-      await publishAndLog(req.org, { reason });
-    } catch (err) {
-      console.error('website push failed', err);
-    }
-  });
+  schedulePublish(req.org, { reason });
 }
 
 function getEvent(db, id) {

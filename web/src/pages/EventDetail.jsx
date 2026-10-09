@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, formatWhen, timeAgo } from '../api.js';
 import {
   Spinner, Modal, ConfirmModal, Empty, Field, CopyBox, useToast,
-  ResponseBadge, StatusBadge, EmailStatusBadge, insertAtCursor,
+  ResponseBadge, StatusBadge, EmailStatusBadge, insertAtCursor, useDelayedSend,
   Banner, Card, StatGrid, Stat, IconButton, Icon, SortTh, useSort, sortRows,
 } from '../ui.jsx';
 import RecipientPicker from '../components/RecipientPicker.jsx';
@@ -60,6 +60,7 @@ export default function EventDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const delayed = useDelayedSend();
 
   const [data, setData] = useState(null);
   const [guests, setGuests] = useState([]);
@@ -78,6 +79,10 @@ export default function EventDetail() {
   const [composePreview, setComposePreview] = useState(null);
   const [busy, setBusy] = useState(false);
   const composeBodyRef = useRef(null);
+  const composeSubjectRef = useRef(null);
+  // Which of the subject and message a placeholder button types into: the
+  // one the cursor was in last.
+  const composeTagTarget = useRef('body');
   const guestsRef = useRef(null);
   const filterRef = useRef(null);
   const [jump, setJump] = useState(0);
@@ -407,8 +412,9 @@ export default function EventDetail() {
                           ) : null}
                           {g.email && ev.status !== 'cancelled' ? (
                             <IconButton icon="mail" label="Send / resend invitation" disabled={busy}
-                              onClick={() => act(() => api.post(`/api/events/${ev.id}/send`, { invite_ids: [g.id] }),
-                                'Invitation queued')} />
+                              onClick={() => delayed.start(`the invitation to ${g.name || g.email}`,
+                                () => act(() => api.post(`/api/events/${ev.id}/send`, { invite_ids: [g.id] }),
+                                  'Invitation queued'))} />
                           ) : null}
                           {!g.contact_id && g.email ? (
                             <IconButton icon="plus" label="Save to contacts" disabled={busy}
@@ -523,15 +529,19 @@ export default function EventDetail() {
             </select>
           </Field>
           <Field label="Subject">
-            <input value={compose.subject} maxLength={300}
+            <input ref={composeSubjectRef} value={compose.subject} maxLength={300}
+              onFocus={() => { composeTagTarget.current = 'subject'; }}
               onChange={(e) => setCompose({ ...compose, subject: e.target.value })} />
           </Field>
           <Field label="Message">
             <textarea ref={composeBodyRef} rows={7} value={compose.body} maxLength={20000}
+              onFocus={() => { composeTagTarget.current = 'body'; }}
               onChange={(e) => setCompose({ ...compose, body: e.target.value })} />
-            <TagButtons compact onInsert={(snippet) =>
-              insertAtCursor(composeBodyRef, compose.body, snippet,
-                (val) => setCompose((c) => ({ ...c, body: val })))} />
+            <TagButtons compact onInsert={(snippet) => (composeTagTarget.current === 'subject'
+              ? insertAtCursor(composeSubjectRef, compose.subject, snippet,
+                (val) => setCompose((c) => ({ ...c, subject: val })))
+              : insertAtCursor(composeBodyRef, compose.body, snippet,
+                (val) => setCompose((c) => ({ ...c, body: val }))))} />
           </Field>
         </Modal>
       ) : null}
@@ -546,12 +556,16 @@ export default function EventDetail() {
         <ConfirmModal title={`${sendLabel(queue)}?`} busy={busy}
           message={sendSummary(queue)}
           confirmLabel={`Send ${sendable}`} onClose={() => setConfirm(null)}
-          onConfirm={() => act(async () => {
-            const result = await api.post(`/api/events/${ev.id}/send`, {});
-            toast(`${result.queued} invitation${result.queued === 1 ? '' : 's'} queued`);
-            setTab('emails');
-          })} />
+          onConfirm={() => {
+            setConfirm(null);
+            delayed.start(`${sendable} invitation${sendable === 1 ? '' : 's'}`, () => act(async () => {
+              const result = await api.post(`/api/events/${ev.id}/send`, {});
+              toast(`${result.queued} invitation${result.queued === 1 ? '' : 's'} queued`);
+              setTab('emails');
+            }));
+          }} />
       ) : null}
+      {delayed.popup}
 
       {confirm?.type === 'removeGuest' ? (
         <ConfirmModal title="Remove guest?" danger busy={busy}

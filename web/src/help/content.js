@@ -41,7 +41,7 @@ const EVENT_WIZARD = {
       heading: '3. Writing the invitation',
       text: [
         'Start from a template, or write the message yourself. Every invitation ends with the event’s details and the Accept and Decline buttons, so you never add those.',
-        'The grey buttons under the message are placeholders. Click one to put it in the message, and it fills in for each guest. Guest first name becomes Fred in Fred P.’s copy.',
+        'The grey buttons under the message are placeholders. Click one to put it where your cursor is, in the subject or the message, and it fills in for each guest. Guest first name becomes Fred in Fred P.’s copy.',
       ],
       points: [
         'Include flyer in email adds a picture of the flyer under the buttons.',
@@ -72,7 +72,7 @@ const EVENT_WIZARD = {
         'Click a group to invite everyone in it.',
         'Untick anyone to leave them out.',
         'Tick more people from the list one at a time.',
-        'To invite someone new, click Add a person. They are saved to your contacts as well.',
+        'To invite someone new, click Add a person, type their name and email, and click Add. They are saved to your contacts and ticked in the list.',
       ],
       text: [
         'The blue box underneath counts who will be added. Nobody is ever invited twice.',
@@ -91,6 +91,7 @@ const EVENT_WIZARD = {
         'Click Yes, send.',
       ],
       points: [
+        'The invitations go out five seconds after Yes, send. Click Cancel sending in that time and nothing is sent.',
         'Sending puts the event page online and emails every guest who has not had an invitation yet.',
         'Publish without sending puts the event page online, and on your website if one is connected, and emails nobody. Use it for a save-the-date. You can send invitations later.',
         'Save draft keeps the event and its guest list, and sends nothing.',
@@ -235,7 +236,7 @@ export const HELP = {
         heading: 'Replies by phone',
         text: [
           'Someone who answers by phone or in person can be marked by hand. Click ✓ on their row for yes, or ✗ for no.',
-          'The envelope on a row sends that one guest their invitation again.',
+          'The envelope on a row sends that one guest their invitation again. It goes out five seconds later, and Cancel sending stops it.',
         ],
         scene: 'event-guests',
       },

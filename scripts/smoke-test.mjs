@@ -24,6 +24,9 @@ const SMTP_PORT = PORT + 600;
 const ENV = {
   ...process.env, PORT: String(PORT), BASE_URL: BASE, DATA_DIR, NODE_ENV: 'test', SMTP2GO_API_KEY: '',
   SMTP2GO_API_BASE: `http://127.0.0.1:${SMTP_PORT}/v3`,
+  // A website delivery waits this long for more changes. The checks below
+  // give it 600ms to land.
+  WEBSITE_PUSH_SETTLE_MS: '150',
 };
 
 let passed = 0;
@@ -1414,6 +1417,24 @@ let guests = [];
   await A.api('PUT', `/api/events/${id}`, { description: 'Impact fees' });
   await settle();
   check('editing a published meeting sends', (await log()).deliveries[0]?.reason === 'edit');
+
+  // The wizard saves on every step. A run of saves is one delivery, and a
+  // save the website would not notice is none.
+  {
+    const before = received.length;
+    for (const description of ['Impact fees and roads', 'Impact fees, roads', 'Impact fees, roads and parks']) {
+      await A.api('PUT', `/api/events/${id}`, { description });
+    }
+    await settle();
+    check('a run of edits makes one delivery', received.length === before + 1, `${received.length - before} deliveries`);
+    check('carrying the last of them',
+      received.at(-1).doc.events.find((e) => e.slug === slug)?.description === 'Impact fees, roads and parks');
+
+    await A.api('PUT', `/api/events/${id}`, { description: 'Impact fees, roads and parks' });
+    await A.api('PUT', `/api/events/${id}`, { email_subject: 'The website never sees this' });
+    await settle();
+    check('a save that changes nothing on the website sends nothing', received.length === before + 1);
+  }
 
   await A.api('POST', `/api/events/${id}/cancel`, { notify: false });
   await settle();

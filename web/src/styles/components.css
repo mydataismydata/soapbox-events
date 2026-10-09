@@ -777,6 +777,20 @@ button.chip.active,
   flex-wrap: wrap;
 }
 
+/* The bar under "Going out in 5 seconds" empties as the count runs down. */
+.send-countdown {
+  height: 4px;
+  background: var(--c-surface-3);
+  overflow: hidden;
+}
+.send-countdown > span {
+  display: block;
+  height: 100%;
+  background: var(--c-accent);
+  transform-origin: left center;
+  transition: transform 100ms linear;
+}
+
 /* === toasts ============================================================== */
 
 .toasts {

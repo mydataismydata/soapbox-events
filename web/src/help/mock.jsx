@@ -145,6 +145,23 @@ export function Modal({ title, children, footer, size, t }) {
   );
 }
 
+// The pause after pressing send: the count, the bar that empties with it, and
+// Cancel sending. `count` is the seconds left, and `tick` is how long a second
+// lasts in the scene.
+export function SendCountdown({ what, count, tick = 1000 }) {
+  return (
+    <Modal title={`Sending ${what}`}
+      footer={<span className="btn btn-danger" data-t="cancel-send">Cancel sending</span>}>
+      <p style={{ marginTop: 0 }}>
+        Going out in <strong>{count}</strong> second{count === 1 ? '' : 's'}. Cancel now and nothing is sent.
+      </p>
+      <div className="send-countdown">
+        <span style={{ transform: `scaleX(${count / 5})`, transition: `transform ${tick}ms linear` }} />
+      </div>
+    </Modal>
+  );
+}
+
 export function Toast({ text, bad = false }) {
   if (!text) return null;
   return (

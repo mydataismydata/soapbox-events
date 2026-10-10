@@ -10,6 +10,8 @@ const reachable = (c) => Boolean(c.email) && !c.unsubscribed_at;
 // The same picker serves events and broadcasts, but the people it picks are
 // called different things in each: an event has guests, a broadcast goes to
 // contacts. Nothing else about the two differs, so only the words are keyed.
+// The already-* words describe a locked row: on the event already, or
+// already sent the broadcast.
 const WORDING = {
   guest: {
     one: 'guest',
@@ -17,6 +19,11 @@ const WORDING = {
     groups: 'Invite whole groups',
     tick: (name) => `Invite ${name}`,
     empty: 'No guests selected yet — you can also skip this and share the event link instead.',
+    noEmail: 'no email — can’t receive invitations',
+    already: 'Already invited',
+    alreadyOne: (who) => `${who} is already invited`,
+    alreadyAll: (n) => `Nobody new selected — all ${n} of the people picked are already invited.`,
+    alreadyRest: (n) => `${n} other${n === 1 ? ' is' : 's are'} already invited and won’t be added again.`,
   },
   contact: {
     one: 'contact',
@@ -24,6 +31,11 @@ const WORDING = {
     groups: 'Send to whole groups',
     tick: (name) => `Send to ${name}`,
     empty: 'No contacts selected yet — pick a group above, or tick people from the list.',
+    noEmail: 'no email — can’t receive broadcasts',
+    already: 'Already sent',
+    alreadyOne: (who) => `${who} was already sent this broadcast`,
+    alreadyAll: (n) => `Nobody new selected — all ${n} of the people picked were already sent this broadcast.`,
+    alreadyRest: (n) => `${n} other${n === 1 ? ' was' : 's were'} already sent it and won’t get it twice.`,
   },
 };
 
@@ -36,9 +48,9 @@ const WORDING = {
 // separately from the group, so removing and re-adding the group keeps them —
 // and they apply last, wherever the person came from.
 //
-// alreadyInvited (emails already on the event) locks those rows instead of
-// just labelling them, so the running total is what will actually be added
-// rather than what was ticked.
+// alreadyInvited (emails already on the event, or already sent the
+// broadcast) locks those rows instead of just labelling them, so the running
+// total is what will actually be added rather than what was ticked.
 export default function RecipientPicker({ value, onChange, alreadyInvited = NOBODY, noun = 'guest' }) {
   const w = WORDING[noun] || WORDING.guest;
   const toast = useToast();
@@ -203,7 +215,7 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
       });
       const email = row.email.trim();
       toast(email && alreadyInvited.has(email.toLowerCase())
-        ? `${email} is already invited.`
+        ? `${w.alreadyOne(email)}.`
         : already
           ? `${email} is already in your contacts, so they are ticked in the list.`
           : `${name} is saved to your contacts and ticked in the list.`);
@@ -274,7 +286,7 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
                   <tr key={c.id} style={invited ? { opacity: 0.55 } : undefined}>
                     <td style={{ width: 34 }}>
                       <input type="checkbox" disabled={invited}
-                        aria-label={invited ? `${c.name} is already invited` : w.tick(c.name)}
+                        aria-label={invited ? w.alreadyOne(c.name) : w.tick(c.name)}
                         checked={isOn(c.id)}
                         onChange={() => toggleContact(c.id)} />
                     </td>
@@ -282,9 +294,9 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
                       <div className="row" style={{ gap: 7 }}>
                         <span className="t-main">{c.name}</span>
                         {c.unsubscribed_at ? <span className="badge badge-amber">Unsubscribed</span> : null}
-                        {invited ? <span className="badge badge-gray">Already invited</span> : null}
+                        {invited ? <span className="badge badge-gray">{w.already}</span> : null}
                       </div>
-                      <div className="t-sub">{c.email || <em>no email — can't receive invitations</em>}</div>
+                      <div className="t-sub">{c.email || <em>{w.noEmail}</em>}</div>
                     </td>
                     <td className="t-sub nowrap" style={{ textAlign: 'right' }}>
                       {invited ? '' /* the badge beside the name already says so */
@@ -328,13 +340,9 @@ export default function RecipientPicker({ value, onChange, alreadyInvited = NOBO
 
       <Banner tone="info" style={{ marginBottom: 0 }}>
         {tally.selected === 0
-          ? (tally.onAlready
-            ? `Nobody new selected — all ${tally.onAlready} of the people picked are already invited.`
-            : w.empty)
+          ? (tally.onAlready ? w.alreadyAll(tally.onAlready) : w.empty)
           : `${tally.selected} ${alreadyInvited.size ? 'new ' : ''}${tally.selected === 1 ? w.one : w.many} selected.`}
-        {tally.selected > 0 && tally.onAlready
-          ? ` ${tally.onAlready} other${tally.onAlready === 1 ? ' is' : 's are'} already invited and won’t be added again.`
-          : ''}
+        {tally.selected > 0 && tally.onAlready ? ` ${w.alreadyRest(tally.onAlready)}` : ''}
       </Banner>
     </div>
   );

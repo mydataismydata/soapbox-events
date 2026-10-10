@@ -10,7 +10,7 @@ import { broadcastStats } from '../lib/stats.js';
 import { orgApiKey, senderFor, sendEmail } from '../lib/email.js';
 import { attachmentInfo, attachmentRow, attachmentProblem, attachmentsFor } from '../lib/attachments.js';
 import {
-  parseFlyer, publicUrl, resolveRecipients, queueBroadcastEmails,
+  parseFlyer, publicUrl, resolveRecipients, queueBroadcastEmails, broadcastSentEmails,
   renderBroadcastEmailFor, broadcastViewUrl, broadcastUnsubUrl, previewUnsubUrl,
 } from '../lib/sending.js';
 
@@ -266,6 +266,58 @@ broadcastRouter.post('/broadcasts/:id/send', wrap(async (req, res) => {
     req.db.prepare(
       "UPDATE broadcasts SET status = 'sent', sent_at = datetime('now'), updated_at = datetime('now') WHERE id = ?"
     ).run(b.id);
+    return r;
+  });
+
+  const updated = req.db.prepare('SELECT * FROM broadcasts WHERE id = ?').get(b.id);
+  res.json({ ...result, broadcast: serializeBroadcast(req, updated) });
+}));
+
+// --- send to additional people ----------------------------------------------
+
+// The addresses a sent broadcast has already gone to. The picker locks these
+// rows so only people it hasn't reached can be ticked.
+broadcastRouter.get('/broadcasts/:id/sent-to', wrap(async (req, res) => {
+  const b = getBroadcast(req.db, req.params.id);
+  res.json({ emails: [...broadcastSentEmails(req.db, b.id)] });
+}));
+
+// Send a broadcast that has gone out to more people, unchanged. Anyone it
+// already went to is skipped here as well as in the picker, so a page left
+// open while someone else sends can't hand a person a second copy.
+broadcastRouter.post('/broadcasts/:id/send-more', wrap(async (req, res) => {
+  const b = getBroadcast(req.db, req.params.id);
+  if (b.status === 'draft') {
+    throw new ApiError(400, 'This broadcast hasn’t been sent yet. Send it from the wizard first.');
+  }
+  const problem = attachmentProblem(req.db, req.org.slug, b.attachment);
+  if (problem) throw new ApiError(400, problem);
+
+  const sel = {
+    contactIds: v.intArray(req.body.contact_ids, { label: 'contact_ids' }),
+    groupIds: v.intArray(req.body.group_ids, { label: 'group_ids' }),
+    excludedIds: v.intArray(req.body.excluded_contact_ids, { label: 'excluded_contact_ids' }),
+    newContacts: Array.isArray(req.body.new_contacts) ? req.body.new_contacts : [],
+    saveNew: true,
+  };
+
+  const result = withTx(req.db, () => {
+    const recipients = resolveRecipients(req.db, sel);
+    if (recipients.length === 0) {
+      throw new ApiError(400, 'No recipients selected — pick people or groups first.');
+    }
+    const r = queueBroadcastEmails(req.db, {
+      org: req.org, broadcast: b, recipients,
+      subjectTemplate: b.subject || b.title,
+      bodyTemplate: b.body || '',
+      skipEmails: broadcastSentEmails(req.db, b.id),
+    });
+    if (r.queued === 0) {
+      throw new ApiError(400, r.skipped.already_sent
+        ? 'Everyone picked has already been sent this broadcast.'
+        : 'None of the people picked has an email address they haven’t unsubscribed from.');
+    }
+    req.db.prepare("UPDATE broadcasts SET updated_at = datetime('now') WHERE id = ?").run(b.id);
     return r;
   });
 

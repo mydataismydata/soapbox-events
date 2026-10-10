@@ -6,12 +6,94 @@ import {
   Banner, Card, StatGrid, Stat, Icon,
 } from '../ui.jsx';
 import EmailLog from '../components/EmailLog.jsx';
+import RecipientPicker from '../components/RecipientPicker.jsx';
 import { fileSize } from '../components/AttachmentPicker.jsx';
 
 function BroadcastBadge({ status }) {
   if (status === 'sent') return <Badge tone="green" dot>Sent</Badge>;
   if (status === 'sending') return <Badge tone="indigo" dot>Sending</Badge>;
   return <Badge tone="amber" dot>Draft</Badge>;
+}
+
+const NO_ONE = { contact_ids: [], group_ids: [], excluded_contact_ids: [], new_contacts: [] };
+
+// Send a broadcast that has gone out to people it hasn't reached yet, as-is.
+// Everyone it was already sent to is locked in the picker, and the server
+// skips them again in case this page is out of date.
+function SendToMore({ broadcast: b, onClose, onSent }) {
+  const toast = useToast();
+  const [sentTo, setSentTo] = useState(null);
+  const [sel, setSel] = useState(NO_ONE);
+  const [count, setCount] = useState(0);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.get(`/api/broadcasts/${b.id}/sent-to`)
+      .then((d) => setSentTo(new Set(d.emails)))
+      .catch((err) => { toast(err.message, 'bad'); onClose(); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [b.id]);
+
+  const payload = () => ({ ...sel, new_contacts: sel.new_contacts.filter((n) => n.name.trim()) });
+
+  // How many emails the selection would send once the people already sent
+  // it are taken out. null while counting.
+  useEffect(() => {
+    const p = payload();
+    if (!p.contact_ids.length && !p.group_ids.length && !p.new_contacts.length) {
+      setCount(0);
+      return undefined;
+    }
+    let cancelled = false;
+    setCount(null);
+    api.post('/api/recipients/preview', { ...p, broadcast_id: b.id })
+      .then((d) => { if (!cancelled) setCount(d.recipients); })
+      .catch(() => { if (!cancelled) setCount(null); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel, b.id]);
+
+  async function send() {
+    setBusy(true);
+    try {
+      const d = await api.post(`/api/broadcasts/${b.id}/send-more`, payload());
+      toast(`${d.queued} email${d.queued === 1 ? '' : 's'} queued`
+        + (d.skipped?.already_sent ? ` · ${d.skipped.already_sent} already sent skipped` : '')
+        + (d.skipped?.unsubscribed ? ` · ${d.skipped.unsubscribed} unsubscribed skipped` : ''));
+      onSent();
+    } catch (err) {
+      toast(err.message, 'bad');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="Send to additional people" size="lg" onClose={onClose}
+      footer={
+        <>
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" disabled={busy || !count} onClick={send}>
+            <Icon name="send" size={14} />{' '}
+            {busy ? 'Sending…'
+              : count == null ? 'Counting…'
+                : count === 0 ? 'Send'
+                  : `Send to ${count} ${count === 1 ? 'person' : 'people'}`}
+          </button>
+        </>
+      }>
+      {sentTo ? (
+        <>
+          <p className="small muted" style={{ marginTop: 0 }}>
+            Sends this broadcast, unchanged, to people it hasn’t gone to yet.
+            {sentTo.size === 1
+              ? ' The one person already sent it can’t be picked.'
+              : ` The ${sentTo.size} people already sent it can’t be picked.`}
+          </p>
+          <RecipientPicker value={sel} onChange={setSel} alreadyInvited={sentTo} noun="contact" />
+        </>
+      ) : <Spinner />}
+    </Modal>
+  );
 }
 
 export default function BroadcastDetail() {
@@ -26,6 +108,9 @@ export default function BroadcastDetail() {
   const [busy, setBusy] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyTo, setCopyTo] = useState('');
+  const [moreOpen, setMoreOpen] = useState(false);
+  // Bumped after a send from this page, so the log fetches the new rows.
+  const [logKey, setLogKey] = useState(0);
   const [previewMsg, setPreviewMsg] = useState(null);
   const [previewBusy, setPreviewBusy] = useState(false);
 
@@ -108,6 +193,11 @@ export default function BroadcastDetail() {
           <Link className="btn" to={`/broadcasts/${b.id}/edit`}>
             <Icon name="pencil" size={14} /> {b.status === 'draft' ? 'Continue editing' : 'Edit'}
           </Link>
+          {b.status !== 'draft' ? (
+            <button className="btn" disabled={busy} onClick={() => setMoreOpen(true)}>
+              <Icon name="users" size={14} /> Send to additional people
+            </button>
+          ) : null}
           <button className="btn" disabled={busy} onClick={() => { setCopyTo(''); setCopyOpen(true); }}>
             <Icon name="send" size={14} /> Send a copy
           </button>
@@ -151,7 +241,7 @@ export default function BroadcastDetail() {
       {/* Every row here is this broadcast, so type and subject would only
           repeat the page heading — the type filter covers test vs real. */}
       <Card flush title="Email log">
-        <EmailLog scope={{ broadcast_id: id }} kinds={['broadcast', 'test']} onSummary={setSummary}
+        <EmailLog key={logKey} scope={{ broadcast_id: id }} kinds={['broadcast', 'test']} onSummary={setSummary}
           emptyHint="Once you send (or run a test), every email shows up here with its exact content and status." />
       </Card>
 
@@ -169,6 +259,7 @@ export default function BroadcastDetail() {
                       ? 'Rendered in simulation mode — nothing was delivered'
                       : `Copy sent to ${d.to}`);
                     setCopyOpen(false);
+                    setLogKey((k) => k + 1);
                     await load(true);
                   } catch (err) { toast(err.message, 'bad'); }
                   finally { setBusy(false); }
@@ -185,6 +276,11 @@ export default function BroadcastDetail() {
               onChange={(e) => setCopyTo(e.target.value)} />
           </Field>
         </Modal>
+      ) : null}
+
+      {moreOpen ? (
+        <SendToMore broadcast={b} onClose={() => setMoreOpen(false)}
+          onSent={() => { setMoreOpen(false); setLogKey((k) => k + 1); load(true); }} />
       ) : null}
 
       {previewMsg ? (

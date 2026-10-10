@@ -254,16 +254,32 @@ export function resolveRecipients(db, {
   return out;
 }
 
+const NO_EMAILS = new Set();
+
 // Dry-run count of how many emails a { contact_ids, group_ids, new_contacts }
 // selection would actually send: unique addresses, minus no-email and
 // unsubscribed. Used to show recipient counts (not group counts) before send.
-export function previewRecipients(db, { contactIds = [], groupIds = [], excludedIds = [], newContacts = [] }) {
+// skipEmails (addresses a broadcast already went to) are left out as well.
+export function previewRecipients(db, {
+  contactIds = [], groupIds = [], excludedIds = [], newContacts = [], skipEmails = NO_EMAILS,
+}) {
   const resolved = resolveRecipients(db, { contactIds, groupIds, excludedIds, newContacts, saveNew: false });
   let recipients = 0;
+  let alreadySent = 0;
   for (const r of resolved) {
-    if (r.email && !isUnsubscribed(db, r.email)) recipients++;
+    if (r.email && skipEmails.has(r.email)) alreadySent++;
+    else if (r.email && !isUnsubscribed(db, r.email)) recipients++;
   }
-  return { recipients, total: resolved.length };
+  return { recipients, total: resolved.length, already_sent: alreadySent };
+}
+
+// Every address a broadcast has already gone to, lowercased. An email still
+// queued, or one that failed, counts too: the log retries those, so sending
+// them again would only make a second copy.
+export function broadcastSentEmails(db, broadcastId) {
+  return new Set(db.prepare(
+    "SELECT DISTINCT lower(to_email) AS email FROM email_log WHERE broadcast_id = ? AND kind = 'broadcast'"
+  ).all(broadcastId).map((r) => r.email));
 }
 
 export function renderBroadcastEmailFor({ org, broadcast, recipient, subjectTemplate, bodyTemplate, viewUrl, unsubUrl }) {
@@ -283,9 +299,13 @@ export function renderBroadcastEmailFor({ org, broadcast, recipient, subjectTemp
 }
 
 // Queue one email per recipient, applying the same skip rules as events.
-export function queueBroadcastEmails(db, { org, broadcast, recipients, subjectTemplate, bodyTemplate }) {
+// skipEmails are addresses the broadcast already went to, which a send to
+// more people leaves out.
+export function queueBroadcastEmails(db, {
+  org, broadcast, recipients, subjectTemplate, bodyTemplate, skipEmails = NO_EMAILS,
+}) {
   let queued = 0;
-  const skipped = { no_email: 0, unsubscribed: 0 };
+  const skipped = { no_email: 0, already_sent: 0, unsubscribed: 0 };
   const viewUrl = broadcast.web_version ? broadcastViewUrl(org.slug, broadcast) : '';
   const insert = db.prepare(
     `INSERT INTO email_log (broadcast_id, kind, to_name, to_email, subject, html, body_text, attachment)
@@ -294,6 +314,7 @@ export function queueBroadcastEmails(db, { org, broadcast, recipients, subjectTe
   for (const r of recipients) {
     const email = (r.email || '').toLowerCase();
     if (!email) { skipped.no_email++; continue; }
+    if (skipEmails.has(email)) { skipped.already_sent++; continue; }
     if (isUnsubscribed(db, email)) { skipped.unsubscribed++; continue; }
     const unsubUrl = broadcastUnsubUrl(org.slug, r.contact_id);
     const msg = renderBroadcastEmailFor({ org, broadcast, recipient: r, subjectTemplate, bodyTemplate, viewUrl, unsubUrl });

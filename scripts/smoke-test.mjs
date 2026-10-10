@@ -996,6 +996,52 @@ let guests = [];
   check('ISOLATION: B cannot fetch A\'s broadcast', bIso.status === 404);
 }
 
+// --- sending a broadcast to additional people ------------------------------
+{
+  const mk = async (name, email) =>
+    (await A.api('POST', '/api/contacts', { name, email })).data.contact.id;
+  const m1 = await mk('More One', 'more1@guest.test');
+  const m2 = await mk('More Two', 'more2@guest.test');
+  const m3 = await mk('More Three', 'more3@guest.test');
+  const gid = (await A.api('POST', '/api/groups', { name: 'More Group', contact_ids: [m1, m2, m3] })).data.group.id;
+  const bc = (await A.api('POST', '/api/broadcasts', {
+    title: 'More People', subject: 'Hello', body: 'Hi {{first_name}}',
+  })).data.broadcast;
+
+  const early = await A.api('POST', `/api/broadcasts/${bc.id}/send-more`, { contact_ids: [m1] });
+  check('a draft broadcast cannot go to additional people', early.status === 400, JSON.stringify(early.data));
+
+  await A.api('POST', `/api/broadcasts/${bc.id}/send`, { contact_ids: [m1] });
+  const sentTo = await A.api('GET', `/api/broadcasts/${bc.id}/sent-to`);
+  check('sent-to lists the addresses a broadcast went to',
+    JSON.stringify(sentTo.data?.emails) === '["more1@guest.test"]', JSON.stringify(sentTo.data));
+
+  const count = await A.api('POST', '/api/recipients/preview', { group_ids: [gid], broadcast_id: bc.id });
+  check('the count for additional people leaves out who already got it',
+    count.data?.recipients === 2 && count.data?.already_sent === 1, JSON.stringify(count.data));
+
+  const more = await A.api('POST', `/api/broadcasts/${bc.id}/send-more`, {
+    group_ids: [gid], new_contacts: [{ name: 'More Four', email: 'more4@guest.test' }],
+  });
+  check('sending to additional people skips who already got it',
+    more.status === 200 && more.data?.queued === 3 && more.data?.skipped?.already_sent === 1,
+    JSON.stringify(more.data));
+  check('a new person picked there is saved to the contacts',
+    (await A.api('GET', '/api/contacts')).data.contacts.some((c) => c.email === 'more4@guest.test'));
+
+  const again = await A.api('POST', `/api/broadcasts/${bc.id}/send-more`, { contact_ids: [m1, m2] });
+  check('sending again to people who already got it is refused', again.status === 400, JSON.stringify(again.data));
+
+  const addrs = (await A.api('GET', `/api/emails?broadcast_id=${bc.id}&per_page=50`)).data.emails
+    .filter((e) => e.kind === 'broadcast').map((e) => e.to_email).sort();
+  check('every address got the broadcast exactly once',
+    JSON.stringify(addrs) === JSON.stringify(['more1@guest.test', 'more2@guest.test', 'more3@guest.test', 'more4@guest.test']),
+    JSON.stringify(addrs));
+
+  const theft = await B.api('POST', `/api/broadcasts/${bc.id}/send-more`, { contact_ids: [m2] });
+  check('ISOLATION: B cannot send A\'s broadcast to more people', theft.status === 404);
+}
+
 // --- recipient preview + unsubscribe side-effects --------------------------
 {
   const c1 = (await A.api('POST', '/api/contacts', { name: 'Unsub One', email: 'unsub1@guest.test' })).data.contact.id;

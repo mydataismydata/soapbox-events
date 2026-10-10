@@ -4,7 +4,7 @@ import { eventStats, broadcastStats, monthEmailCount } from '../lib/stats.js';
 import { getQuota, orgApiKey } from '../lib/email.js';
 import { toCsv } from '../lib/csv.js';
 import { getSetting } from '../lib/db.js';
-import { getInvitesForEvent, inviteEmail, inviteName, publicUrl, previewRecipients } from '../lib/sending.js';
+import { getInvitesForEvent, inviteEmail, inviteName, publicUrl, previewRecipients, broadcastSentEmails } from '../lib/sending.js';
 import { formatWhen } from '../lib/format.js';
 
 export const reportRouter = Router();
@@ -58,12 +58,17 @@ reportRouter.get('/dashboard', wrap(async (req, res) => {
 
 // Dry-run: how many emails a recipient selection would actually send (unique
 // addresses minus no-email/unsubscribed). Powers the wizards' recipient counts.
+// With broadcast_id, people that broadcast already went to are left out too,
+// which is the count for sending it to additional people.
 reportRouter.post('/recipients/preview', wrap(async (req, res) => {
+  const broadcastId = req.body.broadcast_id == null ? null
+    : v.int(req.body.broadcast_id, { label: 'broadcast_id', min: 1 });
   res.json(previewRecipients(req.db, {
     contactIds: v.intArray(req.body.contact_ids, { label: 'contact_ids' }),
     groupIds: v.intArray(req.body.group_ids, { label: 'group_ids' }),
     excludedIds: v.intArray(req.body.excluded_contact_ids, { label: 'excluded_contact_ids' }),
     newContacts: Array.isArray(req.body.new_contacts) ? req.body.new_contacts : [],
+    skipEmails: broadcastId ? broadcastSentEmails(req.db, broadcastId) : undefined,
   }));
 }));
 

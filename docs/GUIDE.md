@@ -196,6 +196,14 @@ to an unguessable page that renders the masthead and your message — handy when
 a mail client clips a long email. Turn it off for an email-only broadcast. It's
 a per-broadcast toggle.
 
+**Send to additional people.** On a sent broadcast's page, **Send to additional
+people** opens the same picker as the wizard's Recipients step. Everyone the
+broadcast already went to is greyed out with an *Already sent* tag and can't be
+ticked, so the message goes only to people who haven't had it. The server
+checks again when you send, so nobody gets a second copy from a page that was
+left open. An email still queued, or one that failed, counts as sent; retry a
+failed one from the log.
+
 **Unsubscribe still applies.** Every broadcast email has an unsubscribe link,
 and anyone who has unsubscribed (from a broadcast *or* an event) is skipped and
 counted in the send summary. The broadcast page shows delivery counts

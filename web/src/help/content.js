@@ -320,6 +320,7 @@ export const HELP = {
         points: [
           'Preview shows the message for a sample recipient.',
           'View web version opens the broadcast’s web page. The Web version link card has its address to copy.',
+          'Send to additional people sends the broadcast to people it hasn’t gone to yet. Everyone it already went to is greyed out and can’t be picked.',
           'Send a copy emails the broadcast to one more address.',
           'Duplicate starts a new draft from this broadcast.',
           'Edit reopens the wizard. Sending it again sends everyone a fresh copy.',

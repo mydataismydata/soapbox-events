@@ -4,7 +4,7 @@ import path from 'node:path';
 import { uploadsDir, insertId } from '../lib/db.js';
 import { wrap, v, ApiError } from '../lib/validate.js';
 import { randomToken } from '../lib/tokens.js';
-import { publicUrl } from '../lib/sending.js';
+import { fileUrl } from '../lib/sending.js';
 import { sniffImage, storeImage } from '../lib/images.js';
 import { sniffAttachment, attachmentFilename } from '../lib/attachments.js';
 import { fetchRemoteImage, RemoteImageError } from '../lib/remoteImage.js';
@@ -73,7 +73,7 @@ uploadRouter.post('/uploads', wrap(async (req, res) => {
   res.status(201).json({
     id,
     token,
-    url: publicUrl(req.org.slug, `/files/${token}`),
+    url: fileUrl(req.org.slug, token),
     name: storedName || '',
     bytes: buf.length,
     mime,
@@ -98,5 +98,5 @@ uploadRouter.post('/uploads/remote', wrap(async (req, res) => {
     try { return decodeURIComponent(new URL(url).pathname.split('/').pop() || '').slice(0, 300); } catch { return ''; }
   })();
   const token = storeImage(req.db, req.org.slug, got.buf, got.mime, name);
-  res.status(201).json({ token, url: publicUrl(req.org.slug, `/files/${token}`), mime: got.mime, bytes: got.buf.length });
+  res.status(201).json({ token, url: fileUrl(req.org.slug, token), mime: got.mime, bytes: got.buf.length });
 }));

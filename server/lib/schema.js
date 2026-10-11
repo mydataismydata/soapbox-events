@@ -10,6 +10,9 @@
 //
 // Migrations use PRAGMA user_version. To evolve a schema later, push another
 // entry onto the relevant array; every database is brought up to date on open.
+// An entry is SQL, or a function of the database for a change SQL can't make.
+
+import { RANDOM_SLUG_RE, syncEventSlug } from './eventSlug.js';
 
 export const CORE_MIGRATIONS = [
   `
@@ -278,4 +281,23 @@ export const ORG_MIGRATIONS = [
   ALTER TABLE broadcasts ADD COLUMN attachment TEXT NOT NULL DEFAULT '';
   ALTER TABLE email_log ADD COLUMN attachment TEXT;
   `,
+
+  // Migration 7: a meeting's address is its date and time rather than a
+  // random code. Each dated event moves to its date address, and an address
+  // a guest could hold is kept in event_slugs to redirect.
+  (db) => {
+    db.exec(`
+      CREATE TABLE event_slugs (
+        id INTEGER PRIMARY KEY,
+        slug TEXT NOT NULL UNIQUE,
+        event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX idx_event_slugs_event ON event_slugs(event_id);
+    `);
+    const dated = db.prepare(`SELECT * FROM events WHERE date IS NOT NULL AND date != '' ORDER BY id`).all();
+    for (const event of dated) {
+      if (RANDOM_SLUG_RE.test(event.slug)) syncEventSlug(db, event);
+    }
+  },
 ];

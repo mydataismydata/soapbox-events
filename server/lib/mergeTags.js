@@ -16,10 +16,10 @@ export const TAG_DEFS = [
   { tag: 'rsvp_deadline', label: 'RSVP deadline', sample: 'Friday, August 7, 2026' },
   { tag: 'event_description', label: 'Event description', sample: 'An evening of music and dinner.' },
   { tag: 'org_name', label: 'Organization name', sample: 'Community Club' },
-  { tag: 'event_link', label: 'Event page link', sample: 'https://example.org/o/club/e/x2m4pw93qk' },
-  { tag: 'rsvp_link', label: 'Personal RSVP link', sample: 'https://example.org/o/club/i/AbC123' },
-  { tag: 'accept_link', label: 'Accept link', sample: 'https://example.org/o/club/i/AbC123/accept' },
-  { tag: 'decline_link', label: 'Decline link', sample: 'https://example.org/o/club/i/AbC123/decline' },
+  { tag: 'event_link', label: 'Event page link', sample: 'https://example.org/club/2026-oct-27-17-30' },
+  { tag: 'rsvp_link', label: 'Personal RSVP link', sample: 'https://example.org/club/i/AbC123' },
+  { tag: 'accept_link', label: 'Accept link', sample: 'https://example.org/club/i/AbC123/accept' },
+  { tag: 'decline_link', label: 'Decline link', sample: 'https://example.org/club/i/AbC123/decline' },
 ];
 
 // Build the tag -> value map for one recipient of one event.

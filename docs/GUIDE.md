@@ -21,7 +21,8 @@ out which organization you belong to from your email address, so there's no
 organization field to fill in. Organizations are created by the server
 operator with `node scripts/create-org.mjs …`, which prints the first
 administrator's credentials. (The organization's short "slug" still appears
-in public event URLs like `/o/your-org/e/…`, but you never type it to log in.)
+in public event URLs like `/your-org/2026-oct-27-17-30`, but you never type it
+to log in.)
 
 **Roles.** Admins manage settings and team members; members do everything
 else (events, contacts, sending). Add teammates in **Settings → Team
@@ -219,11 +220,13 @@ event's email log. Broadcasts also export to CSV
   page — where they can set how many people they're bringing, leave a note
   for the host, add the event to Google Calendar, or download an .ics file
   for Apple/Outlook.
-- The **event page** (`/o/your-org/e/…`) shows the flyer, description,
-  details, optionally who's coming, and — if the shareable link is on — an
-  RSVP form for people who were never individually invited (name + email +
-  party size). Forward the link anywhere; new RSVPs appear in your guest
-  list automatically, marked "via link".
+- The **event page** (`/your-org/2026-oct-27-17-30`, the meeting's date and
+  start time) shows the flyer, description, details, optionally who's
+  coming, and — if the shareable link is on — an RSVP form for people who
+  were never individually invited (name + email + party size). Forward the
+  link anywhere; new RSVPs appear in your guest list automatically, marked
+  "via link". If you change the meeting's date or time, its address changes
+  to match, and the old address still takes people to it.
 - Guests can **change their response** any time until the deadline via their
   personal link. After the deadline the page says responses are closed.
 - Cancelling an event puts a clear banner on the page and (optionally)

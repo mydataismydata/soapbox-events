@@ -78,6 +78,8 @@ app.use('/api', api);
 
 // --- public guest pages ----------------------------------------------------
 
+// Where guest pages began. Emails already sent link here. The same pages are
+// also at /<org>/, mounted below once everything else has had its turn.
 app.use('/o/:orgSlug', publicRouter);
 
 // The admin app bundles IBM Plex through Vite; the server-rendered guest pages
@@ -104,6 +106,13 @@ app.get(['/app', '/app/*'], (_req, res) => {
   res.sendFile(index);
 });
 app.get('/', (_req, res) => res.redirect('/app/'));
+
+// --- guest pages at /<org>/ -------------------------------------------------
+
+// Last, so /api, /app and /fonts are never read as an organization. The
+// router passes on any first word that is not one (RESERVED_SLUGS in db.js
+// keeps the app's own words from becoming one).
+app.use('/:orgSlug', publicRouter);
 
 // --- errors ----------------------------------------------------------------
 

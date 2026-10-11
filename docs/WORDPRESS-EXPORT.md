@@ -64,7 +64,7 @@ stops lining up there is one file to look in:
     "rsvp_deadline": "",
     "rsvp_deadline_offset_days": null,// whole days before the event, or null
     "show_guest_list": false,
-    "public_url": "https://invites.example.org/o/demo/e/q9fgz2frpt",
+    "public_url": "https://invites.example.org/demo/2026-oct-27-17-30",
     "email": {
       "subject": "You're invited: {{event_title}}",
       "body": "Hi {{first_name}}, …",

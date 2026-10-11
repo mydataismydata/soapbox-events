@@ -10,7 +10,7 @@ import { broadcastStats } from '../lib/stats.js';
 import { orgApiKey, senderFor, sendEmail } from '../lib/email.js';
 import { attachmentInfo, attachmentRow, attachmentProblem, attachmentsFor } from '../lib/attachments.js';
 import {
-  parseFlyer, publicUrl, resolveRecipients, queueBroadcastEmails, broadcastSentEmails,
+  parseFlyer, publicUrl, fileUrl, resolveRecipients, queueBroadcastEmails, broadcastSentEmails,
   renderBroadcastEmailFor, broadcastViewUrl, broadcastUnsubUrl, previewUnsubUrl,
 } from '../lib/sending.js';
 
@@ -88,7 +88,7 @@ function serializeBroadcast(req, b) {
   const attachment = attachmentInfo(req.db, b.attachment);
   return {
     ...b,
-    attachment: attachment && { ...attachment, url: publicUrl(req.org.slug, `/files/${attachment.token}`) },
+    attachment: attachment && { ...attachment, url: fileUrl(req.org.slug, attachment.token) },
     flyer: parseFlyer(b),
     audience: parseAudience(b),
     web_version: Boolean(b.web_version),

@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { config } from './env.js';
 import { uploadsDir } from './db.js';
-import { INVITE_SELECT, publicUrl, parseFlyer } from './sending.js';
+import { INVITE_SELECT, eventUrl, fileUrl, parseFlyer } from './sending.js';
 
 export const EXPORT_FORMAT = 'soapbox-event-export';
 export const EXPORT_VERSION = 1;
@@ -85,7 +85,7 @@ function flyerImage(db, orgSlug, { dataUrl, token }) {
       content_type: row.mime,
       bytes: buf.length,
       data_base64: buf.toString('base64'),
-      url: publicUrl(orgSlug, `/files/${row.token}`),
+      url: fileUrl(orgSlug, row.token),
     };
   } catch {
     return null; // the row outlived the file
@@ -186,7 +186,7 @@ export function buildEventExport(db, org, event, { flyerDataUrl = '' } = {}) {
       rsvp_deadline: event.rsvp_deadline || '',
       rsvp_deadline_offset_days: deadlineOffsetDays(event.date, event.rsvp_deadline),
       show_guest_list: Boolean(event.show_guest_list),
-      public_url: publicUrl(org.slug, `/e/${event.slug}`),
+      public_url: eventUrl(org.slug, event),
       email: {
         subject: event.email_subject || '',
         body: event.email_body || '',

@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { config } from './env.js';
 import { getSetting, orgDb, uploadsDir } from './db.js';
-import { parseFlyer, publicUrl } from './sending.js';
+import { parseFlyer, eventUrl } from './sending.js';
 
 export const PUSH_FORMAT = 'soapbox-website-push';
 export const PUSH_VERSION = 1;
@@ -130,7 +130,7 @@ export function buildPayload(db, org, { includeFlyers = true } = {}) {
     rsvp_mode: event.rsvp_mode,
     // Where the website's RSVP button sends people. Soapbox owns the guest
     // list, so the reply is collected here and never on the website.
-    public_url: publicUrl(org.slug, `/e/${event.slug}`),
+    public_url: eventUrl(org.slug, event),
   }));
 
   const payload = {

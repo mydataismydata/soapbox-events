@@ -4,7 +4,7 @@ import { eventStats, broadcastStats, monthEmailCount } from '../lib/stats.js';
 import { getQuota, orgApiKey } from '../lib/email.js';
 import { toCsv } from '../lib/csv.js';
 import { getSetting } from '../lib/db.js';
-import { getInvitesForEvent, inviteEmail, inviteName, publicUrl, previewRecipients, broadcastSentEmails } from '../lib/sending.js';
+import { getInvitesForEvent, inviteEmail, inviteName, publicUrl, eventUrl, previewRecipients, broadcastSentEmails } from '../lib/sending.js';
 import { formatWhen } from '../lib/format.js';
 
 export const reportRouter = Router();
@@ -130,7 +130,7 @@ reportRouter.get('/export/venues.csv', wrap(async (req, res) => {
 
 reportRouter.get('/export/events.csv', wrap(async (req, res) => {
   const rows = req.db.prepare('SELECT * FROM events ORDER BY date DESC, id DESC').all()
-    .map((ev) => ({ ...ev, ...eventStats(req.db, ev.id), share_url: publicUrl(req.org.slug, `/e/${ev.slug}`) }));
+    .map((ev) => ({ ...ev, ...eventStats(req.db, ev.id), share_url: eventUrl(req.org.slug, ev) }));
   sendCsv(res, 'events.csv', toCsv(rows, [
     { key: 'title', label: 'title' },
     { key: 'status', label: 'status' },

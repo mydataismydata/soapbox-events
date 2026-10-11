@@ -18,12 +18,25 @@ export const DEFAULT_BODIES = {
   cancellation: DEFAULT_CANCEL_BODY,
 };
 
+// Guest pages are at /<org>/…. They began at /o/<org>/…, which still
+// answers, so links in emails sent before the move keep working.
 export function publicUrl(orgSlug, path) {
-  return `${config.baseUrl}/o/${orgSlug}${path}`;
+  return `${config.baseUrl}/${orgSlug}${path}`;
+}
+
+// A meeting's page: /<org>/<date slug>. See eventSlug.js.
+export function eventUrl(orgSlug, event) {
+  return publicUrl(orgSlug, `/${event.slug}`);
+}
+
+// Uploaded files stay under /o/<org>/files/. Rich text recognizes its own
+// pictures by that path, so it is fixed.
+export function fileUrl(orgSlug, token) {
+  return `${config.baseUrl}/o/${orgSlug}/files/${token}`;
 }
 
 export function buildLinks(orgSlug, event, invite = null) {
-  const links = { event: publicUrl(orgSlug, `/e/${event.slug}`) };
+  const links = { event: eventUrl(orgSlug, event) };
   if (invite) {
     links.rsvp = publicUrl(orgSlug, `/i/${invite.token}`);
     links.accept = `${links.rsvp}/accept`;
@@ -36,7 +49,7 @@ export function buildLinks(orgSlug, event, invite = null) {
 // Resolves an {{image:token}} marker in a message body to the file's public
 // URL. Emails are read anywhere, so it has to be absolute.
 export function orgImageUrl(orgSlug) {
-  return (token) => publicUrl(orgSlug, `/files/${token}`);
+  return (token) => fileUrl(orgSlug, token);
 }
 
 export function parseFlyer(event) {
@@ -52,14 +65,14 @@ export function eventAccent(event) {
 // Public URLs for a flyer's featured images, aligned to flyer.imageTokens
 // (empty string for an empty slot). Passed straight into renderFlyer.
 export function flyerImageUrls(orgSlug, flyer) {
-  return normalizeFlyer(flyer).imageTokens.map((t) => (t ? publicUrl(orgSlug, `/files/${t}`) : ''));
+  return normalizeFlyer(flyer).imageTokens.map((t) => (t ? fileUrl(orgSlug, t) : ''));
 }
 
 // URL of the Dark template's full-bleed background image, empty when none is
 // set. Passed to renderFlyer as bgUrl.
 export function flyerBgUrl(orgSlug, flyer) {
   const t = normalizeFlyer(flyer).bgToken;
-  return t ? publicUrl(orgSlug, `/files/${t}`) : '';
+  return t ? fileUrl(orgSlug, t) : '';
 }
 
 // URL of the picture-of-the-flyer that goes at the foot of the invitation
@@ -68,7 +81,7 @@ export function flyerBgUrl(orgSlug, flyer) {
 export function flyerSnapshotUrl(orgSlug, flyer) {
   const f = normalizeFlyer(flyer);
   if (!f.includeFlyerImage || !f.flyerImageToken) return '';
-  return publicUrl(orgSlug, `/files/${f.flyerImageToken}`);
+  return fileUrl(orgSlug, f.flyerImageToken);
 }
 
 export function inviteName(invite) {
@@ -111,8 +124,8 @@ function insertEmailLog(db, { event, invite, kind, toName, toEmail, subject, htm
 // Links used in test sends and previews: every button lands on the public
 // event page instead of mutating a real invite.
 export function previewLinks(orgSlug, event) {
-  const eventUrl = publicUrl(orgSlug, `/e/${event.slug}`);
-  return { event: eventUrl, rsvp: eventUrl, accept: eventUrl, decline: eventUrl, unsub: '' };
+  const url = eventUrl(orgSlug, event);
+  return { event: url, rsvp: url, accept: url, decline: url, unsub: '' };
 }
 
 export function renderEmailFor({ org, event, invite, kind, subjectTemplate, bodyTemplate, linksOverride }) {

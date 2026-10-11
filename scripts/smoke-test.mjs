@@ -217,7 +217,8 @@ const deadline = new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)
   });
   eventId = r.data?.event?.id;
   eventSlug = r.data?.event?.slug;
-  check('create event', r.status === 201 && eventId > 0 && /^[a-z0-9]{10}$/.test(eventSlug || ''));
+  // Its address is its date and start time, e.g. 2026-oct-27-18-00.
+  check('create event', r.status === 201 && eventId > 0 && /^\d{4}-[a-z]{3}-\d{2}-18-00$/.test(eventSlug || ''), eventSlug);
 
   const upd = await A.api('PUT', `/api/events/${eventId}`, {
     flyer: { style: 'retro', font: 'sans', scale: 'l', eyebrow: 'Save the date', tagline: 'Dinner & dancing',
@@ -243,9 +244,14 @@ const deadline = new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)
   check('description strips scripts + unknown classes',
     !/<script/i.test(desc) && !desc.includes('danger'));
 
-  const draftHidden = await fetch(`${BASE}/o/alpha/e/${eventSlug}`);
+  const draftHidden = await fetch(`${BASE}/alpha/${eventSlug}`);
   check('draft landing hidden from public', draftHidden.status === 404);
-  const draftPreview = await A.raw('GET', `/o/alpha/e/${eventSlug}`);
+  const draftOld = await fetch(`${BASE}/o/alpha/e/${eventSlug}`, { redirect: 'manual' });
+  check('and from public at its old-style address', draftOld.status === 404);
+  const draftMoved = await A.raw('GET', `/o/alpha/e/${eventSlug}`);
+  check('an old-style address redirects a member to the event’s own',
+    draftMoved.status === 301 && draftMoved.headers.get('location') === `/alpha/${eventSlug}`, draftMoved.headers.get('location'));
+  const draftPreview = await A.raw('GET', `/alpha/${eventSlug}`);
   check('draft landing visible to signed-in org member', draftPreview.status === 200);
   const draftHtml = await draftPreview.text();
   check('landing renders all three featured images',
@@ -345,13 +351,13 @@ let guests = [];
 
 // --- share-link RSVP (new person) ------------------------------------------
 {
-  const res = await fetch(`${BASE}/o/alpha/e/${eventSlug}/rsvp`, {
+  const res = await fetch(`${BASE}/alpha/${eventSlug}/rsvp`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ name: 'Walk In', email: 'walkin@guest.test', attending: 'yes', party_size: '2', note: 'Found the link!' }).toString(),
     redirect: 'manual',
   });
-  check('share-link RSVP redirects to personal page', res.status === 303 && (res.headers.get('location') || '').includes('/o/alpha/i/'));
+  check('share-link RSVP redirects to personal page', res.status === 303 && (res.headers.get('location') || '').startsWith('/alpha/i/'));
   const g = await A.api('GET', `/api/events/${eventId}/guests`);
   const walkin = g.data.guests.find((x) => x.email === 'walkin@guest.test');
   check('share-link guest recorded as yes +1', walkin?.response === 'yes' && walkin?.party_size === 2 && walkin?.source === 'link');
@@ -638,7 +644,7 @@ let guests = [];
 
 // --- public pages ----------------------------------------------------------
 {
-  const landing = await fetch(`${BASE}/o/alpha/e/${eventSlug}`);
+  const landing = await fetch(`${BASE}/alpha/${eventSlug}`, { redirect: 'manual' });
   const html = await landing.text();
   check('landing page renders with RSVP form + guest list', landing.status === 200
     && html.includes('Test Gala') && html.includes('Will you be there?') && html.includes("Who's coming"));
@@ -652,7 +658,7 @@ let guests = [];
   const font = await fetch(`${BASE}/fonts/ibm-plex-mono/ibm-plex-mono-latin-500-normal.woff2`);
   check('the typeface is served from /fonts', font.status === 200
     && /font\/woff2/.test(font.headers.get('content-type') || ''));
-  const ics = await fetch(`${BASE}/o/alpha/e/${eventSlug}/ics`);
+  const ics = await fetch(`${BASE}/alpha/${eventSlug}/ics`);
   const icsText = await ics.text();
   check('ICS download works', ics.status === 200 && icsText.includes('BEGIN:VCALENDAR') && icsText.includes('SUMMARY:Test Gala'));
   check('ICS UID is namespaced with the BASE_URL host',
@@ -721,7 +727,7 @@ let guests = [];
 {
   const open = await A.api('POST', '/api/events', { title: 'Open House', date: future, rsvp_mode: 'open' });
   await A.api('POST', `/api/events/${open.data.event.id}/publish`, {});
-  const page = await fetch(`${BASE}/o/alpha/e/${open.data.event.slug}`);
+  const page = await fetch(`${BASE}/alpha/${open.data.event.slug}`);
   const html = await page.text();
   check('open event landing shows no-RSVP message', html.includes('No RSVP needed'));
 
@@ -730,9 +736,101 @@ let guests = [];
 
   const cancel = await A.api('POST', `/api/events/${eventId}/cancel`, { notify: true });
   check('cancel notifies responded+contacted guests', cancel.status === 200 && cancel.data?.notified >= 3, JSON.stringify(cancel.data));
-  const cancelledLanding = await fetch(`${BASE}/o/alpha/e/${eventSlug}`);
+  const cancelledLanding = await fetch(`${BASE}/alpha/${eventSlug}`);
   const cHtml = await cancelledLanding.text();
   check('cancelled landing shows banner, no RSVP form', cHtml.includes('cancelled') && !cHtml.includes('Will you be there?'));
+}
+
+// --- event addresses: the meeting's date and time --------------------------
+{
+  const mk = (body) => A.api('POST', '/api/events', { title: 'Address test', ...body });
+  const slugOf = (r) => r.data?.event?.slug;
+  const first = await mk({ date: '2031-03-04', start_time: '17:30' });
+  check('an event is addressed by its date and time', slugOf(first) === '2031-mar-04-17-30', slugOf(first));
+  check('and its link is /<org>/<that>', first.data?.event?.share_url === `${BASE}/alpha/2031-mar-04-17-30`,
+    first.data?.event?.share_url);
+  const twin = await mk({ date: '2031-03-04', start_time: '17:30' });
+  check('a second meeting at the same time is numbered', slugOf(twin) === '2031-mar-04-17-30-2', slugOf(twin));
+  const allDay = await mk({ date: '2031-03-04' });
+  check('a meeting with no start time is at its date alone', slugOf(allDay) === '2031-mar-04', slugOf(allDay));
+
+  const undated = await mk({});
+  check('an event made without a date has a random address', /^[a-z2-9]{10}$/.test(slugOf(undated) || ''), slugOf(undated));
+  const dated = await A.api('PUT', `/api/events/${undated.data.event.id}`, { date: '2031-03-05', start_time: '09:00' });
+  check('and moves to its date address once it has one', slugOf(dated) === '2031-mar-05-09-00', slugOf(dated));
+  const draftOld = await A.raw('GET', `/alpha/${slugOf(undated)}`);
+  check('a draft’s earlier address is not kept', draftOld.status === 404);
+
+  // A published meeting that moves keeps answering at its old address.
+  const id = first.data.event.id;
+  await A.api('POST', `/api/events/${id}/publish`, {});
+  const uid = (t) => t.match(/UID:.*/)?.[0];
+  const icsBefore = await (await fetch(`${BASE}/alpha/2031-mar-04-17-30/ics`)).text();
+  const moved = await A.api('PUT', `/api/events/${id}`, { start_time: '19:00' });
+  check('a meeting that moves gets a new address', slugOf(moved) === '2031-mar-04-19-00', slugOf(moved));
+  const old = await fetch(`${BASE}/alpha/2031-mar-04-17-30`, { redirect: 'manual' });
+  check('its old address redirects to the new one',
+    old.status === 301 && old.headers.get('location') === '/alpha/2031-mar-04-19-00', `${old.status} ${old.headers.get('location')}`);
+  const older = await fetch(`${BASE}/o/alpha/e/2031-mar-04-17-30`, { redirect: 'manual' });
+  check('and so does its old-style address',
+    older.status === 301 && older.headers.get('location') === '/alpha/2031-mar-04-19-00', `${older.status} ${older.headers.get('location')}`);
+  const page = await fetch(`${BASE}/alpha/2031-mar-04-17-30`);
+  check('which lands on the meeting', page.status === 200 && page.url.endsWith('/alpha/2031-mar-04-19-00'), page.url);
+  const icsAfter = await (await fetch(`${BASE}/alpha/2031-mar-04-19-00/ics`)).text();
+  check('its calendar entry keeps its identity', uid(icsBefore) && uid(icsBefore) === uid(icsAfter),
+    `${uid(icsBefore)} / ${uid(icsAfter)}`);
+  const rsvp = await fetch(`${BASE}/alpha/2031-mar-04-17-30/rsvp`, {
+    method: 'POST', redirect: 'manual',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ name: 'Late Reader', email: 'late@guest.test', attending: 'yes' }).toString(),
+  });
+  check('an RSVP sent to the old address is taken',
+    rsvp.status === 303 && (rsvp.headers.get('location') || '').startsWith('/alpha/i/'), rsvp.headers.get('location'));
+
+  const third = await mk({ date: '2031-03-04', start_time: '17:30' });
+  check('an old address is not handed to another meeting', slugOf(third) === '2031-mar-04-17-30-3', slugOf(third));
+  const back = await A.api('PUT', `/api/events/${id}`, { start_time: '17:30' });
+  check('a meeting that moves back gets its address back', slugOf(back) === '2031-mar-04-17-30', slugOf(back));
+  const fromLater = await fetch(`${BASE}/alpha/2031-mar-04-19-00`, { redirect: 'manual' });
+  check('and the time it moved away from redirects there', fromLater.headers.get('location') === '/alpha/2031-mar-04-17-30',
+    fromLater.headers.get('location'));
+
+  const crossOrg = await fetch(`${BASE}/beta/2031-mar-04-17-30`);
+  check('another organization has nothing at that address', crossOrg.status === 404);
+  const noOrg = await fetch(`${BASE}/nobody/2031-mar-04-17-30`);
+  check('an address under no organization is not found', noOrg.status === 404);
+  const apiMiss = await A.api('GET', '/api/no-such-thing');
+  check('an unknown API address still answers in JSON', apiMiss.status === 404 && apiMiss.data?.error === 'Not found',
+    JSON.stringify(apiMiss.data));
+}
+
+// --- events made before date addresses move to them ------------------------
+{
+  const r = spawnSync('node', ['scripts/create-org.mjs',
+    '--slug', 'gamma', '--name', 'Gamma Guild', '--admin-email', 'admin@gamma.test',
+    '--admin-name', 'Admin', '--password', 'correct-horse-battery'], { env: ENV, encoding: 'utf8' });
+  check('create-org gamma', r.status === 0, r.stderr);
+  // Wind gamma's database back to before the move, holding the kinds of
+  // event a real one would. The server has not opened it yet.
+  const { DatabaseSync } = await import('node:sqlite');
+  const db = new DatabaseSync(path.join(DATA_DIR, 'orgs', 'gamma', 'org.db'));
+  db.exec('DROP TABLE event_slugs; PRAGMA user_version = 6;');
+  const add = db.prepare('INSERT INTO events (slug, title, status, date, start_time) VALUES (?, ?, ?, ?, ?)');
+  add.run('n3nuw7b5wz', 'Sent Meeting', 'published', '2031-10-27', '17:30');
+  add.run('q9fgz2frpt', 'Undated Draft', 'draft', null, null);
+  add.run('monthly-meeting', 'Kept Website Address', 'published', '2031-11-03', '18:00');
+  db.close();
+
+  const moved = await fetch(`${BASE}/gamma/n3nuw7b5wz`, { redirect: 'manual' });
+  check('an existing meeting moves to its date address',
+    moved.status === 301 && moved.headers.get('location') === '/gamma/2031-oct-27-17-30', `${moved.status} ${moved.headers.get('location')}`);
+  const emailed = await fetch(`${BASE}/o/gamma/e/n3nuw7b5wz`, { redirect: 'manual' });
+  check('and the link in invitations already sent still reaches it',
+    emailed.status === 301 && emailed.headers.get('location') === '/gamma/2031-oct-27-17-30');
+  const ics = await (await fetch(`${BASE}/gamma/2031-oct-27-17-30/ics`)).text();
+  check('its calendar identity is unchanged', ics.includes('UID:n3nuw7b5wz@'), ics.match(/UID:.*/)?.[0]);
+  const kept = await fetch(`${BASE}/gamma/monthly-meeting`, { redirect: 'manual' });
+  check('a meeting on a website address stays on it', kept.status === 200);
 }
 
 // --- users admin -----------------------------------------------------------
@@ -973,7 +1071,7 @@ let guests = [];
   const bhtml = (await A.api('GET', `/api/emails/${one.id}`)).data?.email?.html || '';
   check('broadcast email has unsubscribe + view-online, no RSVP',
     bhtml.includes('/bu/') && bhtml.includes('/b/') && !bhtml.includes('/accept'));
-  const m = bhtml.match(/\/o\/alpha\/bu\/([^"'<>\s]+)/);
+  const m = bhtml.match(/\/alpha\/bu\/([^"'<>\s]+)/);
   check('broadcast unsubscribe link present', Boolean(m));
   if (m) {
     const unsubGet = await fetch(`${BASE}/o/alpha/bu/${m[1]}`);
@@ -1458,7 +1556,7 @@ let guests = [];
   check('with the venue nested the way the website reads it',
     received.at(-1).doc.events.find((e) => e.slug === slug)?.venue?.name === 'Library');
   check('and an RSVP link back to Soapbox',
-    received.at(-1).doc.events.find((e) => e.slug === slug)?.public_url === `${BASE}/o/alpha/e/${slug}`);
+    received.at(-1).doc.events.find((e) => e.slug === slug)?.public_url === `${BASE}/alpha/${slug}`);
 
   await A.api('PUT', `/api/events/${id}`, { description: 'Impact fees' });
   await settle();
@@ -1561,7 +1659,7 @@ let guests = [];
     check('so its picture goes back to the website under that address',
       sent.flyers?.['monthly-meeting-with-a-speaker']?.content_type === 'image/png');
     const odd = sent.events.find((e) => e.title === 'A Meeting With An Odd Address');
-    check('an address Soapbox cannot use is replaced', odd && /^[a-z2-9]{10}$/.test(odd.slug), odd?.slug);
+    check('an address Soapbox cannot use is replaced by its date', odd && /^\d{4}-[a-z]{3}-\d{2}$/.test(odd.slug), odd?.slug);
 
     const list = (await A.api('GET', '/api/events')).data.events;
     const speaker = list.find((e) => e.slug === 'monthly-meeting-with-a-speaker');

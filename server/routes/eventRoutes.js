@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { insertId, withTx } from '../lib/db.js';
 import { wrap, v, ApiError } from '../lib/validate.js';
-import { randomSlug, randomToken } from '../lib/tokens.js';
+import { randomToken } from '../lib/tokens.js';
+import { newEventSlug, syncEventSlug, slugHolder } from '../lib/eventSlug.js';
 import { normalizeFlyer } from '../lib/flyer.js';
 import { sanitizeRichText } from '../lib/sanitizeHtml.js';
 import { eventStats } from '../lib/stats.js';
@@ -13,7 +14,7 @@ import { schedulePublish } from '../lib/websitePush.js';
 import { requireAdmin } from '../lib/auth.js';
 import { sniffImage, storeImage } from '../lib/images.js';
 import {
-  parseFlyer, publicUrl, getInvitesForEvent, queueEmails, renderEmailFor,
+  parseFlyer, eventUrl, getInvitesForEvent, queueEmails, renderEmailFor,
   previewLinks, logTestEmail, inviteEmail, inviteName, INVITE_SELECT, DEFAULT_BODIES,
 } from '../lib/sending.js';
 
@@ -41,7 +42,7 @@ function serializeEvent(req, ev) {
     allow_plus_ones: Boolean(ev.allow_plus_ones),
     show_guest_list: Boolean(ev.show_guest_list),
     share_enabled: Boolean(ev.share_enabled),
-    share_url: publicUrl(req.org.slug, `/e/${ev.slug}`),
+    share_url: eventUrl(req.org.slug, ev),
   };
 }
 
@@ -111,7 +112,7 @@ eventRouter.post('/events', wrap(async (req, res) => {
   const fields = pickEventFields(req.body);
   if (!fields.title) throw new ApiError(400, 'Title is required.');
   if (fields.flyer === undefined) fields.flyer = JSON.stringify(normalizeFlyer({}));
-  const slug = randomSlug(10);
+  const slug = newEventSlug(req.db, fields);
   const keys = Object.keys(fields);
   const info = req.db.prepare(
     `INSERT INTO events (slug, created_by, ${keys.join(', ')})
@@ -133,7 +134,12 @@ eventRouter.put('/events/:id', wrap(async (req, res) => {
   const sets = Object.keys(fields).map((k) => `${k} = ?`).join(', ');
   req.db.prepare(`UPDATE events SET ${sets}, updated_at = datetime('now') WHERE id = ?`)
     .run(...Object.keys(fields).map((k) => fields[k] === '' ? null : fields[k]), event.id);
-  const updated = req.db.prepare('SELECT * FROM events WHERE id = ?').get(event.id);
+  let updated = req.db.prepare('SELECT * FROM events WHERE id = ?').get(event.id);
+  // The address follows the date and time. The old one keeps redirecting.
+  if ((updated.date || '') !== (event.date || '') || (updated.start_time || '') !== (event.start_time || '')) {
+    withTx(req.db, () => syncEventSlug(req.db, updated));
+    updated = req.db.prepare('SELECT * FROM events WHERE id = ?').get(event.id);
+  }
   // Only a published event is on the website. The wizard saves a draft on
   // every step, and none of those saves change what a visitor would see.
   if (event.status === 'published') pushToWebsite(req, 'edit');
@@ -167,7 +173,7 @@ eventRouter.post('/events/:id/duplicate', wrap(async (req, res) => {
   const info = req.db.prepare(
     `INSERT INTO events (slug, title, status, created_by, ${copyKeys.join(', ')})
      VALUES (?, ?, 'draft', ?, ${copyKeys.map(() => '?').join(', ')})`
-  ).run(randomSlug(10), title, req.user.id, ...copyKeys.map((k) => event[k]));
+  ).run(newEventSlug(req.db), title, req.user.id, ...copyKeys.map((k) => event[k]));
   const copy = req.db.prepare('SELECT * FROM events WHERE id = ?').get(insertId(info));
   res.status(201).json({ event: serializeEvent(req, copy) });
 }));
@@ -197,7 +203,6 @@ eventRouter.post('/events/import', requireAdmin, wrap(async (req, res) => {
   }
 
   const today = todayIso();
-  const taken = req.db.prepare('SELECT 1 FROM events WHERE slug = ?');
   const ready = [];
   const skipped = [];
 
@@ -220,11 +225,13 @@ eventRouter.post('/events/import', requireAdmin, wrap(async (req, res) => {
       if (!fields.title) throw new ApiError(400, 'it has no title');
 
       let slug = String(row.slug || '').trim().toLowerCase();
-      if (slug && taken.get(slug)) {
+      if (slug && slugHolder(req.db, slug) !== null) {
         skipped.push(`${label}: already here`);
         continue;
       }
-      if (!IMPORT_SLUG_RE.test(slug)) slug = randomSlug(10);
+      // Without a usable website address it gets a date address, given as
+      // it goes in so two meetings in one file cannot both take it.
+      if (!IMPORT_SLUG_RE.test(slug)) slug = '';
 
       let picture = null;
       if (row.picture?.data) {
@@ -263,7 +270,7 @@ eventRouter.post('/events/import', requireAdmin, wrap(async (req, res) => {
       req.db.prepare(
         `INSERT INTO events (slug, status, rsvp_deadline, created_by, ${keys.join(', ')})
          VALUES (?, ?, ?, ?, ${keys.map(() => '?').join(', ')})`
-      ).run(item.slug, item.status, item.deadline, req.user.id,
+      ).run(item.slug || newEventSlug(req.db, item.fields), item.status, item.deadline, req.user.id,
         ...keys.map((k) => item.fields[k] === '' ? null : item.fields[k]));
     }
   });
@@ -281,7 +288,11 @@ function assertPublishable(event) {
 eventRouter.post('/events/:id/publish', wrap(async (req, res) => {
   const event = getEvent(req.db, req.params.id);
   assertPublishable(event);
-  req.db.prepare(`UPDATE events SET status = 'published', updated_at = datetime('now') WHERE id = ?`).run(event.id);
+  withTx(req.db, () => {
+    // An event can reach here still on the random address it was made with.
+    syncEventSlug(req.db, event);
+    req.db.prepare(`UPDATE events SET status = 'published', updated_at = datetime('now') WHERE id = ?`).run(event.id);
+  });
   pushToWebsite(req, 'publish');
   res.json({ ok: true, status: 'published' });
 }));
@@ -470,6 +481,8 @@ eventRouter.post('/events/:id/send', wrap(async (req, res) => {
   }
 
   if (event.status === 'draft') {
+    // The invitations carry the address, so it has to be the date one first.
+    event.slug = withTx(req.db, () => syncEventSlug(req.db, event));
     req.db.prepare(`UPDATE events SET status = 'published', updated_at = datetime('now') WHERE id = ?`).run(event.id);
     event.status = 'published';
     // Only when that branch ran. Sending a second round of invitations for an

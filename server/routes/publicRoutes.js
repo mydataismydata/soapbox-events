@@ -1,11 +1,16 @@
 // Guest-facing pages. Everything here is server-rendered HTML that works
-// without JavaScript, reached through unguessable tokens:
+// without JavaScript. An event page is at its date, and everything personal
+// is reached through an unguessable token:
 //
-//   /o/<org>/e/<slug>        event landing page (shareable link, open RSVPs)
-//   /o/<org>/i/<token>       personal invite page (RSVP, change response)
-//   /o/<org>/i/<token>/accept|decline   one-click buttons from emails
-//   /o/<org>/u/<token>       unsubscribe
-//   /o/<org>/files/<token>   uploaded images, and broadcasts' attached files
+//   /<org>/<date slug>     event landing page (shareable link, open RSVPs)
+//   /<org>/i/<token>       personal invite page (RSVP, change response)
+//   /<org>/i/<token>/accept|decline   one-click buttons from emails
+//   /<org>/u/<token>       unsubscribe
+//   /<org>/files/<token>   uploaded images, and broadcasts' attached files
+//
+// The router is also mounted at /o/<org>, where these pages began. Emails
+// already sent carry those addresses, so they answer for good, and an old
+// event address (/o/<org>/e/<slug>) redirects to the new one.
 import { Router } from 'express';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -13,8 +18,9 @@ import { getOrg, orgDb, uploadsDir, insertId } from '../lib/db.js';
 import { resolveSession } from '../lib/auth.js';
 import { esc, textToHtml, publicPage, expandImageMarkers } from '../lib/html.js';
 import { renderFlyer } from '../lib/flyer.js';
+import { EVENT_SLUG_RE, eventUidKey } from '../lib/eventSlug.js';
 import {
-  parseFlyer, publicUrl, flyerImageUrls, flyerBgUrl, verifyContactToken, orgImageUrl, PREVIEW_UNSUB,
+  parseFlyer, eventUrl, flyerImageUrls, flyerBgUrl, verifyContactToken, orgImageUrl, PREVIEW_UNSUB,
 } from '../lib/sending.js';
 import { buildBroadcastTagContext, renderTags } from '../lib/mergeTags.js';
 import { sanitizeRichText, looksLikeHtml } from '../lib/sanitizeHtml.js';
@@ -33,13 +39,10 @@ export const publicRouter = Router({ mergeParams: true });
 publicRouter.use((req, res, next) => {
   const slug = String(req.params.orgSlug || '').toLowerCase();
   const org = getOrg(slug);
-  if (!org) {
-    return res.status(404).send(publicPage({
-      title: 'Not found',
-      bodyHtml: `<div class="pub-card"><h2>Page not found</h2>
-        <p class="pub-muted">This link doesn't point to anything. Double-check the address you were given.</p></div>`,
-    }));
-  }
+  // Not an organization: leave it to the rest of the app. At the top level
+  // this router sees every address the app itself does not answer, /api/
+  // ones included, and those must keep their JSON 404.
+  if (!org) return next('router');
   req.pub = { org: { slug: org.slug, name: org.name }, db: orgDb(slug) };
   next();
 });
@@ -61,9 +64,12 @@ function nowSql() {
   return new Date().toISOString().slice(0, 19).replace('T', ' ');
 }
 
+// The event at this address, or the event that used to be at it.
 function eventBySlug(db, slug) {
-  if (!/^[a-z0-9]{4,20}$/.test(String(slug))) return null;
-  return db.prepare('SELECT * FROM events WHERE slug = ?').get(slug) || null;
+  if (!EVENT_SLUG_RE.test(String(slug))) return null;
+  return db.prepare('SELECT * FROM events WHERE slug = ?').get(slug)
+    || db.prepare('SELECT e.* FROM event_slugs s JOIN events e ON e.id = s.event_id WHERE s.slug = ?').get(slug)
+    || null;
 }
 
 function inviteByToken(db, token) {
@@ -97,7 +103,7 @@ function flyerHtmlFor(req, event) {
 
 function calendarButtons(req, event, icsPath) {
   if (!event.date || event.status === 'cancelled') return '';
-  const gcal = googleCalendarUrl({ event, url: publicUrl(req.pub.org.slug, `/e/${event.slug}`) });
+  const gcal = googleCalendarUrl({ event, url: eventUrl(req.pub.org.slug, event) });
   return `<div class="pub-actions">
     <a class="pub-btn pub-btn-ghost" href="${esc(gcal)}" target="_blank" rel="noopener">Add to Google Calendar</a>
     <a class="pub-btn pub-btn-ghost" href="${esc(icsPath)}">Download .ics (Apple / Outlook)</a>
@@ -182,7 +188,7 @@ function orgFooter(req) {
 
 // --- event landing page ----------------------------------------------------
 
-publicRouter.get('/e/:slug', (req, res) => {
+function eventPage(req, res) {
   const db = req.pub.db;
   const event = eventBySlug(db, req.params.slug);
   if (!event) return notFoundPage(res);
@@ -195,6 +201,11 @@ publicRouter.get('/e/:slug', (req, res) => {
     previewBanner = statusBanner('Draft preview — guests cannot see this page yet.', 'warn');
   }
 
+  // An old address, or this one under /o/, moves the browser to the event's
+  // own, so that is the one guests copy and share.
+  const own = `/${req.pub.org.slug}/${event.slug}`;
+  if (req.originalUrl.split('?')[0] !== own) return res.redirect(301, own);
+
   const cancelled = event.status === 'cancelled';
   const closed = deadlinePassed(event);
   const left = seatsLeft(db, event);
@@ -204,7 +215,7 @@ publicRouter.get('/e/:slug', (req, res) => {
   if (!cancelled && event.rsvp_mode === 'open') {
     rsvpCard = `<div class="pub-card"><h2>No RSVP needed</h2>
       <p class="pub-muted">This is an open event — just show up! Add it to your calendar so you don't miss it.</p>
-      ${calendarButtons(req, event, `/o/${esc(req.pub.org.slug)}/e/${esc(event.slug)}/ics`)}</div>`;
+      ${calendarButtons(req, event, `/${esc(req.pub.org.slug)}/${esc(event.slug)}/ics`)}</div>`;
   } else if (!cancelled && event.rsvp_mode === 'rsvp') {
     if (!event.share_enabled) {
       rsvpCard = `<div class="pub-card"><h2>RSVP</h2>
@@ -217,7 +228,7 @@ publicRouter.get('/e/:slug', (req, res) => {
         <p class="pub-muted">All ${esc(String(event.capacity))} places have been taken. Contact the host if you have questions.</p></div>`;
     } else {
       rsvpCard = `<div class="pub-card"><h2>Will you be there?</h2>
-        <form method="post" action="/o/${esc(req.pub.org.slug)}/e/${esc(event.slug)}/rsvp">
+        <form method="post" action="/${esc(req.pub.org.slug)}/${esc(event.slug)}/rsvp">
           <div class="pub-field"><label for="name">Your name</label>
             <input id="name" name="name" required maxlength="200" autocomplete="name"></div>
           <div class="pub-field"><label for="email">Your email</label>
@@ -243,16 +254,16 @@ publicRouter.get('/e/:slug', (req, res) => {
       ${flyerHtmlFor(req, event)}
       ${detailsCard(event)}
       ${rsvpCard}
-      ${!cancelled && event.rsvp_mode === 'rsvp' ? `<div class="pub-card">${calendarButtons(req, event, `/o/${esc(req.pub.org.slug)}/e/${esc(event.slug)}/ics`) || '<p class="pub-muted">Calendar links appear once the event has a date.</p>'}</div>` : ''}
+      ${!cancelled && event.rsvp_mode === 'rsvp' ? `<div class="pub-card">${calendarButtons(req, event, `/${esc(req.pub.org.slug)}/${esc(event.slug)}/ics`) || '<p class="pub-muted">Calendar links appear once the event has a date.</p>'}</div>` : ''}
       ${guestListCard(db, event)}
     `,
     footerHtml: orgFooter(req),
   }));
-});
+}
 
 // Open RSVP from the shareable link: creates (or updates) an invite keyed by
 // the guest's email, then redirects to their personal invite page.
-publicRouter.post('/e/:slug/rsvp', (req, res) => {
+function eventRsvp(req, res) {
   const db = req.pub.db;
   const event = eventBySlug(db, req.params.slug);
   if (!event || event.status !== 'published') return notFoundPage(res);
@@ -278,7 +289,7 @@ publicRouter.post('/e/:slug/rsvp', (req, res) => {
       <p class="pub-muted">Please go back and enter your name and a valid email address.</p></div>`,
     }));
   }
-  if (deadlinePassed(event)) return res.redirect(303, `/o/${req.pub.org.slug}/e/${event.slug}`);
+  if (deadlinePassed(event)) return res.redirect(303, `/${req.pub.org.slug}/${event.slug}`);
 
   // Reuse an existing invite for this email (personal invite or earlier link
   // RSVP); otherwise create a fresh one.
@@ -314,22 +325,22 @@ publicRouter.post('/e/:slug/rsvp', (req, res) => {
     `).run(event.id, contact?.id ?? null, name, email, randomToken(24), attending, party, note, nowSql());
     invite = db.prepare('SELECT * FROM invites WHERE id = ?').get(insertId(info));
   }
-  res.redirect(303, `/o/${req.pub.org.slug}/i/${invite.token}?thanks=1`);
-});
+  res.redirect(303, `/${req.pub.org.slug}/i/${invite.token}?thanks=1`);
+}
 
-publicRouter.get('/e/:slug/ics', (req, res) => {
+function eventIcs(req, res) {
   const event = eventBySlug(req.pub.db, req.params.slug);
   if (!event || event.status === 'draft') return notFoundPage(res);
   const ics = buildIcs({
     event, orgName: req.pub.org.name,
-    url: publicUrl(req.pub.org.slug, `/e/${event.slug}`),
-    uidKey: event.slug,
+    url: eventUrl(req.pub.org.slug, event),
+    uidKey: eventUidKey(req.pub.db, event),
   });
   if (!ics) return notFoundPage(res, 'This event has no date yet.');
   res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="event.ics"');
   res.send(ics);
-});
+}
 
 // --- personal invite pages -------------------------------------------------
 
@@ -338,7 +349,7 @@ function respondCard(req, event, invite) {
   const closed = deadlinePassed(event);
   const cancelled = event.status === 'cancelled';
   if (cancelled || closed) return '';
-  const base = `/o/${esc(req.pub.org.slug)}/i/${esc(invite.token)}`;
+  const base = `/${esc(req.pub.org.slug)}/i/${esc(invite.token)}`;
   const left = seatsLeft(db, event, invite.id);
   const yesDisabled = left !== null && left <= 0 && invite.response !== 'yes';
 
@@ -391,11 +402,11 @@ publicRouter.get('/i/:token', (req, res) => {
       ${detailsCard(event)}
       ${event.rsvp_mode === 'rsvp' ? respondCard(req, event, invite) : ''}
       ${invite.response !== 'no' && event.status !== 'cancelled'
-        ? `<div class="pub-card">${calendarButtons(req, event, `/o/${esc(req.pub.org.slug)}/i/${esc(invite.token)}/ics`) || '<p class="pub-muted">Calendar links appear once the event has a date.</p>'}</div>`
+        ? `<div class="pub-card">${calendarButtons(req, event, `/${esc(req.pub.org.slug)}/i/${esc(invite.token)}/ics`) || '<p class="pub-muted">Calendar links appear once the event has a date.</p>'}</div>`
         : ''}
       ${guestListCard(db, event)}
       <div class="pub-card"><p class="pub-muted">Shareable event page:
-        <a href="/o/${esc(req.pub.org.slug)}/e/${esc(event.slug)}">${esc(publicUrl(req.pub.org.slug, `/e/${event.slug}`))}</a></p></div>
+        <a href="/${esc(req.pub.org.slug)}/${esc(event.slug)}">${esc(eventUrl(req.pub.org.slug, event))}</a></p></div>
     `,
     footerHtml: orgFooter(req),
   }));
@@ -407,7 +418,7 @@ function recordResponse(req, res, answer) {
   if (!invite) return notFoundPage(res);
   const event = db.prepare('SELECT * FROM events WHERE id = ?').get(invite.event_id);
   if (!event || event.status === 'draft') return notFoundPage(res);
-  const base = `/o/${req.pub.org.slug}/i/${invite.token}`;
+  const base = `/${req.pub.org.slug}/i/${invite.token}`;
 
   if (event.status === 'cancelled') return res.redirect(303, base);
   if (event.rsvp_mode !== 'rsvp') return res.redirect(303, base);
@@ -431,7 +442,7 @@ publicRouter.post('/i/:token', (req, res) => {
   if (!invite) return notFoundPage(res);
   const event = db.prepare('SELECT * FROM events WHERE id = ?').get(invite.event_id);
   if (!event || event.status !== 'published') return notFoundPage(res);
-  if (deadlinePassed(event)) return res.redirect(303, `/o/${req.pub.org.slug}/i/${invite.token}?closed=1`);
+  if (deadlinePassed(event)) return res.redirect(303, `/${req.pub.org.slug}/i/${invite.token}?closed=1`);
 
   let party = Number(req.body.party_size || invite.party_size);
   if (!Number.isInteger(party) || party < 1) party = invite.party_size;
@@ -441,11 +452,11 @@ publicRouter.post('/i/:token', (req, res) => {
   if (invite.response === 'yes') {
     const left = seatsLeft(db, event, invite.id);
     if (left !== null && party > left) {
-      return res.redirect(303, `/o/${req.pub.org.slug}/i/${invite.token}?full=1`);
+      return res.redirect(303, `/${req.pub.org.slug}/i/${invite.token}?full=1`);
     }
   }
   db.prepare('UPDATE invites SET party_size = ?, note = ? WHERE id = ?').run(party, note, invite.id);
-  res.redirect(303, `/o/${req.pub.org.slug}/i/${invite.token}?updated=1`);
+  res.redirect(303, `/${req.pub.org.slug}/i/${invite.token}?updated=1`);
 });
 
 publicRouter.get('/i/:token/ics', (req, res) => {
@@ -456,7 +467,7 @@ publicRouter.get('/i/:token/ics', (req, res) => {
   if (!event || event.status === 'draft') return notFoundPage(res);
   const ics = buildIcs({
     event, orgName: req.pub.org.name,
-    url: publicUrl(req.pub.org.slug, `/e/${event.slug}`),
+    url: eventUrl(req.pub.org.slug, event),
     uidKey: invite.token,
   });
   if (!ics) return notFoundPage(res, 'This event has no date yet.');
@@ -479,7 +490,7 @@ publicRouter.get('/u/:token', (req, res) => {
     title: 'Unsubscribe',
     bodyHtml: `<div class="pub-card"><h2>Stop receiving emails?</h2>
       <p class="pub-muted">${esc(email)} will no longer receive invitations or updates from ${esc(req.pub.org.name)}.</p>
-      <form method="post" action="/o/${esc(req.pub.org.slug)}/u/${esc(invite.token)}" style="margin-top:14px;">
+      <form method="post" action="/${esc(req.pub.org.slug)}/u/${esc(invite.token)}" style="margin-top:14px;">
         <button class="pub-btn pub-btn-plain" type="submit">Unsubscribe</button>
       </form></div>`,
     footerHtml: orgFooter(req),
@@ -579,7 +590,7 @@ publicRouter.get('/bu/:token', (req, res) => {
     title: 'Unsubscribe',
     bodyHtml: `<div class="pub-card"><h2>Stop receiving emails?</h2>
       <p class="pub-muted">${esc(contact.email)} will no longer receive announcements or invitations from ${esc(req.pub.org.name)}.</p>
-      <form method="post" action="/o/${esc(req.pub.org.slug)}/bu/${esc(req.params.token)}" style="margin-top:14px;">
+      <form method="post" action="/${esc(req.pub.org.slug)}/bu/${esc(req.params.token)}" style="margin-top:14px;">
         <button class="pub-btn pub-btn-plain" type="submit">Unsubscribe</button>
       </form></div>`,
     footerHtml: orgFooter(req),
@@ -620,3 +631,16 @@ publicRouter.get('/files/:token', (req, res) => {
   if (!row.mime.startsWith('image/')) res.setHeader('Content-Disposition', downloadDisposition(row.original_name));
   res.sendFile(file);
 });
+
+// --- event addresses -------------------------------------------------------
+
+// The addresses events had before. eventPage redirects to the new one.
+publicRouter.get('/e/:slug', eventPage);
+publicRouter.post('/e/:slug/rsvp', eventRsvp);
+publicRouter.get('/e/:slug/ics', eventIcs);
+
+// An event's address is one word after the organization. These come last,
+// so the fixed words above (i, u, b, bu, files) always win.
+publicRouter.get('/:slug', eventPage);
+publicRouter.post('/:slug/rsvp', eventRsvp);
+publicRouter.get('/:slug/ics', eventIcs);

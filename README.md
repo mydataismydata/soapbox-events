@@ -200,17 +200,28 @@ scripts/              create-org, reset-password, seed-demo, smoke-test, backup
 data/                 runtime state: core.db + one directory per organization
 ```
 
-Public guest URLs are namespaced per organization and token-based:
+Public guest URLs are namespaced per organization. An event page is at the
+meeting's date and start time; everything personal is token-based:
 
 ```
-/o/<org>/e/<event-slug>        landing page + open RSVP form
-/o/<org>/i/<invite-token>      personal RSVP page
-/o/<org>/i/<token>/accept      one-click accept (from email button)
-/o/<org>/i/<token>/decline     one-click decline
-/o/<org>/u/<token>             unsubscribe (event invitation)
-/o/<org>/b/<slug>              broadcast web version ("view in browser")
-/o/<org>/bu/<token>            unsubscribe (broadcast)
+/<org>/2026-oct-27-17-30     landing page + open RSVP form
+/<org>/i/<invite-token>      personal RSVP page
+/<org>/i/<token>/accept      one-click accept (from email button)
+/<org>/i/<token>/decline     one-click decline
+/<org>/u/<token>             unsubscribe (event invitation)
+/<org>/b/<slug>              broadcast web version ("view in browser")
+/<org>/bu/<token>            unsubscribe (broadcast)
 ```
+
+A meeting with no start time is at its date alone (`/<org>/2026-oct-27`).
+Two meetings at the same time get `-2`, `-3` on the end. A meeting that
+moves gets a new address, and the old one redirects to it.
+
+These pages began under `/o/<org>/…`, and every old address still works:
+`/o/<org>/e/<slug>` redirects to the event's current page, and the rest
+answer as before. An organization's slug can't be one of the app's own
+top-level words (`app`, `api`, `fonts`, `o` and the rest of
+`RESERVED_SLUGS` in `server/lib/db.js`).
 
 ## Security notes
 

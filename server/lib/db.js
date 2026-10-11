@@ -22,7 +22,7 @@ try {
 
 export const RESERVED_SLUGS = new Set([
   'app', 'api', 'o', 'e', 'i', 'u', 'files', 'admin', 'assets', 'static',
-  'login', 'logout', 'data', 'public', 'www', 'mail', 'health',
+  'login', 'logout', 'data', 'public', 'www', 'mail', 'health', 'fonts',
 ]);
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,28}[a-z0-9])?$/;
 
@@ -40,7 +40,8 @@ function migrate(db, migrations) {
   for (let i = version; i < migrations.length; i++) {
     db.exec('BEGIN');
     try {
-      db.exec(migrations[i]);
+      if (typeof migrations[i] === 'function') migrations[i](db);
+      else db.exec(migrations[i]);
       db.exec(`PRAGMA user_version = ${i + 1}`);
       db.exec('COMMIT');
     } catch (err) {

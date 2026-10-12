@@ -31,10 +31,10 @@ const WORDING = {
     groups: 'Send to whole groups',
     tick: (name) => `Send to ${name}`,
     empty: 'No contacts selected yet — pick a group above, or tick people from the list.',
-    noEmail: 'no email — can’t receive broadcasts',
+    noEmail: 'no email — can’t receive bulk emails',
     already: 'Already sent',
-    alreadyOne: (who) => `${who} was already sent this broadcast`,
-    alreadyAll: (n) => `Nobody new selected — all ${n} of the people picked were already sent this broadcast.`,
+    alreadyOne: (who) => `${who} was already sent this bulk email`,
+    alreadyAll: (n) => `Nobody new selected — all ${n} of the people picked were already sent this bulk email.`,
     alreadyRest: (n) => `${n} other${n === 1 ? ' was' : 's were'} already sent it and won’t get it twice.`,
   },
   // A survey asks people.

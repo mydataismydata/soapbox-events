@@ -172,9 +172,9 @@ export default function Dashboard() {
       ) : null}
 
       <div className="grid2" style={{ alignItems: 'start' }}>
-        <Card flush title="Broadcasts" actions={<SeeAll to="/broadcasts">All broadcasts</SeeAll>}>
+        <Card flush title="Bulk emails" actions={<SeeAll to="/bulk-emails">All bulk emails</SeeAll>}>
           {broadcasts.length === 0 ? (
-            <Empty icon="megaphone" title="No broadcasts yet">Email blasts to your contacts show up here.</Empty>
+            <Empty icon="megaphone" title="No bulk emails yet">Email blasts to your contacts show up here.</Empty>
           ) : (
             <div className="table-wrap">
               <table className="table">
@@ -182,7 +182,7 @@ export default function Dashboard() {
                   {broadcasts.map((b) => (
                     <tr key={b.id} className="row-link">
                       <td>
-                        <Link to={`/broadcasts/${b.id}`} className="t-main row-link-target">{b.title}</Link>
+                        <Link to={`/bulk-emails/${b.id}`} className="t-main row-link-target">{b.title}</Link>
                         <div className="t-sub">
                           {b.status === 'sent'
                             ? `${b.stats.recipients} recipient${b.stats.recipients === 1 ? '' : 's'}${b.sent_at ? ` · ${timeAgo(b.sent_at)}` : ''}`

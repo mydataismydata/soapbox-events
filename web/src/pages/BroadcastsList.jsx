@@ -14,7 +14,7 @@ function Row({ b }) {
   return (
     <tr className="row-link">
       <td>
-        <Link to={`/broadcasts/${b.id}`} className="t-main row-link-target">{b.title}</Link>
+        <Link to={`/bulk-emails/${b.id}`} className="t-main row-link-target">{b.title}</Link>
         <div className="t-sub">{b.subject || <em>no subject yet</em>}</div>
       </td>
       <td><BroadcastBadge status={b.status} /></td>
@@ -36,7 +36,7 @@ function Row({ b }) {
 function Section({ title, rows }) {
   if (rows.length === 0) return null;
   return (
-    <Card flush title={title} sub={`${rows.length} broadcast${rows.length === 1 ? '' : 's'}`}
+    <Card flush title={title} sub={`${rows.length} bulk email${rows.length === 1 ? '' : 's'}`}
       style={{ marginBottom: 16 }}>
       <div className="table-wrap">
         <table className="table"><tbody>{rows.map((b) => <Row key={b.id} b={b} />)}</tbody></table>
@@ -64,7 +64,7 @@ export default function BroadcastsList() {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1 className="page-title">Broadcasts</h1>
+          <h1 className="page-title">Bulk emails</h1>
           <p className="page-sub">Email blasts to your contacts and groups — no event, no RSVP.</p>
         </div>
         <div className="head-actions">
@@ -73,18 +73,18 @@ export default function BroadcastsList() {
               <Icon name="download" size={15} /> Export CSV
             </a>
           ) : null}
-          <button className="btn btn-primary" onClick={() => navigate('/broadcasts/new')}>
-            <Icon name="plus" size={15} /> New broadcast
+          <button className="btn btn-primary" onClick={() => navigate('/bulk-emails/new')}>
+            <Icon name="plus" size={15} /> New bulk email
           </button>
         </div>
       </div>
 
       {broadcasts.length === 0 ? (
         <Card flush>
-          <Empty icon="megaphone" title="No broadcasts yet" action={
-            <button className="btn btn-primary" onClick={() => navigate('/broadcasts/new')}>Create your first broadcast</button>
+          <Empty icon="megaphone" title="No bulk emails yet" action={
+            <button className="btn btn-primary" onClick={() => navigate('/bulk-emails/new')}>Create your first bulk email</button>
           }>
-            Use a broadcast for announcements that aren't tied to an event — endorsements, primary
+            Use a bulk email for announcements that aren't tied to an event — endorsements, primary
             reminders, newsletters. You get the flyer designer and templates, minus RSVP.
           </Empty>
         </Card>

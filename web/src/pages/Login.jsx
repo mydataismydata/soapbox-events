@@ -67,7 +67,7 @@ export default function Login({ onLogin }) {
           <p>Run your events and your mailing list from the same roster. No per-guest fees, no third-party invite service.</p>
           <ul className="login-feats">
             <li><span className="arrow" aria-hidden="true">→</span><span>Invite by group, add people inline, and send only to those not yet invited.</span></li>
-            <li><span className="arrow" aria-hidden="true">→</span><span>Publish a web version of any broadcast, or keep it email-only.</span></li>
+            <li><span className="arrow" aria-hidden="true">→</span><span>Publish a web version of any bulk email, or keep it email-only.</span></li>
             <li><span className="arrow" aria-hidden="true">→</span><span>Every send is logged — delivered, bounced, opened.</span></li>
           </ul>
         </div>

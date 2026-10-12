@@ -167,7 +167,7 @@ reportRouter.get('/export/events.csv', wrap(async (req, res) => {
 reportRouter.get('/export/broadcasts.csv', wrap(async (req, res) => {
   const rows = req.db.prepare('SELECT * FROM broadcasts ORDER BY COALESCE(sent_at, updated_at) DESC, id DESC').all()
     .map((b) => ({ ...b, ...broadcastStats(req.db, b.id), web_url: publicUrl(req.org.slug, `/b/${b.slug}`) }));
-  sendCsv(res, 'broadcasts.csv', toCsv(rows, [
+  sendCsv(res, 'bulk-emails.csv', toCsv(rows, [
     { key: 'title', label: 'title' },
     { key: 'status', label: 'status' },
     { key: 'subject', label: 'subject' },

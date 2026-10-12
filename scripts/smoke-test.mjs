@@ -2330,7 +2330,9 @@ let surveySlug = '';
 // --- help: every page has help, and every picture it names exists ----------
 {
   const app = fs.readFileSync(new URL('../web/src/App.jsx', import.meta.url), 'utf8');
-  const routes = [...app.matchAll(/<Route path="([^"]+)"/g)].map((m) => m[1]).filter((p) => p !== '*');
+  // A route that only forwards to another address has no page of its own.
+  const routes = [...app.matchAll(/<Route path="([^"]+)" element={<(\w+)/g)]
+    .filter((m) => !['Navigate', 'Moved'].includes(m[2])).map((m) => m[1]);
   check('the app has routes to look for help on', routes.length >= 15, `found ${routes.length}`);
   const missing = routes.filter((r) => !helpFor(r.replace(/:\w+/g, '12')));
   check('every page has help', missing.length === 0, missing.join(', '));

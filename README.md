@@ -43,22 +43,22 @@ organizations from one installation**, with hard isolation between them.
   cancellation notices, test sends to yourself
 - Duplicate past events; manual RSVP entry for phone responses
 
-**Broadcasts**
+**Bulk emails**
 - Standalone email blasts that aren't tied to an event — endorsements, primary
   reminders, newsletters — with the same flyer designer and templates, minus
   RSVP and guest tracking
 - A slimmed wizard (details → design & message → recipients → review & send);
   send to groups and individual contacts, add new people inline
-- One **attached file** per broadcast, up to 5 MB: a PDF, a Word, Excel or
+- One **attached file** per bulk email, up to 5 MB: a PDF, a Word, Excel or
   PowerPoint file, or a picture. Every email carries it, test emails included.
-- Optional unguessable **web version** ("view this email online") per broadcast,
+- Optional unguessable **web version** ("view this email online") per bulk email,
   rendered from the flyer masthead; per-send toggle. The email itself carries
   your message and nothing above it.
-- Every broadcast email carries a one-click unsubscribe; unsubscribed contacts
+- Every bulk email carries a one-click unsubscribe; unsubscribed contacts
   are skipped and shared with the event unsubscribe list
 - Delivery report (recipients, sent, queued, failed) and a full email log with
   one-click retry
-- Email logs everywhere — per event, per broadcast, and an organization-wide
+- Email logs everywhere — per event, per bulk email, per survey, and an organization-wide
   one — filterable by recipient, type and status, sortable on every column,
   and paginated
 
@@ -233,8 +233,8 @@ reached through an unguessable code:
 /<org>/i/<token>/accept      one-click accept (from email button)
 /<org>/i/<token>/decline     one-click decline
 /<org>/u/<token>             unsubscribe (event invitation)
-/<org>/b/<slug>              broadcast web version ("view in browser")
-/<org>/bu/<token>            unsubscribe (broadcast)
+/<org>/b/<slug>              bulk email web version ("view in browser")
+/<org>/bu/<token>            unsubscribe (bulk email)
 /<org>/s/<code>              survey's shared page (answers it if the survey is public)
 /<org>/q/<token>             personal survey page (answer, or change answers)
 ```
@@ -271,7 +271,7 @@ top-level words (`app`, `api`, `fonts`, `o` and the rest of
 - Login and public RSVP endpoints are rate-limited
 - All SQL uses prepared statements; all HTML output is escaped
 - Uploads are validated by magic bytes (JPEG/PNG/GIF/WebP only, 5 MB cap) and
-  served with fixed content types from unguessable URLs. A broadcast's
+  served with fixed content types from unguessable URLs. A bulk email's
   attachment may also be a PDF or a Word, Excel or PowerPoint file, judged by
   its contents; Office files with macros are refused, and documents are served
   as downloads

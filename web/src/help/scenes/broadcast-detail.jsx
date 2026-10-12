@@ -17,7 +17,7 @@ const steps = [
 export default function BroadcastDetail() {
   return (
     <Scene width={560} height={470} length={10000} start={start} steps={steps}
-      label="The page of the sent broadcast Election Info. Its numbers show 7 recipients, 6 sent and 1 failed. In the email log, the email to Sean C. failed with the reason underneath. Clicking its retry button sends it again, and Sent becomes 7. Duplicate at the top starts a new broadcast from this one.">
+      label="The page of the sent bulk email Election Info. Its numbers show 7 recipients, 6 sent and 1 failed. In the email log, the email to Sean C. failed with the reason underneath. Clicking its retry button sends it again, and Sent becomes 7. Duplicate at the top starts a new bulk email from this one.">
       {(s) => {
         const seanStatus = s.delivered ? 'sent' : s.retried ? 'queued' : 'failed';
         const rows = [...PEOPLE].reverse().slice(0, 5).map((p) => ({
@@ -39,7 +39,7 @@ export default function BroadcastDetail() {
               )} />
             <div data-t="stats">
               <StatGrid>
-                <Stat label="Recipients" value={7} sub="emailed this broadcast" />
+                <Stat label="Recipients" value={7} sub="sent this bulk email" />
                 <Stat label="Sent" value={s.delivered ? 7 : 6} tone="ok" sub="delivered / simulated" />
                 <Stat label="Queued" value={s.retried && !s.delivered ? 1 : 0} tone="warn" sub="waiting to send" />
                 <Stat label="Failed" value={s.retried ? 0 : 1} tone="bad" sub={s.retried ? 'none' : 'retry from the log below'} />

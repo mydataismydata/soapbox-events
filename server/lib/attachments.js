@@ -105,7 +105,7 @@ export function attachmentInfo(db, token) {
   return row ? { token: row.token, name: row.original_name || 'attachment', bytes: row.bytes, mime: row.mime } : null;
 }
 
-const GONE = 'The attached file is missing. Remove it from the broadcast, or attach it again.';
+const GONE = 'The attached file is missing. Remove it from the bulk email, or attach it again.';
 
 /** Why an attachment cannot go out, or '' when it can. Checked before anything is queued. */
 export function attachmentProblem(db, orgSlug, token) {

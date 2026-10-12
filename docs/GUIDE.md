@@ -160,14 +160,14 @@ leave and resume any time (it stays a draft until you send or publish).
    sends nothing. The same pause applies on the event page, to **Send** and
    to the envelope button that resends one guest's invitation.
 
-## Broadcasts (email blasts, no event)
+## Bulk emails (email blasts, no event)
 
 Sometimes you need to email your people about something that isn't an event —
-an endorsement, a primary reminder, a newsletter. **Broadcasts** do exactly
+an endorsement, a primary reminder, a newsletter. **Bulk emails** do exactly
 that: the same flyer designer and templates as events, but no RSVP, no guest
 list, no date/venue.
 
-**Broadcasts → New broadcast** opens a slimmed four-step wizard:
+**Bulk emails → New bulk email** opens a slimmed four-step wizard:
 
 1. **Details** — a title (the internal name, also shown on the web version),
    the email subject (defaults to the title), and whether to publish a **web
@@ -186,32 +186,32 @@ list, no date/venue.
    queued per recipient who has an address and hasn't unsubscribed.
 
 **Attachment.** Attach a file, under the message, adds one file of up to 5 MB:
-a PDF, a Word, Excel or PowerPoint file, or a picture. Every email the
-broadcast sends carries it as an attachment, and so do test emails and copies.
+a PDF, a Word, Excel or PowerPoint file, or a picture. Every email it sends
+carries it as an attachment, and so do test emails and copies.
 Office files with macros are refused. Each mail program shows the file where it
 shows any attachment. Mail on a Mac shows a PDF inside the message, and Gmail
 and Outlook list it with the email.
 
 **Web version.** With it on, the email includes a “View this email online” link
 to an unguessable page that renders the masthead and your message — handy when
-a mail client clips a long email. Turn it off for an email-only broadcast. It's
-a per-broadcast toggle.
+a mail client clips a long email. Turn it off to send by email only. Each bulk
+email has its own setting.
 
-**Send to additional people.** On a sent broadcast's page, **Send to additional
+**Send to additional people.** On a sent bulk email's page, **Send to additional
 people** opens the same picker as the wizard's Recipients step. Everyone the
-broadcast already went to is greyed out with an *Already sent* tag and can't be
+bulk email already went to is greyed out with an *Already sent* tag and can't be
 ticked, so the message goes only to people who haven't had it. The server
 checks again when you send, so nobody gets a second copy from a page that was
 left open. An email still queued, or one that failed, counts as sent; retry a
 failed one from the log.
 
-**Unsubscribe still applies.** Every broadcast email has an unsubscribe link,
-and anyone who has unsubscribed (from a broadcast *or* an event) is skipped and
-counted in the send summary. The broadcast page shows delivery counts
+**Unsubscribe still applies.** Every bulk email has an unsubscribe link,
+and anyone who has unsubscribed (from a bulk email *or* an event) is skipped and
+counted in the send summary. The bulk email's page shows delivery counts
 (recipients, sent, queued, failed) and a full email log with one-click retry,
 filtering by recipient and status, and sortable columns — exactly like an
-event's email log. Broadcasts also export to CSV
-(Settings → Export, or the button on the Broadcasts page).
+event's email log. Bulk emails also export to CSV
+(Settings → Export, or the button on the Bulk emails page).
 
 ## Surveys
 
@@ -344,8 +344,8 @@ optional notification), and delete for drafts and cancelled events.
 - **Event stats** — invited, emailed, accepted (plus total headcount
   including plus-ones), declined, awaiting reply, not yet reached.
 - **Email log** (the sidebar one) — every email the organization has ever
-  sent, from every event and broadcast, in one paginated list. This is where
-  the type and the event/broadcast it came from become useful columns, so
+  sent, from every event, bulk email and survey, in one paginated list. This is where
+  the type and the event, bulk email or survey it came from become useful columns, so
   both are shown here along with the subject. Filter by recipient, type or
   status, and sort on any column. Each row still opens the exact email that
   was sent and offers a retry if it failed.

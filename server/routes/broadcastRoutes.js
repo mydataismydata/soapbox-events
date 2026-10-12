@@ -17,8 +17,8 @@ import {
 export const broadcastRouter = Router();
 
 function getBroadcast(db, id) {
-  const b = db.prepare('SELECT * FROM broadcasts WHERE id = ?').get(v.int(id, { label: 'broadcast id', min: 1 }));
-  if (!b) throw new ApiError(404, 'Broadcast not found.');
+  const b = db.prepare('SELECT * FROM broadcasts WHERE id = ?').get(v.int(id, { label: 'bulk email id', min: 1 }));
+  if (!b) throw new ApiError(404, 'Bulk email not found.');
   return b;
 }
 
@@ -237,7 +237,7 @@ broadcastRouter.post('/broadcasts/:id/send-copy', wrap(async (req, res) => {
 
 broadcastRouter.post('/broadcasts/:id/send', wrap(async (req, res) => {
   const b = getBroadcast(req.db, req.params.id);
-  if (!b.title) throw new ApiError(400, 'Give the broadcast a title before sending.');
+  if (!b.title) throw new ApiError(400, 'Give the bulk email a title before sending.');
   // Caught here, before anything is queued, rather than as a failure on
   // every email.
   const problem = attachmentProblem(req.db, req.org.slug, b.attachment);
@@ -288,7 +288,7 @@ broadcastRouter.get('/broadcasts/:id/sent-to', wrap(async (req, res) => {
 broadcastRouter.post('/broadcasts/:id/send-more', wrap(async (req, res) => {
   const b = getBroadcast(req.db, req.params.id);
   if (b.status === 'draft') {
-    throw new ApiError(400, 'This broadcast hasn’t been sent yet. Send it from the wizard first.');
+    throw new ApiError(400, 'This bulk email hasn’t been sent yet. Send it from the wizard first.');
   }
   const problem = attachmentProblem(req.db, req.org.slug, b.attachment);
   if (problem) throw new ApiError(400, problem);
@@ -314,7 +314,7 @@ broadcastRouter.post('/broadcasts/:id/send-more', wrap(async (req, res) => {
     });
     if (r.queued === 0) {
       throw new ApiError(400, r.skipped.already_sent
-        ? 'Everyone picked has already been sent this broadcast.'
+        ? 'Everyone picked has already been sent this bulk email.'
         : 'None of the people picked has an email address they haven’t unsubscribed from.');
     }
     req.db.prepare("UPDATE broadcasts SET updated_at = datetime('now') WHERE id = ?").run(b.id);

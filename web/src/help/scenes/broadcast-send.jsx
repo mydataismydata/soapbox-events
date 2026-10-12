@@ -22,7 +22,7 @@ function Kv({ k, children, t }) {
 export default function BroadcastSend() {
   return (
     <Scene width={560} height={542} length={12000} start={start} steps={steps}
-      label="Steps 3 and 4 of the broadcast wizard. Clicking Select all ticks all seven contacts, and the button changes to Deselect all. Continue moves to Review & send, which says 7 recipients will be emailed. Send broadcast asks Send this broadcast now?, and Yes, send queues 7 emails.">
+      label="Steps 3 and 4 of the bulk email wizard. Clicking Select all ticks all seven contacts, and the button changes to Deselect all. Continue moves to Review & send, which says 7 recipients will be emailed. Send bulk email asks Send this bulk email now?, and Yes, send queues 7 emails.">
       {(s) => (
         <Screen bare>
           <Wizard labels={BROADCAST_STEPS} step={s.step}>
@@ -35,19 +35,19 @@ export default function BroadcastSend() {
               </>
             ) : (
               <Card title="Review & send">
-                <Kv k="Broadcast"><strong>{BOCC.title}</strong></Kv>
+                <Kv k="Bulk email"><strong>{BOCC.title}</strong></Kv>
                 <Kv k="Subject">{BOCC.subject}</Kv>
                 <Kv k="Web version">On — “view in browser” link included</Kv>
                 <Kv k="Recipients" t="recipients"><strong>7</strong> recipients will be emailed</Kv>
                 <div className="row mt" style={{ flexWrap: 'nowrap' }}>
-                  <span className="btn btn-primary" data-t="send"><Icon name="send" size={15} /> Send broadcast</span>
+                  <span className="btn btn-primary" data-t="send"><Icon name="send" size={15} /> Send bulk email</span>
                   <span className="btn">Save draft</span>
                 </div>
               </Card>
             )}
           </Wizard>
           {s.confirm ? (
-            <Modal title="Send this broadcast now?"
+            <Modal title="Send this bulk email now?"
               footer={(
                 <>
                   <span className="btn">Cancel</span>

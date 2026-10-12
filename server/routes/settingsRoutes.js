@@ -52,13 +52,13 @@ settingsRouter.put('/settings', requireAdmin, wrap(async (req, res) => {
     setSetting(req.db, 'broadcast_sender_split', b.broadcast_sender_split ? '1' : '');
   }
   if (b.broadcast_sender_name !== undefined) {
-    setSetting(req.db, 'broadcast_sender_name', v.optStr(b.broadcast_sender_name, { label: 'Broadcast sender name', max: 200 }));
+    setSetting(req.db, 'broadcast_sender_name', v.optStr(b.broadcast_sender_name, { label: 'Bulk email sender name', max: 200 }));
   }
   if (b.broadcast_sender_email !== undefined) {
-    setSetting(req.db, 'broadcast_sender_email', v.optEmail(b.broadcast_sender_email, { label: 'Broadcast sender email' }));
+    setSetting(req.db, 'broadcast_sender_email', v.optEmail(b.broadcast_sender_email, { label: 'Bulk email sender email' }));
   }
   if (b.broadcast_reply_to !== undefined) {
-    setSetting(req.db, 'broadcast_reply_to', v.optEmail(b.broadcast_reply_to, { label: 'Broadcast reply-to email' }));
+    setSetting(req.db, 'broadcast_reply_to', v.optEmail(b.broadcast_reply_to, { label: 'Bulk email reply-to email' }));
   }
   if (b.smtp2go_api_key !== undefined) {
     const key = v.optStr(b.smtp2go_api_key, { label: 'API key', max: 200 });

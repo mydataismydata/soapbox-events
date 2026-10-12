@@ -79,7 +79,7 @@ export default function BroadcastWizard() {
           new_contacts: bc.audience?.new_contacts || [],
         });
         if (bc.status !== 'draft') {
-          toast('This broadcast was already sent — changes create a fresh send when you send again.', 'bad');
+          toast('This bulk email was already sent — changes create a fresh send when you send again.', 'bad');
         }
       }).catch((err) => setError(err.message));
     }
@@ -123,7 +123,7 @@ export default function BroadcastWizard() {
 
   async function goTo(next) {
     if (next > step && step === 0 && !b.title.trim()) {
-      setError('Give the broadcast a title first.');
+      setError('Give the bulk email a title first.');
       return;
     }
     try {
@@ -138,7 +138,7 @@ export default function BroadcastWizard() {
     try {
       const bid = await persist();
       toast('Saved');
-      navigate(`/broadcasts/${bid}`);
+      navigate(`/bulk-emails/${bid}`);
     } catch { /* shown */ }
   }
 
@@ -148,7 +148,7 @@ export default function BroadcastWizard() {
       const result = await api.post(`/api/broadcasts/${bid}/send`, audiencePayload());
       toast(`${result.queued} email${result.queued === 1 ? '' : 's'} queued`
         + (result.skipped?.unsubscribed ? ` · ${result.skipped.unsubscribed} unsubscribed skipped` : ''));
-      navigate(`/broadcasts/${bid}`);
+      navigate(`/bulk-emails/${bid}`);
     } catch (err) {
       setConfirmSend(false);
       setError(err.message);
@@ -168,7 +168,7 @@ export default function BroadcastWizard() {
       const bid = await persist();
       const d = await api.post(`/api/broadcasts/${bid}/test-email`, testTo ? { to: testTo } : {});
       toast(d.status === 'simulated'
-        ? 'Test rendered in simulation mode — view it on the broadcast page'
+        ? 'Test rendered in simulation mode — view it on the bulk email’s page'
         : 'Test email sent — check your inbox');
     } catch (err) { toast(err.message, 'bad'); }
   }
@@ -204,7 +204,7 @@ export default function BroadcastWizard() {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1 className="page-title">{editing ? `Edit: ${b.title || 'broadcast'}` : 'New broadcast'}</h1>
+          <h1 className="page-title">{editing ? `Edit: ${b.title || 'bulk email'}` : 'New bulk email'}</h1>
           <p className="page-sub">An email blast to your contacts — flyer and templates, no RSVP. Saves as you go.</p>
         </div>
         <div className="head-actions">
@@ -245,7 +245,7 @@ export default function BroadcastWizard() {
                   onChange={(e) => patch({ web_version: e.target.checked })} />
                 <span><span className="cb-label">Publish a web version</span>
                   <div className="cb-sub">Adds a “View this email online” link at an unguessable URL — handy when
-                    email clients clip long messages. Turn off to keep this broadcast email-only.</div></span>
+                    email clients clip long messages. Turn off to send it by email only.</div></span>
               </label>
             </Card>
           ) : null}
@@ -254,7 +254,7 @@ export default function BroadcastWizard() {
             <>
               <Card title="Write the message">
                 {templates.length > 0 ? (
-                  <Field label="Start from a template" hint="Event-only placeholders (dates, venue) are left blank in a broadcast.">
+                  <Field label="Start from a template" hint="Event-only placeholders (dates, venue) are left blank in a bulk email.">
                     <select defaultValue="" onChange={(e) => {
                       const t = templates.find((x) => x.id === Number(e.target.value));
                       if (t) patch({ body: t.body, subject: b.subject || t.subject });
@@ -284,7 +284,7 @@ export default function BroadcastWizard() {
                   off there is nothing here to design. */}
               {b.web_version ? (
                 <Card title="Design the masthead"
-                  sub="Fronts the broadcast’s web version. The email itself is just your message.">
+                  sub="Fronts the bulk email’s web version. The email itself is just your message.">
                   <FlyerDesigner mode="broadcast" eventBasics={{ title: b.title, host_name: '' }}
                     flyer={b.flyer} onChange={(flyer) => patch({ flyer })} />
                 </Card>
@@ -300,7 +300,7 @@ export default function BroadcastWizard() {
 
           {step === 3 ? (
             <Card title="Review & send">
-              <div className="kv"><span className="k">Broadcast</span><span><strong>{b.title || '—'}</strong></span></div>
+              <div className="kv"><span className="k">Bulk email</span><span><strong>{b.title || '—'}</strong></span></div>
               <div className="kv"><span className="k">Subject</span><span>{b.subject || b.title || '—'}</span></div>
               <div className="kv"><span className="k">Web version</span>
                 <span>{b.web_version ? 'On — “view in browser” link included' : 'Off — email only'}</span></div>
@@ -326,7 +326,7 @@ export default function BroadcastWizard() {
               <div className="row mt">
                 <button className="btn btn-primary btn-lg" disabled={saving || !recipientCount}
                   onClick={() => setConfirmSend(true)}>
-                  <Icon name="send" size={15} /> Send broadcast
+                  <Icon name="send" size={15} /> Send bulk email
                 </button>
                 <button className="btn btn-lg" onClick={saveDraftAndExit} disabled={saving}>Save draft</button>
               </div>
@@ -367,7 +367,7 @@ export default function BroadcastWizard() {
       ) : null}
 
       {confirmSend ? (
-        <Modal title="Send this broadcast now?" onClose={() => setConfirmSend(false)}
+        <Modal title="Send this bulk email now?" onClose={() => setConfirmSend(false)}
           footer={
             <>
               <button className="btn" onClick={() => setConfirmSend(false)}>Cancel</button>

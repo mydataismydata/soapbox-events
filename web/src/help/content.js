@@ -103,13 +103,13 @@ const EVENT_WIZARD = {
 };
 
 const BROADCAST_WIZARD = {
-  title: 'Writing a broadcast',
-  intro: 'The broadcast wizard has four steps, listed down the left. It saves as you go, and Save & exit keeps a draft.',
+  title: 'Writing a bulk email',
+  intro: 'The bulk email wizard has four steps, listed down the left. It saves as you go, and Save & exit keeps a draft.',
   sections: [
     {
       heading: '1. Details',
       text: [
-        'The title names the broadcast in your list and heads its web version. The email subject is what people see in their inbox. Leave the subject empty to use the title.',
+        'The title names the bulk email in your list and heads its web version. The email subject is what people see in their inbox. Leave the subject empty to use the title.',
         'Publish a web version puts a View this email online link in the email. Some mail programs cut off a long email, and the link shows all of it.',
       ],
       scene: 'broadcast-details',
@@ -118,11 +118,11 @@ const BROADCAST_WIZARD = {
       heading: '2. Message',
       text: [
         'Write the message in the box. The toolbar sets bold, italics, underline, the font and the size, and adds links and pictures.',
-        'First name, Full name and Organization under the box are placeholders. Each one fills in for every person the broadcast goes to.',
+        'First name, Full name and Organization under the box are placeholders. Each one fills in for every person the bulk email goes to.',
       ],
       points: [
-        'Soapbox adds an unsubscribe link to the end of every broadcast.',
-        'Attach a file adds one file of up to 5 MB, such as a PDF. Every email the broadcast sends carries it.',
+        'Soapbox adds an unsubscribe link to the end of every bulk email.',
+        'Attach a file adds one file of up to 5 MB, such as a PDF. Every email it sends carries it.',
         'With the web version on, this step also designs the masthead at the top of the web page. You type its lines straight onto it, the same way as an event’s flyer.',
       ],
       scene: 'broadcast-message',
@@ -132,7 +132,7 @@ const BROADCAST_WIZARD = {
       steps: [
         'Click a group or Select all, or tick people one at a time.',
         'Click Continue.',
-        'Check the number of recipients, and click Send broadcast.',
+        'Check the number of recipients, and click Send bulk email.',
         'Click Yes, send.',
       ],
       points: [
@@ -210,7 +210,7 @@ export const HELP = {
       {
         heading: 'Getting around',
         text: [
-          'The tabs along the top are for what you send and who you send it to: Events, Broadcasts, Surveys, Contacts and Groups.',
+          'The tabs along the top are for what you send and who you send it to: Events, Bulk emails, Surveys, Contacts and Groups.',
           'Your name, at the top right, opens a menu with Venues, Templates, the Email log, Settings and Sign out.',
           'Help, beside it, explains the page you are on.',
         ],
@@ -222,7 +222,7 @@ export const HELP = {
           'Each of the four numbers along the top opens the page it counts. Email quota left opens the email settings.',
           'Upcoming events lists your next events. Coming counts guests and the people they are bringing, and Waiting counts guests who have not answered.',
           'Recent responses shows the newest replies first, as guests click Accept or Decline.',
-          'Broadcasts shows your latest email blasts and whether each has gone out.',
+          'Bulk emails shows your latest email blasts and whether each has gone out.',
           'Open surveys appears while a survey is taking answers, with how many people have answered.',
         ],
         scene: 'dashboard',
@@ -338,33 +338,33 @@ export const HELP = {
     ],
   },
 
-  '/broadcasts': {
-    title: 'Broadcasts',
-    intro: 'A broadcast is an email to your contacts with nothing to reply to, such as news, endorsements or a notice about a public meeting.',
+  '/bulk-emails': {
+    title: 'Bulk emails',
+    intro: 'A bulk email is an email to your contacts with nothing to reply to, such as news, endorsements or a notice about a public meeting.',
     sections: [
       {
-        heading: 'Your broadcasts',
+        heading: 'Your bulk emails',
         text: [
-          'Drafts are broadcasts not sent yet. Sent lists the rest, with how many emails went out.',
-          'Click a broadcast to see who it went to.',
+          'Drafts are bulk emails not sent yet. Sent lists the rest, with how many emails went out.',
+          'Click a bulk email to see who it went to.',
         ],
         scene: 'broadcasts-list',
       },
       {
         heading: 'Writing one',
         text: [
-          'Click New broadcast. The wizard has four steps: the title, the message, the recipients, and a last check before sending.',
+          'Click New bulk email. The wizard has four steps: the title, the message, the recipients, and a last check before sending.',
         ],
       },
     ],
   },
 
-  '/broadcasts/new': BROADCAST_WIZARD,
-  '/broadcasts/:id/edit': BROADCAST_WIZARD,
+  '/bulk-emails/new': BROADCAST_WIZARD,
+  '/bulk-emails/:id/edit': BROADCAST_WIZARD,
 
-  '/broadcasts/:id': {
-    title: 'A broadcast',
-    intro: 'A broadcast’s page shows how its sending went, one row per person.',
+  '/bulk-emails/:id': {
+    title: 'A bulk email',
+    intro: 'A bulk email’s page shows how its sending went, one row per person.',
     sections: [
       {
         heading: 'Delivery',
@@ -378,10 +378,10 @@ export const HELP = {
         heading: 'The buttons at the top',
         points: [
           'Preview shows the message for a sample recipient.',
-          'View web version opens the broadcast’s web page. The Web version link card has its address to copy.',
-          'Send to additional people sends the broadcast to people it hasn’t gone to yet. Everyone it already went to is greyed out and can’t be picked.',
-          'Send a copy emails the broadcast to one more address.',
-          'Duplicate starts a new draft from this broadcast.',
+          'View web version opens the bulk email’s web page. The Web version link card has its address to copy.',
+          'Send to additional people sends the bulk email to people it hasn’t gone to yet. Everyone it already went to is greyed out and can’t be picked.',
+          'Send a copy sends the bulk email to one more address.',
+          'Duplicate starts a new draft from this bulk email.',
           'Edit reopens the wizard. Sending it again sends everyone a fresh copy.',
         ],
       },
@@ -448,7 +448,7 @@ export const HELP = {
 
   '/contacts': {
     title: 'Contacts',
-    intro: 'Contacts is your address book. Every event and broadcast picks its people from here.',
+    intro: 'Contacts is your address book. Every event, bulk email and survey picks its people from here.',
     sections: [
       {
         heading: 'Adding someone',
@@ -491,7 +491,7 @@ export const HELP = {
 
   '/groups': {
     title: 'Groups',
-    intro: 'A group is a saved list of people, such as the executive team. The event and broadcast wizards invite a whole group with one click.',
+    intro: 'A group is a saved list of people, such as the executive team. The event, bulk email and survey wizards invite a whole group with one click.',
     sections: [
       {
         heading: 'Making a group',
@@ -580,12 +580,12 @@ export const HELP = {
 
   '/emails': {
     title: 'Email log',
-    intro: 'The email log lists every email your organization has sent, from every event and broadcast, newest first.',
+    intro: 'The email log lists every email your organization has sent, from every event, bulk email and survey, newest first.',
     sections: [
       {
         heading: 'Finding an email',
         text: [
-          'Type a name or address into Filter by recipient. The two lists beside it pick the type of email, such as Invitation or Broadcast, and its status.',
+          'Type a name or address into Filter by recipient. The two lists beside it pick the type of email, such as Invitation or Bulk email, and its status.',
           'View opens the email exactly as it was sent.',
         ],
         scene: 'email-log',
@@ -620,7 +620,7 @@ export const HELP = {
         ],
         points: [
           'With a key saved, the green box shows how many emails are left in this SMTP2GO billing cycle.',
-          'Send broadcasts from a different address gives broadcasts their own sender, such as a newsletter address.',
+          'Send bulk emails from a different address gives bulk emails their own sender, such as a newsletter address.',
         ],
         scene: 'settings-sending',
       },
@@ -667,7 +667,7 @@ export const HELP = {
       {
         heading: 'Export your data',
         text: [
-          'The buttons download your contacts, groups, venues, events, broadcasts and email log as spreadsheets. Full JSON backup downloads everything as one file.',
+          'The buttons download your contacts, groups, venues, events, bulk emails and email log as spreadsheets. Full JSON backup downloads everything as one file.',
         ],
       },
     ],

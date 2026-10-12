@@ -611,7 +611,7 @@ publicRouter.get('/b/:slug', (req, res) => {
   res.send(publicPage({
     title: b.title,
     bodyHtml: `
-      ${b.status === 'draft' ? statusBanner('Draft preview — this broadcast has not been sent yet.', 'warn') : ''}
+      ${b.status === 'draft' ? statusBanner('Draft preview — this bulk email has not been sent yet.', 'warn') : ''}
       ${flyerHtml}
       ${bodyText.trim()
         ? `<div class="pub-card rt-content">${looksLikeHtml(bodyText)

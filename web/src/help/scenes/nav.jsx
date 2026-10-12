@@ -7,7 +7,7 @@ import { ORG } from '../data.js';
 const start = { menu: false };
 const steps = [
   { at: 600, point: 'tab-Events', say: 'Events: meetings people reply to' },
-  { at: 2200, point: 'tab-Broadcasts', say: 'Broadcasts: news with nothing to reply to' },
+  { at: 2200, point: 'tab-Bulk emails', say: 'Bulk emails: news with nothing to reply to' },
   { at: 3800, point: 'tab-Contacts', say: 'Contacts and Groups: your people' },
   { at: 5400, tap: 'acct', say: 'Your name opens the rest', side: 'left', set: { menu: true } },
   { at: 7000, point: 'menu-Email log', say: 'Venues, templates, the email log and settings', side: 'left' },
@@ -18,7 +18,7 @@ const steps = [
 export default function Nav() {
   return (
     <Scene width={560} height={300} length={11500} start={start} steps={steps}
-      label="Getting around. The tabs along the top are Dashboard, Events, Broadcasts, Contacts and Groups. Clicking your name at the top right opens a menu with Venues, Templates, Email log, Settings and Sign out. Help sits just left of your name.">
+      label="Getting around. The tabs along the top are Dashboard, Events, Bulk emails, Surveys, Contacts and Groups. Clicking your name at the top right opens a menu with Venues, Templates, Email log, Settings and Sign out. Help sits just left of your name.">
       {(s) => (
         <Screen tab="Dashboard" menu={s.menu}>
           <PageHead title="Welcome back, Joe" sub={`Here's what's happening at ${ORG}.`}

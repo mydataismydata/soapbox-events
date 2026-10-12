@@ -8,7 +8,7 @@ import Icon from '../icons.jsx';
 import { Badge, Card, EmailStatusBadge } from '../ui.jsx';
 import { GROUPS, ME, ORG, PEOPLE } from './data.js';
 
-const TABS = ['Dashboard', 'Events', 'Broadcasts', 'Surveys', 'Contacts', 'Groups'];
+const TABS = ['Dashboard', 'Events', 'Bulk emails', 'Surveys', 'Contacts', 'Groups'];
 const MENU = [
   ['Venues', 'pin'],
   ['Templates', 'file'],

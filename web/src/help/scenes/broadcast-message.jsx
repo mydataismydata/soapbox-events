@@ -18,7 +18,7 @@ const steps = [
 export default function BroadcastMessage() {
   return (
     <Scene width={560} height={560} length={14000} start={start} steps={steps}
-      label="Step 2 of the broadcast wizard. The message reads Hi {{first_name}}, then the notice that the County Commissioners are having a special meeting on Oct 28 at 9 AM to reconsider approvals for Agricultural Enclaves, signed {{org_name}}. First name, Full name and Organization under the box are placeholders. Attach a file adds Agenda Oct 28.pdf, 182 KB, which every email carries. Preview email shows Fred's copy, which ends with View this email online and a link to stop receiving emails.">
+      label="Step 2 of the bulk email wizard. The message reads Hi {{first_name}}, then the notice that the County Commissioners are having a special meeting on Oct 28 at 9 AM to reconsider approvals for Agricultural Enclaves, signed {{org_name}}. First name, Full name and Organization under the box are placeholders. Attach a file adds Agenda Oct 28.pdf, 182 KB, which every email carries. Preview email shows Fred's copy, which ends with View this email online and a link to stop receiving emails.">
       {(s) => (
         <Screen bare>
           <Wizard labels={BROADCAST_STEPS} step={1}>

@@ -14,7 +14,7 @@ const KIND_LABELS = {
   nudge: 'Nudge',
   follow_up: 'Follow-up',
   cancellation: 'Cancellation',
-  broadcast: 'Broadcast',
+  broadcast: 'Bulk email',
   survey: 'Survey',
   survey_reminder: 'Survey reminder',
   test: 'Test',
@@ -170,7 +170,7 @@ export default function EmailLog({
                       {e.event_id ? (
                         <Link className="t-main" to={`/events/${e.event_id}`}>{e.event_title}</Link>
                       ) : e.broadcast_id ? (
-                        <Link className="t-main" to={`/broadcasts/${e.broadcast_id}`}>{e.broadcast_title}</Link>
+                        <Link className="t-main" to={`/bulk-emails/${e.broadcast_id}`}>{e.broadcast_title}</Link>
                       ) : e.survey_id ? (
                         <Link className="t-main" to={`/surveys/${e.survey_id}`}>{e.survey_title}</Link>
                       ) : <span className="t-sub">—</span>}

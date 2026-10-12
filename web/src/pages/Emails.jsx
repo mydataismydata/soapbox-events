@@ -18,7 +18,7 @@ export default function Emails() {
 
       <Card flush>
         <EmailLog kinds={KINDS} showType showSource showSubject perPage={50}
-          emptyHint="Emails from your events and broadcasts will show up here, with their exact content." />
+          emptyHint="Emails from your events, bulk emails and surveys will show up here, with their exact content." />
       </Card>
     </div>
   );

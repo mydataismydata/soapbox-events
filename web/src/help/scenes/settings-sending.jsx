@@ -54,7 +54,7 @@ export default function SettingsSending() {
             </div>
             <label className="checkbox">
               <Check on={false} />
-              <span><span className="cb-label">Send broadcasts from a different address</span></span>
+              <span><span className="cb-label">Send bulk emails from a different address</span></span>
             </label>
             <div className="row" style={{ gap: 12 }}>
               <span className="btn btn-primary" data-t="save">Save sending settings</span>

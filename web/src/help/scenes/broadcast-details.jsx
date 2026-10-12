@@ -17,7 +17,7 @@ const steps = [
 export default function BroadcastDetails() {
   return (
     <Scene width={560} height={410} length={10000} start={start} steps={steps}
-      label="Step 1 of the broadcast wizard. The title Board of County Commissioners special meeting Oct 28 is typed in, then the email subject Special meeting Oct 28 at 9 AM. Publish a web version is ticked. Continue moves on to the message.">
+      label="Step 1 of the bulk email wizard. The title Board of County Commissioners special meeting Oct 28 is typed in, then the email subject Special meeting Oct 28 at 9 AM. Publish a web version is ticked. Continue moves on to the message.">
       {(s) => (
         <Screen bare>
           <Wizard labels={BROADCAST_STEPS} step={0}>
@@ -32,7 +32,7 @@ export default function BroadcastDetails() {
                 <Check on />
                 <span><span className="cb-label">Publish a web version</span>
                   <div className="cb-sub">Adds a “View this email online” link at an unguessable URL — handy when
-                    email clients clip long messages. Turn off to keep this broadcast email-only.</div></span>
+                    email clients clip long messages. Turn off to send it by email only.</div></span>
               </label>
             </Card>
             <WizardFoot />

@@ -38,7 +38,7 @@ export function useAuth() {
 const PRIMARY = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/events', label: 'Events' },
-  { to: '/broadcasts', label: 'Broadcasts' },
+  { to: '/bulk-emails', label: 'Bulk emails' },
   { to: '/surveys', label: 'Surveys' },
   { to: '/contacts', label: 'Contacts' },
   { to: '/groups', label: 'Groups' },
@@ -49,6 +49,12 @@ const MENU = [
   { to: '/emails', label: 'Email log', icon: 'inbox' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
+
+// Bulk emails used to be called broadcasts. An old bookmark still finds its page.
+function Moved({ from, to }) {
+  const { pathname, search } = useLocation();
+  return <Navigate to={to + pathname.slice(from.length) + search} replace />;
+}
 
 function initials(name) {
   return (name || '?')
@@ -228,10 +234,11 @@ export default function App() {
               <Route path="/events/new" element={<EventWizard />} />
               <Route path="/events/:id" element={<EventDetail />} />
               <Route path="/events/:id/edit" element={<EventWizard />} />
-              <Route path="/broadcasts" element={<BroadcastsList />} />
-              <Route path="/broadcasts/new" element={<BroadcastWizard />} />
-              <Route path="/broadcasts/:id" element={<BroadcastDetail />} />
-              <Route path="/broadcasts/:id/edit" element={<BroadcastWizard />} />
+              <Route path="/bulk-emails" element={<BroadcastsList />} />
+              <Route path="/bulk-emails/new" element={<BroadcastWizard />} />
+              <Route path="/bulk-emails/:id" element={<BroadcastDetail />} />
+              <Route path="/bulk-emails/:id/edit" element={<BroadcastWizard />} />
+              <Route path="/broadcasts/*" element={<Moved from="/broadcasts" to="/bulk-emails" />} />
               <Route path="/surveys" element={<SurveysList />} />
               <Route path="/surveys/new" element={<SurveyWizard />} />
               <Route path="/surveys/:id" element={<SurveyDetail />} />

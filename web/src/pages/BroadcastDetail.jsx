@@ -84,7 +84,7 @@ function SendToMore({ broadcast: b, onClose, onSent }) {
       {sentTo ? (
         <>
           <p className="small muted" style={{ marginTop: 0 }}>
-            Sends this broadcast, unchanged, to people it hasn’t gone to yet.
+            Sends this bulk email, unchanged, to people it hasn’t gone to yet.
             {sentTo.size === 1
               ? ' The one person already sent it can’t be picked.'
               : ` The ${sentTo.size} people already sent it can’t be picked.`}
@@ -190,7 +190,7 @@ export default function BroadcastDetail() {
                 View web version <Icon name="external" size={14} />
               </a>
             : null}
-          <Link className="btn" to={`/broadcasts/${b.id}/edit`}>
+          <Link className="btn" to={`/bulk-emails/${b.id}/edit`}>
             <Icon name="pencil" size={14} /> {b.status === 'draft' ? 'Continue editing' : 'Edit'}
           </Link>
           {b.status !== 'draft' ? (
@@ -203,7 +203,7 @@ export default function BroadcastDetail() {
           </button>
           <button className="btn" disabled={busy} onClick={() => act(async () => {
             const d = await api.post(`/api/broadcasts/${b.id}/duplicate`);
-            navigate(`/broadcasts/${d.broadcast.id}/edit`);
+            navigate(`/bulk-emails/${d.broadcast.id}/edit`);
           })}><Icon name="copy" size={14} /> Duplicate</button>
           <button className="btn btn-danger" onClick={() => setConfirm({ type: 'delete' })}>
             <Icon name="trash" size={14} /> Delete
@@ -214,14 +214,14 @@ export default function BroadcastDetail() {
       {b.status === 'draft' ? (
         <Banner tone="info">
           <span>
-            This broadcast hasn't been sent yet.{' '}
-            <Link to={`/broadcasts/${b.id}/edit`}>Open it in the wizard</Link> to pick recipients and send.
+            This bulk email hasn't been sent yet.{' '}
+            <Link to={`/bulk-emails/${b.id}/edit`}>Open it in the wizard</Link> to pick recipients and send.
           </span>
         </Banner>
       ) : null}
 
       <StatGrid>
-        <Stat icon="users" label="Recipients" value={s.recipients} sub="emailed this broadcast" />
+        <Stat icon="users" label="Recipients" value={s.recipients} sub="sent this bulk email" />
         <Stat icon="checkCircle" tone="ok" label="Sent" value={s.sent} sub="delivered / simulated" />
         <Stat icon="clipboard" tone="warn" label="Queued" value={s.pending} sub="waiting to send" />
         <Stat icon="xCircle" tone="bad" label="Failed" value={s.failed}
@@ -232,7 +232,7 @@ export default function BroadcastDetail() {
         <Card style={{ marginBottom: 16 }}>
           <strong style={{ fontSize: 13 }}>Web version link</strong>
           <p className="small muted" style={{ margin: '2px 0 8px' }}>
-            The “view in browser” link included in the email. Anyone with it can read this broadcast.
+            The “view in browser” link included in the email. Anyone with it can read this bulk email.
           </p>
           <CopyBox value={b.share_url} />
         </Card>
@@ -246,7 +246,7 @@ export default function BroadcastDetail() {
       </Card>
 
       {copyOpen ? (
-        <Modal title="Send a copy of this broadcast" onClose={() => setCopyOpen(false)}
+        <Modal title="Send a copy of this bulk email" onClose={() => setCopyOpen(false)}
           footer={
             <>
               <button className="btn" onClick={() => setCopyOpen(false)}>Cancel</button>
@@ -293,10 +293,10 @@ export default function BroadcastDetail() {
       ) : null}
 
       {confirm?.type === 'delete' ? (
-        <ConfirmModal title="Delete broadcast?" danger busy={busy}
-          message="This permanently deletes the broadcast and its web version. The email log is kept."
+        <ConfirmModal title="Delete bulk email?" danger busy={busy}
+          message="This permanently deletes the bulk email and its web version. The email log is kept."
           confirmLabel="Delete forever" onClose={() => setConfirm(null)}
-          onConfirm={() => act(async () => { await api.del(`/api/broadcasts/${b.id}`); navigate('/broadcasts'); })} />
+          onConfirm={() => act(async () => { await api.del(`/api/broadcasts/${b.id}`); navigate('/bulk-emails'); })} />
       ) : null}
     </div>
   );

@@ -38,7 +38,7 @@ function SendingCard({ data, isAdmin, onSaved }) {
     // A split with no address of its own would silently fall back to the
     // default sender — better to say so than to look like it took effect.
     if (form.broadcast_sender_split && !form.broadcast_sender_email.trim()) {
-      toast('Give broadcasts a sender email, or turn the split off.', 'bad');
+      toast('Give bulk emails a sender email, or turn the split off.', 'bad');
       return;
     }
     setBusy(true);
@@ -129,10 +129,10 @@ function SendingCard({ data, isAdmin, onSaved }) {
       <label className="checkbox">
         <input type="checkbox" checked={form.broadcast_sender_split} disabled={!isAdmin}
           onChange={(e) => set({ broadcast_sender_split: e.target.checked })} />
-        <span><span className="cb-label">Send broadcasts from a different address</span>
+        <span><span className="cb-label">Send bulk emails from a different address</span>
           <div className="cb-sub">
-            Off, everything goes out from the address above — event invitations and broadcasts alike.
-            On, broadcasts use their own identity, so a newsletter needn't come from the address
+            Off, everything goes out from the address above — event invitations and bulk emails alike.
+            On, bulk emails use their own identity, so a newsletter needn't come from the address
             that invites people to meetings.
           </div></span>
       </label>
@@ -140,19 +140,19 @@ function SendingCard({ data, isAdmin, onSaved }) {
       {form.broadcast_sender_split ? (
         <>
           <div className="field-row">
-            <Field label="Broadcast sender name" hint="Leave blank to reuse the sender name above.">
+            <Field label="Bulk email sender name" hint="Leave blank to reuse the sender name above.">
               <input value={form.broadcast_sender_name} maxLength={200} disabled={!isAdmin}
                 onChange={(e) => set({ broadcast_sender_name: e.target.value })} />
             </Field>
-            <Field label="Broadcast sender email" required
+            <Field label="Bulk email sender email" required
               hint="Also has to be on a domain verified in SMTP2GO.">
               <input type="email" value={form.broadcast_sender_email} maxLength={254} disabled={!isAdmin}
                 onChange={(e) => set({ broadcast_sender_email: e.target.value })} />
             </Field>
           </div>
           <div className="field-row">
-            <Field label="Broadcast reply-to (optional)"
-              hint="Blank sends replies to the broadcast address itself. The reply-to above never applies to broadcasts.">
+            <Field label="Bulk email reply-to (optional)"
+              hint="Blank sends replies to the bulk email address itself. The reply-to above never applies to bulk emails.">
               <input type="email" value={form.broadcast_reply_to} maxLength={254} disabled={!isAdmin}
                 onChange={(e) => set({ broadcast_reply_to: e.target.value })} />
             </Field>
@@ -699,7 +699,7 @@ export default function Settings() {
             ['groups.csv', 'Groups CSV'],
             ['venues.csv', 'Venues CSV'],
             ['events.csv', 'Events CSV'],
-            ['broadcasts.csv', 'Broadcasts CSV'],
+            ['broadcasts.csv', 'Bulk emails CSV'],
             ['emails.csv', 'Email log CSV'],
             ['backup.json', 'Full JSON backup'],
           ].map(([file, label]) => (

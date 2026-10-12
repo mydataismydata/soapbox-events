@@ -64,6 +64,30 @@ export function buildBroadcastTagContext({ org, recipientName, links = {} }) {
   };
 }
 
+// Surveys have a title, a closing date and a personal link, and nothing else
+// an event has.
+export const SURVEY_TAG_DEFS = [
+  { tag: 'first_name', label: 'First name', sample: 'Alex' },
+  { tag: 'full_name', label: 'Full name', sample: 'Alex Rivera' },
+  { tag: 'survey_title', label: 'Survey title', sample: 'Fall priorities' },
+  { tag: 'closes_on', label: 'Closing date', sample: 'Friday, October 30, 2026' },
+  { tag: 'survey_link', label: 'Personal survey link', sample: 'https://example.org/club/q/AbC123' },
+  { tag: 'org_name', label: 'Organization', sample: 'Community Club' },
+];
+
+export function buildSurveyTagContext({ org, survey, recipientName, links = {} }) {
+  const name = String(recipientName || '').trim();
+  return {
+    first_name: firstName(name) || 'there',
+    full_name: name || 'there',
+    recipient_name: name || 'there', // legacy alias
+    survey_title: survey.title || '',
+    closes_on: formatDate(survey.closes_on) || '',
+    survey_link: links.answer || '',
+    org_name: org?.name || '',
+  };
+}
+
 // Replace {{ tag }} occurrences in plain text. Unknown tags become ''.
 export function renderTags(text, ctx) {
   return String(text || '').replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_m, tag) => {

@@ -220,16 +220,78 @@ const PUBLIC_CSS = `
   .rt-al-left { text-align: left; }
   .rt-al-center { text-align: center; }
   .rt-al-right { text-align: right; }
+  /* Surveys (surveyForm.js). Each question is a card; its answers indent
+     under the prompt, past the question number. */
+  .sv-title { font-size: 22px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.3; }
+  .sv-q { border: 0; min-width: 0; }
+  .sv-prompt { display: flex; gap: 10px; align-items: baseline; font-size: 16px; font-weight: 600; line-height: 1.4; }
+  .sv-n { flex: 0 0 18px; font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--ink-2); }
+  .sv-optional { font-family: var(--mono); font-size: 10.5px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--faint); margin-left: 6px; white-space: nowrap; }
+  .sv-help, .sv-hint { color: var(--ink-2); font-size: 14px; margin: 4px 0 0 28px; }
+  .sv-err { color: var(--bad); font-size: 14px; font-weight: 600; margin: 6px 0 0 28px; }
+  .pub-card:has(.sv-q-bad) { border-color: var(--bad-line); box-shadow: inset 3px 0 0 var(--bad); }
+  .sv-choices { display: grid; gap: 8px; margin: 14px 0 0 28px; }
+  .sv-yesno { grid-template-columns: repeat(2, minmax(0, 170px)); }
+  .sv-choice { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 9px 12px; cursor: pointer;
+    border: 1px solid var(--line-strong); border-radius: 3px; background: var(--surface); font-size: 15px; }
+  .sv-choice:hover { background: var(--surface-2); }
+  .sv-choice:has(> input:checked) { border-color: var(--accent); background: #edf3fc; box-shadow: inset 0 0 0 1px var(--accent); }
+  .sv-choice > input[type="radio"], .sv-choice > input[type="checkbox"] {
+    width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--accent); }
+  .sv-choice.is-capped { opacity: 0.55; cursor: not-allowed; }
+  .sv-other-text { flex: 1 1 auto; min-width: 0; min-height: 34px; font: inherit; font-size: 15px; padding: 5px 9px;
+    border: 1px solid var(--line-strong); border-radius: 3px; background: var(--surface); color: var(--ink); }
+  .sv-other-text:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(31, 95, 191, 0.22); }
+  .sv-q .pub-field { margin: 12px 0 0 28px; }
+  .sv-q textarea { resize: vertical; line-height: 1.5; }
+  .sv-rank { list-style: none; display: grid; gap: 8px; margin: 12px 0 0 28px; }
+  .sv-rank-item { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 7px 12px; width: 100%;
+    border: 1px solid var(--line-strong); border-radius: 3px; background: var(--surface); font: inherit; font-size: 15px;
+    color: var(--ink); text-align: left; }
+  .sv-rank-item select { width: 64px; min-height: 34px; font: inherit; padding: 4px 6px; border: 1px solid var(--line-strong);
+    border-radius: 3px; background: var(--surface); color: var(--ink); }
+  button.sv-rank-item { cursor: pointer; }
+  button.sv-rank-item:hover { background: var(--surface-2); }
+  button.sv-rank-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sv-rank-badge { flex: 0 0 28px; height: 28px; border-radius: 50%; border: 1px dashed var(--line-strong);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--faint); }
+  .sv-rank-item.is-ranked { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .sv-rank-item.is-ranked .sv-rank-badge { background: var(--accent); border: 1px solid var(--accent); color: #ffffff; }
+  .sv-rank-reset { margin: 10px 0 0 28px; background: none; border: 0; padding: 0; font: inherit; font-size: 14px;
+    color: var(--accent); text-decoration: underline; cursor: pointer; }
+  .sv-scale { margin: 18px 0 0 28px; max-width: 540px; }
+  .sv-stops { position: relative; display: grid; grid-template-columns: repeat(var(--points), minmax(0, 1fr)); }
+  .sv-stops::before { content: ''; position: absolute; top: 15px; height: 2px; background: var(--line-strong);
+    left: calc(50% / var(--points)); right: calc(50% / var(--points)); }
+  .sv-stop { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 3px 0; cursor: pointer; }
+  .sv-stop input { position: absolute; top: 3px; width: 26px; height: 26px; margin: 0; opacity: 0; cursor: pointer; }
+  .sv-dot { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--surface);
+    transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease; }
+  .sv-stop:hover .sv-dot { border-color: var(--accent); }
+  .sv-stop input:checked + .sv-dot { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 4px rgba(31, 95, 191, 0.18); }
+  .sv-stop input:focus-visible + .sv-dot { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .sv-stop-n { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+  .sv-stop input:checked ~ .sv-stop-n { color: var(--accent); font-weight: 600; }
+  .sv-ends { display: flex; justify-content: space-between; gap: 16px; margin-top: 4px; font-size: 13px; color: var(--ink-2); }
+  .sv-ends span:last-child { text-align: right; }
+  .sv-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+  .sv-read-q { font-weight: 600; margin-bottom: 2px; }
   @media (max-width: 480px) {
     .pub-card { padding: 20px 16px; }
     .pub-actions .pub-btn { flex: 1 1 100%; }
+    .sv-help, .sv-hint, .sv-err, .sv-choices, .sv-rank, .sv-rank-reset, .sv-scale, .sv-q .pub-field { margin-left: 0; }
+    .sv-yesno { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 `;
 
 // Guest pages stay out of search engines unless the caller says otherwise.
 // Only a public meeting's own page is meant to be found; it passes
 // `canonical`, its address, so redirects to it are not indexed twice.
-export function publicPage({ title, bodyHtml, footerHtml = '', canonical = '' }) {
+// `scripts` are this server's own script files, such as the survey helper;
+// the pages work without them.
+export function publicPage({ title, bodyHtml, footerHtml = '', canonical = '', scripts = [] }) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -239,6 +301,7 @@ ${canonical ? `<link rel="canonical" href="${esc(canonical)}">` : '<meta name="r
 <title>${esc(title)}</title>
 <link rel="icon" href="data:,">
 <style>${PUBLIC_CSS}</style>
+${scripts.map((src) => `<script src="${esc(src)}" defer></script>`).join('\n')}
 </head>
 <body>
 <div class="pub-wrap">

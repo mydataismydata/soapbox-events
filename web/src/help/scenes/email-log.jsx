@@ -46,7 +46,7 @@ export default function EmailLog() {
               </div>
               <table className="table hs-tight" data-t="rows">
                 <thead>
-                  <tr><th>When</th><th>Type</th><th>Event / broadcast</th><th>To</th><th>Status</th>
+                  <tr><th>When</th><th>Type</th><th>Sent for</th><th>To</th><th>Status</th>
                     <th><span className="sr-only">Actions</span></th></tr>
                 </thead>
                 <tbody>

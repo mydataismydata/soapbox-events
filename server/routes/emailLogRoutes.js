@@ -10,14 +10,15 @@ const SORTS = {
   recipient: 'LOWER(COALESCE(NULLIF(l.to_name, \'\'), l.to_email))',
   kind: 'l.kind',
   subject: 'LOWER(l.subject)',
-  source: 'LOWER(COALESCE(e.title, b.title))',
+  source: 'LOWER(COALESCE(e.title, b.title, s.title))',
   status: 'l.status',
 };
 
 const FROM = `
   FROM email_log l
   LEFT JOIN events e ON e.id = l.event_id
-  LEFT JOIN broadcasts b ON b.id = l.broadcast_id`;
+  LEFT JOIN broadcasts b ON b.id = l.broadcast_id
+  LEFT JOIN surveys s ON s.id = l.survey_id`;
 
 // Shared WHERE for the list and its total, so the count always matches the rows.
 function buildWhere(query) {
@@ -30,6 +31,10 @@ function buildWhere(query) {
   if (query.broadcast_id) {
     where.push('l.broadcast_id = ?');
     params.push(v.int(query.broadcast_id, { label: 'broadcast_id', min: 1 }));
+  }
+  if (query.survey_id) {
+    where.push('l.survey_id = ?');
+    params.push(v.int(query.survey_id, { label: 'survey_id', min: 1 }));
   }
   const status = v.optStr(query.status, { max: 20 });
   if (status) { where.push('l.status = ?'); params.push(status); }
@@ -67,9 +72,9 @@ emailLogRouter.get('/emails', wrap(async (req, res) => {
 
   const total = req.db.prepare(`SELECT COUNT(*) AS n ${FROM}${where}`).get(...params).n;
   const emails = req.db.prepare(`
-    SELECT l.id, l.event_id, l.invite_id, l.broadcast_id, l.kind, l.to_name, l.to_email, l.subject,
+    SELECT l.id, l.event_id, l.invite_id, l.broadcast_id, l.survey_id, l.kind, l.to_name, l.to_email, l.subject,
            l.status, l.error, l.provider_id, l.created_at, l.sent_at,
-           e.title AS event_title, e.slug AS event_slug, b.title AS broadcast_title
+           e.title AS event_title, e.slug AS event_slug, b.title AS broadcast_title, s.title AS survey_title
     ${FROM}${where}${orderBy} LIMIT ? OFFSET ?
   `).all(...params, perPage, (page - 1) * perPage);
 
@@ -85,9 +90,10 @@ emailLogRouter.get('/emails', wrap(async (req, res) => {
 emailLogRouter.get('/emails/:id', wrap(async (req, res) => {
   const id = v.int(req.params.id, { label: 'id', min: 1 });
   const email = req.db.prepare(`
-    SELECT l.*, e.title AS event_title, b.title AS broadcast_title FROM email_log l
+    SELECT l.*, e.title AS event_title, b.title AS broadcast_title, s.title AS survey_title FROM email_log l
     LEFT JOIN events e ON e.id = l.event_id
     LEFT JOIN broadcasts b ON b.id = l.broadcast_id
+    LEFT JOIN surveys s ON s.id = l.survey_id
     WHERE l.id = ?
   `).get(id);
   if (!email) throw new ApiError(404, 'Email not found.');
@@ -102,6 +108,9 @@ emailLogRouter.post('/emails/:id/retry', wrap(async (req, res) => {
   req.db.prepare("UPDATE email_log SET status = 'queued', error = NULL WHERE id = ?").run(id);
   if (email.invite_id && email.kind === 'invitation') {
     req.db.prepare("UPDATE invites SET email_status = 'queued' WHERE id = ?").run(email.invite_id);
+  }
+  if (email.survey_invite_id && email.kind === 'survey') {
+    req.db.prepare("UPDATE survey_invites SET email_status = 'queued' WHERE id = ?").run(email.survey_invite_id);
   }
   res.json({ ok: true });
 }));

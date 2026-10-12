@@ -213,6 +213,77 @@ filtering by recipient and status, and sortable columns — exactly like an
 event's email log. Broadcasts also export to CSV
 (Settings → Export, or the button on the Broadcasts page).
 
+## Surveys
+
+A survey is emailed like an invitation, but it asks questions instead of
+taking an RSVP. Everyone you ask gets their own link. The results add up on the
+survey's page as people answer.
+
+**Surveys → New survey** opens a five-step wizard:
+
+1. **Details.** Give the survey a title and, if you like, an introduction and a
+   closing date. Two choices decide who answers and what you see:
+   - **Public survey.** Anyone with the survey's link can answer, as well as
+     the people you email. Leave it off and only the people you email can
+     answer, each through their own link.
+   - **Anonymous.** Answers are kept with no link to who gave them. You see who
+     has answered, so reminders skip them, but never what they said. People
+     can't change an anonymous answer once it is sent.
+2. **Questions.** Pick a type under *Add a question*, then type the question.
+   - *Yes / No* gives two buttons.
+   - *Single choice* takes one pick. *Multiple choice* takes any number, or up
+     to the most you set.
+   - *Ranking* asks people to put the choices in order. On a phone they tap the
+     choices in turn.
+   - *Preference scale* is a row of 3 to 10 points with a label at each end,
+     such as *Not interested at all* and *Very interested*.
+   - *Written answer* is one line, or a paragraph.
+   - *Offer "Other"* adds a last choice with a box to type in.
+   - Untick *Required* to let people skip a question.
+3. **Invitation.** Write the email. Every survey email ends with a button to
+   the person's own survey page, so you never add a link yourself. The
+   placeholders are `{{first_name}}`, `{{full_name}}`, `{{survey_title}}`,
+   `{{closes_on}}` and `{{org_name}}`.
+4. **People.** Pick groups and people, as for an event's guests.
+5. **Review & send.** Send the survey, after the usual five-second pause. A
+   public survey can also open without sending, to be shared by its link.
+
+**Answering.** The survey page works in any browser, with or without
+JavaScript. People answer every question on one page, and the page points out
+anything left out before it keeps their answers. A named survey's page shows
+someone their answers again, and they can change them until it closes.
+
+**Results.** The survey's page has a card for each question:
+
+- Choices show how many people picked each one, and the share of those who
+  answered.
+- A ranking lists the choices by points. With three choices, first place earns
+  3 points, second 2 and third 1. Each choice also shows its average place and
+  how often it came first.
+- A scale shows how many people picked each point, the average and the median.
+- Written answers are listed, with names on a named survey.
+
+*Export responses* downloads a spreadsheet with one row for each set of
+answers. The *Responses* tab lists each set, and its bin takes one out of the
+results, such as a joke entry on a public survey.
+
+**Locked questions.** Once anyone has answered, you can still fix the wording
+of a question, its note or its choices. You can't add, remove, reorder or
+retype questions, or change their choices, because that would change what the
+earlier answers mean. To ask something different, duplicate the survey.
+
+**Reminders, closing and reopening.** *Reminders* emails everyone who was sent
+the survey and hasn't answered. *Close survey* stops every link taking answers,
+and a closing date does the same when that day ends. *Reopen* starts it again,
+with a new closing date if you give one.
+
+**Privacy.** An anonymous survey stores each set of answers with no link to the
+person, under a random number rather than a counted one, and with only the day
+it was given. So the order people answered in can't pair them up again either.
+On a public named survey, nobody can read or change another person's answers by
+typing their email address. An address that has already answered is turned
+away, and the personal link is only shown to whoever made it.
+
 ## The guest experience
 
 - The **invitation email** shows the event details and two unmistakable

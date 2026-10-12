@@ -37,6 +37,19 @@ const WORDING = {
     alreadyAll: (n) => `Nobody new selected — all ${n} of the people picked were already sent this broadcast.`,
     alreadyRest: (n) => `${n} other${n === 1 ? ' was' : 's were'} already sent it and won’t get it twice.`,
   },
+  // A survey asks people.
+  person: {
+    one: 'person',
+    many: 'people',
+    groups: 'Ask whole groups',
+    tick: (name) => `Ask ${name}`,
+    empty: 'Nobody selected yet. Pick a group above, or tick people from the list.',
+    noEmail: 'no email, so can’t be sent the survey',
+    already: 'Already asked',
+    alreadyOne: (who) => `${who} is already on this survey`,
+    alreadyAll: (n) => `Nobody new selected. All ${n} of the people picked are already on this survey.`,
+    alreadyRest: (n) => `${n} other${n === 1 ? ' is' : 's are'} already on it and won’t be added again.`,
+  },
 };
 
 // Choose who gets invited: pick whole groups, tick individual contacts, and

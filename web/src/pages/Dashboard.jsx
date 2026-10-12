@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, timeAgo } from '../api.js';
+import { api, formatDateShort, timeAgo } from '../api.js';
 import { useAuth } from '../App.jsx';
 import {
   Spinner, Empty, ResponseBadge, Badge, Banner, Card, StatGrid, Stat, Icon,
@@ -63,7 +63,7 @@ export default function Dashboard() {
   if (error) return <div className="page"><Banner tone="bad">{error}</Banner></div>;
   if (!data) return <div className="page"><Spinner /></div>;
 
-  const { counts, upcoming, recent, broadcasts = [], quota, month_emails } = data;
+  const { counts, upcoming, recent, broadcasts = [], surveys = [], quota, month_emails } = data;
   const firstName = (user.name || '').split(' ')[0];
   const gettingStarted = counts.events === 0;
 
@@ -139,6 +139,37 @@ export default function Dashboard() {
           </div>
         )}
       </Card>
+
+      {/* Only while a survey is taking answers. */}
+      {surveys.length ? (
+        <Card flush title="Open surveys" actions={<SeeAll to="/surveys">All surveys</SeeAll>}
+          style={{ marginBottom: 16 }}>
+          <div className="table-wrap">
+            <table className="table">
+              <tbody>
+                {surveys.map((sv) => (
+                  <tr key={sv.id} className="row-link">
+                    <td>
+                      <Link to={`/surveys/${sv.id}`} className="t-main row-link-target">{sv.title}</Link>
+                      <div className="t-sub">
+                        {sv.closes_on ? `Closes ${formatDateShort(sv.closes_on)}` : 'Open until you close it'}
+                        {sv.anonymous ? ' · Anonymous' : ''}
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div className="mini-tiles">
+                        <MiniTile label="Asked" value={sv.stats.invited} />
+                        <MiniTile label="Answered" value={sv.stats.answered} tone="ok" />
+                        <MiniTile label="Responses" value={sv.stats.responses} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ) : null}
 
       <div className="grid2" style={{ alignItems: 'start' }}>
         <Card flush title="Broadcasts" actions={<SeeAll to="/broadcasts">All broadcasts</SeeAll>}>

@@ -15,6 +15,7 @@ import { personName, splitPersonName } from '../server/lib/contacts.js';
 import { fetchRemoteImage } from '../server/lib/remoteImage.js';
 import { meetingEnd, meetingOver } from '../server/lib/clock.js';
 import { allScenes, helpFor, sectionsFor } from '../web/src/help/content.js';
+import { normalizeQuestions, parseAnswers, tally, answerText } from '../server/lib/surveyQuestions.js';
 
 const PORT = 3870 + Math.floor(Math.random() * 100);
 const BASE = `http://localhost:${PORT}`;
@@ -947,7 +948,10 @@ let guests = [];
   // event a real one would. The server has not opened it yet.
   const { DatabaseSync } = await import('node:sqlite');
   const db = new DatabaseSync(path.join(DATA_DIR, 'orgs', 'gamma', 'org.db'));
-  db.exec('DROP TABLE event_slugs; PRAGMA user_version = 6;');
+  // Back to version 6: undo migration 7's table, and the survey tables
+  // migration 9 makes (its email_log rebuild simply runs again).
+  db.exec(`DROP TABLE event_slugs; DROP TABLE survey_responses; DROP TABLE survey_invites; DROP TABLE surveys;
+    PRAGMA user_version = 6;`);
   const add = db.prepare('INSERT INTO events (slug, title, status, date, start_time) VALUES (?, ?, ?, ?, ?)');
   add.run('n3nuw7b5wz', 'Sent Meeting', 'published', '2031-10-27', '17:30');
   add.run('q9fgz2frpt', 'Undated Draft', 'draft', null, null);
@@ -2012,6 +2016,315 @@ let guests = [];
   await A.api('PUT', '/api/settings', { smtp2go_api_key: '' });
   check('sending is simulated again', (await A.api('GET', '/api/settings')).data?.settings?.smtp2go_key_set === false);
   smtp.close();
+}
+
+// --- surveys: the questions and answers, checked directly ------------------
+{
+  const qs = normalizeQuestions([
+    { kind: 'yes_no', prompt: 'Should we meet monthly?' },
+    { kind: 'single', prompt: 'Best night?', options: [{ label: 'Monday' }, { label: 'Tuesday' }, { label: '' }], other: true },
+    { kind: 'multi', prompt: 'Which topics?', options: [{ label: 'Taxes' }, { label: 'Schools' }, { label: 'Roads' }], max: 2 },
+    { kind: 'ranking', prompt: 'Rank the speakers', options: [{ label: 'Ann' }, { label: 'Bo' }, { label: 'Cy' }] },
+    { kind: 'scale', prompt: 'How interested are you?', points: 5, low: 'Not interested at all', high: 'Very interested' },
+    { kind: 'text', prompt: 'Anything else?', long: true, required: false },
+  ]);
+  check('questions get ids in order', qs.map((q) => q.id).join() === 'q1,q2,q3,q4,q5,q6');
+  check('choices get ids, and blank ones are dropped', qs[1].options.map((o) => o.id).join() === 'o1,o2');
+  check('every question is required unless it says not', qs[0].required && !qs[5].required);
+  const refuses = (input) => { try { normalizeQuestions(input); return false; } catch (e) { return e.status === 400; } };
+  check('a choice question needs two choices', refuses([{ kind: 'single', prompt: 'One?', options: [{ label: 'Only' }] }]));
+  check('a question needs wording', refuses([{ kind: 'yes_no', prompt: '   ' }]));
+  check('an unknown type is refused', refuses([{ kind: 'essay', prompt: 'Hi' }]));
+  check('the same choice twice is refused', refuses([{ kind: 'single', prompt: 'X', options: [{ label: 'A' }, { label: 'a' }] }]));
+  check('a scale is kept between 3 and 10 points',
+    normalizeQuestions([{ kind: 'scale', prompt: 'S', points: 40 }])[0].points === 10);
+
+  const full = {
+    q1: 'yes', q2: 'other', q2_other: 'Thursday', q3: ['o1', 'o3'],
+    q4_o1: '2', q4_o2: '1', q4_o3: '3', q5: '4', q6: 'Line one\r\nLine two',
+  };
+  const good = parseAnswers(qs, full);
+  check('a full set of answers has no errors', Object.keys(good.errors).length === 0, JSON.stringify(good.errors));
+  check('answers are stored in their shapes',
+    good.answers.q1 === 'yes' && good.answers.q2.pick === 'other' && good.answers.q2.other === 'Thursday'
+    && good.answers.q3.picks.join() === 'o1,o3' && good.answers.q4.join() === 'o2,o1,o3'
+    && good.answers.q5 === 4 && good.answers.q6 === 'Line one\nLine two', JSON.stringify(good.answers));
+  const empty = parseAnswers(qs, {});
+  check('a required question left out is an error', Boolean(empty.errors.q1 && empty.errors.q5) && !empty.errors.q6);
+  check('too many picks is an error', Boolean(parseAnswers(qs, { ...full, q3: ['o1', 'o2', 'o3'] }).errors.q3));
+  check('two choices with the same place is an error', Boolean(parseAnswers(qs, { ...full, q4_o3: '1' }).errors.q4));
+  check('a required ranking needs every choice placed', Boolean(parseAnswers(qs, { ...full, q4_o3: '' }).errors.q4));
+  check('Other with nothing typed is an error', Boolean(parseAnswers(qs, { ...full, q2_other: ' ' }).errors.q2));
+  check('a point off the scale is not an answer', Boolean(parseAnswers(qs, { ...full, q5: '9' }).errors.q5));
+  check('a choice the question never had is not an answer', Boolean(parseAnswers(qs, { ...full, q2: 'o9' }).errors.q2));
+
+  const results = tally(qs, [
+    { answers: good.answers },
+    { answers: { q1: 'no', q2: { pick: 'o1' }, q3: { picks: ['o1'] }, q4: ['o1', 'o2', 'o3'], q5: 2 } },
+    { answers: { q1: 'yes', q2: { pick: 'o1' }, q4: ['o1', 'o3', 'o2'], q5: 5 } },
+  ]);
+  check('yes/no is counted', results[0].options[0].count === 2 && results[0].options[1].count === 1 && results[0].answered === 3);
+  check('single choice counts Other apart, with what was typed',
+    results[1].options[0].count === 2 && results[1].other.count === 1 && results[1].other.answers[0].text === 'Thursday');
+  check('multiple choice is a share of those who answered it',
+    results[2].answered === 2 && results[2].options[0].count === 2 && results[2].options[0].pct === 100);
+  check('a ranking is ordered by points',
+    results[3].options.map((o) => o.label).join() === 'Ann,Bo,Cy' && results[3].options[0].firsts === 2
+    && results[3].options[0].points === 8, JSON.stringify(results[3].options));
+  check('a scale has its spread, average and median',
+    results[4].counts.map((c) => c.count).join() === '0,1,0,1,1' && results[4].average === 3.7 && results[4].median === 4);
+  check('written answers are listed', results[5].answers.length === 1 && results[5].answers[0].text.startsWith('Line one'));
+  check('an answer reads back in words', answerText(qs[3], good.answers.q4) === '1. Bo; 2. Ann; 3. Cy'
+    && answerText(qs[4], 1) === '1 of 5 (Not interested at all)');
+
+  const reworded = qs.map((q) => (q.id === 'q1' ? { ...q, prompt: 'Meet every month?' } : q));
+  check('a locked survey can be reworded',
+    normalizeQuestions(reworded, { previous: qs, locked: true })[0].prompt === 'Meet every month?');
+  const lockedRefuses = (input) => { try { normalizeQuestions(input, { previous: qs, locked: true }); return false; } catch (e) { return e.status === 409; } };
+  check('a locked survey keeps its types', lockedRefuses(qs.map((q) => (q.id === 'q1' ? { ...q, kind: 'single', options: [{ label: 'A' }, { label: 'B' }] } : q))));
+  check('a locked survey keeps its choices', lockedRefuses(qs.map((q) => (q.id === 'q2' ? { ...q, options: [...q.options, { label: 'Friday' }] } : q))));
+  check('a locked survey keeps its questions', lockedRefuses(qs.slice(1)) && lockedRefuses([...qs, { kind: 'yes_no', prompt: 'New?' }]));
+}
+
+// --- surveys: asking, answering and counting -------------------------------
+const SURVEY_QUESTIONS = [
+  { kind: 'yes_no', prompt: 'Should we meet monthly?' },
+  { kind: 'single', prompt: 'Best night?', options: [{ label: 'Monday' }, { label: 'Tuesday' }], other: true },
+  { kind: 'multi', prompt: 'Which topics?', options: [{ label: 'Taxes' }, { label: 'Schools' }, { label: 'Roads' }], max: 2 },
+  { kind: 'ranking', prompt: 'Rank the speakers', options: [{ label: 'Ann' }, { label: 'Bo' }, { label: 'Cy' }] },
+  { kind: 'scale', prompt: 'How interested are you?', points: 5, low: 'Not interested at all', high: 'Very interested' },
+  { kind: 'text', prompt: 'Anything else?', long: true, required: false },
+];
+const SURVEY_ANSWERS = {
+  q1: 'yes', q2: 'o2', q3: ['o1', 'o2'], q4_o1: '1', q4_o2: '3', q4_o3: '2', q5: '5', q6: 'More coffee',
+};
+function postAnswers(pagePath, fields) {
+  const body = new URLSearchParams();
+  for (const [k, val] of Object.entries(fields)) {
+    for (const one of Array.isArray(val) ? val : [val]) body.append(k, one);
+  }
+  return fetch(`${BASE}${pagePath}`, {
+    method: 'POST', redirect: 'manual',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: body.toString(),
+  });
+}
+async function surveyStamp(pagePath) {
+  const html = await (await fetch(`${BASE}${pagePath}`)).text();
+  return html.match(/name="t" value="([^"]+)"/)?.[1] || '';
+}
+let surveyId = null;
+let surveySlug = '';
+{
+  const made = await A.api('POST', '/api/surveys', {
+    title: 'Fall priorities', description: '<p>Tell us <strong>what matters</strong>.</p>',
+    share_enabled: true, questions: SURVEY_QUESTIONS,
+  });
+  check('create a survey', made.status === 201 && made.data?.survey?.state === 'draft', JSON.stringify(made.data));
+  surveyId = made.data.survey.id;
+  surveySlug = made.data.survey.slug;
+  check('its questions come back with ids', made.data.survey.questions.length === 6 && made.data.survey.questions[3].id === 'q4');
+  check('a survey with no answers is not locked', made.data.survey.locked === false);
+  const bad = await A.api('PUT', `/api/surveys/${surveyId}`, { questions: [{ kind: 'single', prompt: 'One', options: [{ label: 'A' }] }] });
+  check('a bad question is refused with a reason', bad.status === 400 && /two choices/.test(bad.data?.error || ''));
+
+  const emptyOne = await A.api('POST', '/api/surveys', { title: 'No questions yet' });
+  const sendEmpty = await A.api('POST', `/api/surveys/${emptyOne.data.survey.id}/send`, {});
+  check('a survey with no questions can’t be sent', sendEmpty.status === 400 && /question/.test(sendEmpty.data?.error || ''));
+  await A.api('DELETE', `/api/surveys/${emptyOne.data.survey.id}`);
+
+  check('the shared page of a draft is hidden', (await fetch(`${BASE}/alpha/s/${surveySlug}`)).status === 404);
+  const preview = await A.raw('GET', `/alpha/s/${surveySlug}`);
+  const previewHtml = await preview.text();
+  check('a member sees the draft, with the button off',
+    preview.status === 200 && previewHtml.includes('Draft preview') && /class="pub-btn pub-btn-plain sv-submit" type="submit" disabled/.test(previewHtml));
+
+  const people = await A.api('POST', `/api/surveys/${surveyId}/people`, {
+    new_contacts: [
+      { name: 'Sam Survey', email: 'sam@survey.test' },
+      { name: 'Tia Survey', email: 'tia@survey.test' },
+      { name: 'Uma Survey', email: 'uma@survey.test' },
+    ],
+    save_new: true,
+  });
+  check('add people to a survey', people.data?.added === 3 && people.data?.contacts_created === 3, JSON.stringify(people.data));
+  const again = await A.api('POST', `/api/surveys/${surveyId}/people`, { new_contacts: [{ name: 'Sam', email: 'sam@survey.test' }] });
+  check('nobody is added twice', again.data?.added === 0 && again.data?.skipped === 1);
+
+  const sent = await A.api('POST', `/api/surveys/${surveyId}/send`, {});
+  check('sending queues one email each', sent.data?.queued === 3, JSON.stringify(sent.data));
+  check('sending opens the survey', (await A.api('GET', `/api/surveys/${surveyId}`)).data?.survey?.state === 'open');
+  await waitFor(async () => {
+    const r = await A.api('GET', `/api/emails?survey_id=${surveyId}&status=simulated`);
+    return r.data?.emails?.length === 3;
+  }, 'the queue sends the three survey emails');
+  const log = await A.api('GET', `/api/emails?survey_id=${surveyId}`);
+  check('the email log names the survey', log.data.emails.every((e) => e.kind === 'survey' && e.survey_title === 'Fall priorities'));
+  const listed = (await A.api('GET', `/api/surveys/${surveyId}/people`)).data;
+  check('each person is marked emailed', listed.people.every((p) => p.email_status === 'sent') && listed.stats.awaiting === 3);
+  const one = await A.api('GET', `/api/emails/${log.data.emails[0].id}`);
+  check('the email carries the person’s own link', one.data.email.html.includes('/alpha/q/') && one.data.email.html.includes('Take the survey'));
+
+  const sam = listed.people.find((p) => p.email === 'sam@survey.test');
+  const samPath = `/alpha/q/${sam.token}`;
+  const pageHtml = await (await fetch(`${BASE}${samPath}`)).text();
+  check('the personal page shows every question',
+    SURVEY_QUESTIONS.every((q) => pageHtml.includes(q.prompt)) && pageHtml.includes('Not interested at all'));
+  check('the personal page loads the form helper', pageHtml.includes('<script src="/assets/survey.js?v='));
+  check('the introduction is shown', pageHtml.includes('<strong>what matters</strong>'));
+  const helper = await fetch(`${BASE}/assets/survey.js`);
+  check('the form helper is served', helper.status === 200 && (helper.headers.get('content-type') || '').includes('javascript'));
+
+  const missing = await postAnswers(samPath, { q1: 'yes' });
+  const missingHtml = await missing.text();
+  check('leaving out required answers draws the form again', missing.status === 400
+    && missingHtml.includes('answers need') && missingHtml.includes('Choose a point on the scale.') && missingHtml.includes('value="yes" checked'));
+  check('and keeps nothing', (await A.api('GET', `/api/surveys/${surveyId}`)).data.stats.responses === 0);
+
+  const ok = await postAnswers(samPath, SURVEY_ANSWERS);
+  check('answers are taken', ok.status === 303 && ok.headers.get('location') === `${samPath}?thanks=1`);
+  const after = await (await fetch(`${BASE}${samPath}`)).text();
+  check('the page then offers to change them, filled in',
+    after.includes('Save my changes') && after.includes('More coffee') && /value="o2" checked/.test(after));
+  const changed = await postAnswers(samPath, { ...SURVEY_ANSWERS, q1: 'no', q6: '' });
+  check('answers can be changed', changed.status === 303 && changed.headers.get('location') === `${samPath}?updated=1`);
+  const stats = (await A.api('GET', `/api/surveys/${surveyId}`)).data;
+  check('one person is still one response', stats.stats.responses === 1 && stats.stats.answered === 1 && stats.stats.awaiting === 2);
+  check('a survey with answers is locked', stats.survey.locked === true);
+
+  const res = (await A.api('GET', `/api/surveys/${surveyId}/results`)).data;
+  check('results count the changed answers', res.responses === 1 && res.questions[0].options[1].count === 1
+    && res.questions[0].options[0].count === 0 && res.questions[5].answered === 0);
+  check('results rank the speakers', res.questions[3].options.map((o) => o.label).join() === 'Ann,Cy,Bo');
+  const rows = (await A.api('GET', `/api/surveys/${surveyId}/responses`)).data;
+  check('responses say whose they are', rows.responses[0].name === 'Sam Survey' && rows.responses[0].answers.q2 === 'Tuesday');
+  const csv = await (await A.raw('GET', `/api/export/surveys/${surveyId}/responses.csv`)).text();
+  check('the responses spreadsheet', csv.includes('Sam Survey') && csv.includes('Q4. Rank the speakers') && csv.includes('1. Ann; 2. Cy; 3. Bo'));
+
+  const reword = stats.survey.questions.map((q) => (q.id === 'q1' ? { ...q, prompt: 'Meet every month?' } : q));
+  check('a locked survey can still be reworded', (await A.api('PUT', `/api/surveys/${surveyId}`, { questions: reword })).status === 200);
+  const restructure = await A.api('PUT', `/api/surveys/${surveyId}`, { questions: reword.slice(1) });
+  check('but its questions can’t be taken away', restructure.status === 409);
+  check('and it can’t turn anonymous', (await A.api('PUT', `/api/surveys/${surveyId}`, { anonymous: true })).status === 409);
+
+  const remind = await A.api('POST', `/api/surveys/${surveyId}/remind`, { body: 'Hi {{first_name}}, a reminder about {{survey_title}}.' });
+  check('a reminder goes to those who haven’t answered', remind.data?.queued === 2, JSON.stringify(remind.data));
+
+  // The shared page.
+  const shared = `/alpha/s/${surveySlug}`;
+  const sharedHtml = await (await fetch(`${BASE}${shared}`)).text();
+  check('a public survey’s page asks for a name and email', sharedHtml.includes('name="email"') && sharedHtml.includes('name="website"'));
+  const trapped = await postAnswers(shared, { ...SURVEY_ANSWERS, name: 'Bot', email: 'bot@spam.test', website: 'x', t: await surveyStamp(shared) });
+  check('a filled-in trap is thanked and kept nowhere',
+    trapped.status === 200 && (await A.api('GET', `/api/surveys/${surveyId}`)).data.stats.responses === 1);
+  const rsvpStamp = await formStamp('/alpha/2031-may-06-18-30');
+  await pause(FILL_MS);
+  const wrongStamp = await postAnswers(shared, { ...SURVEY_ANSWERS, name: 'Val', email: 'val@survey.test', t: rsvpStamp });
+  check('an RSVP form’s stamp doesn’t pass for the survey’s',
+    Boolean(rsvpStamp) && (await wrongStamp.text()).includes('have not been sent yet'));
+
+  let t = await surveyStamp(shared);
+  await pause(FILL_MS);
+  const fresh = await postAnswers(shared, { ...SURVEY_ANSWERS, name: 'Val Visitor', email: 'val@survey.test', t });
+  check('a visitor’s answers make them a personal link', fresh.status === 303 && /^\/alpha\/q\/\w+\?thanks=1$/.test(fresh.headers.get('location') || ''));
+  t = await surveyStamp(shared);
+  await pause(FILL_MS);
+  const dupe = await postAnswers(shared, { ...SURVEY_ANSWERS, name: 'Someone', email: 'SAM@survey.test', t });
+  check('an address that already answered is turned away', dupe.status === 409 && (await dupe.text()).includes('already answered'));
+  t = await surveyStamp(shared);
+  await pause(FILL_MS);
+  const invited = await postAnswers(shared, { ...SURVEY_ANSWERS, name: 'Tia', email: 'tia@survey.test', t });
+  check('an invited address is thanked without its personal link', invited.status === 303 && invited.headers.get('location') === `${shared}?thanks=1`);
+  const now = (await A.api('GET', `/api/surveys/${surveyId}`)).data.stats;
+  check('both count', now.responses === 3 && now.answered === 3 && now.invited === 4);
+
+  const closed = await A.api('POST', `/api/surveys/${surveyId}/close`, {});
+  check('a survey can be closed', closed.data?.survey?.state === 'closed');
+  const closedHtml = await (await fetch(`${BASE}${samPath}`)).text();
+  check('a closed survey shows the person their answers', closedHtml.includes('This survey is closed') && closedHtml.includes('Your answers'));
+  const late = await postAnswers(samPath, { ...SURVEY_ANSWERS, q1: 'yes' });
+  check('and takes no more', late.status === 303
+    && (await A.api('GET', `/api/surveys/${surveyId}/results`)).data.questions[0].options[0].count === 2);
+  check('reopening with a date that has passed is refused',
+    (await A.api('POST', `/api/surveys/${surveyId}/reopen`, { closes_on: '2020-01-01' })).status === 400);
+  check('a survey can be reopened', (await A.api('POST', `/api/surveys/${surveyId}/reopen`, {})).data?.survey?.state === 'open');
+  const past = await A.api('PUT', `/api/surveys/${surveyId}`, { closes_on: '2020-01-01' });
+  check('a closing date that has passed closes it', past.data?.survey?.state === 'closed');
+  check('so the shared page says so', (await (await fetch(`${BASE}${shared}`)).text()).includes('This survey is closed'));
+  await A.api('POST', `/api/surveys/${surveyId}/reopen`, {});
+
+  const uma = listed.people.find((p) => p.email === 'uma@survey.test');
+  const unsub = await fetch(`${BASE}/alpha/u/${uma.token}`, { method: 'POST' });
+  check('a survey email’s unsubscribe link works', unsub.status === 200 && (await unsub.text()).includes('uma@survey.test'));
+  const reminded = await A.api('POST', `/api/surveys/${surveyId}/remind`, { body: 'Again' });
+  check('and the next reminder skips them', reminded.data?.skipped?.unsubscribed === 1, JSON.stringify(reminded.data));
+
+  const del = await A.api('DELETE', `/api/surveys/${surveyId}/responses/${rows.responses[0].id}`);
+  check('a response can be taken out', del.status === 200 && del.data.stats.responses === 2 && del.data.stats.answered === 2);
+  const copy = await A.api('POST', `/api/surveys/${surveyId}/duplicate`, {});
+  check('a copy is a draft with the same questions',
+    copy.status === 201 && copy.data.survey.state === 'draft' && copy.data.survey.questions.length === 6 && copy.data.survey.locked === false);
+  check('the copy has nobody on it', (await A.api('GET', `/api/surveys/${copy.data.survey.id}/people`)).data.people.length === 0);
+}
+
+// --- surveys: anonymous ----------------------------------------------------
+{
+  const made = await A.api('POST', '/api/surveys', {
+    title: 'Honest feedback', anonymous: true, share_enabled: true,
+    questions: [{ kind: 'scale', prompt: 'How did we do?', points: 5 }, { kind: 'text', prompt: 'Tell us more', required: false }],
+  });
+  const id = made.data.survey.id;
+  await A.api('POST', `/api/surveys/${id}/people`, { new_contacts: [{ name: 'Wes Anon', email: 'wes@survey.test' }] });
+  await A.api('POST', `/api/surveys/${id}/send`, {});
+  const wes = (await A.api('GET', `/api/surveys/${id}/people`)).data.people[0];
+  const wesPath = `/alpha/q/${wes.token}`;
+  const first = await postAnswers(wesPath, { q1: '2', q2: 'The chairs' });
+  check('an anonymous answer is taken', first.status === 303);
+  const page2 = await (await fetch(`${BASE}${wesPath}`)).text();
+  check('and can’t be shown again', page2.includes('You have answered') && !page2.includes('The chairs'));
+  const second = await postAnswers(wesPath, { q1: '5' });
+  check('or changed', second.status === 303
+    && (await A.api('GET', `/api/surveys/${id}/results`)).data.questions[0].counts[1].count === 1);
+  const people = (await A.api('GET', `/api/surveys/${id}/people`)).data;
+  check('the person still shows as answered', Boolean(people.people[0].responded_at) && people.stats.awaiting === 0);
+  const rows = (await A.api('GET', `/api/surveys/${id}/responses`)).data;
+  check('the responses carry no name', rows.anonymous === true && rows.responses[0].name === '' && rows.responses[0].email === '');
+  const backup = (await A.api('GET', '/api/export/backup.json')).data;
+  const stored = backup.survey_responses.filter((r) => r.survey_id === id);
+  check('nothing stored links the answers to the person', stored.length === 1 && stored[0].invite_id === null
+    && stored[0].submitted_at.endsWith('00:00:00') && stored[0].id > 1000000);
+  check('the backup holds the surveys', backup.surveys.length >= 3 && backup.survey_invites.length >= 5);
+  const csv = await (await A.raw('GET', `/api/export/surveys/${id}/responses.csv`)).text();
+  check('the anonymous spreadsheet has no names', !csv.includes('Wes') && csv.includes('The chairs'));
+
+  const shared = `/alpha/s/${made.data.survey.slug}`;
+  const sharedHtml = await (await fetch(`${BASE}${shared}`)).text();
+  check('an anonymous public survey asks for no name', !sharedHtml.includes('name="email"') && sharedHtml.includes('anonymous'));
+  const t = await surveyStamp(shared);
+  await pause(FILL_MS);
+  const visit = await postAnswers(shared, { q1: '4', t });
+  check('a visitor answers anonymously', visit.status === 303 && visit.headers.get('location') === `${shared}?thanks=1`);
+  const cookie = (visit.headers.get('set-cookie') || '').split(';')[0];
+  const back = await (await fetch(`${BASE}${shared}`, { headers: { cookie } })).text();
+  check('the same browser is thanked rather than asked again', back.includes('We have your answers') && !back.includes('<form'));
+  check('two responses, one person', (await A.api('GET', `/api/surveys/${id}`)).data.stats.responses === 2);
+}
+
+// --- surveys: a private one, and another organization ----------------------
+{
+  const made = await A.api('POST', '/api/surveys', { title: 'Board only', questions: [{ kind: 'yes_no', prompt: 'Approve?' }] });
+  const { id, slug } = made.data.survey;
+  await A.api('POST', `/api/surveys/${id}/open`, {});
+  const html = await (await fetch(`${BASE}/alpha/s/${slug}`)).text();
+  check('a private survey’s page sends people to their email', html.includes('By invitation') && !html.includes('<form'));
+  const posted = await postAnswers(`/alpha/s/${slug}`, { q1: 'yes', name: 'X', email: 'x@survey.test' });
+  check('and takes no answers', posted.status === 404);
+
+  check('another organization can’t see a survey', (await B.api('GET', `/api/surveys/${surveyId}`)).status === 404);
+  check('or list it', (await B.api('GET', '/api/surveys')).data?.surveys?.length === 0);
+  check('or reach its page under its own name', (await fetch(`${BASE}/beta/s/${surveySlug}`)).status === 404);
+  const sam = (await A.api('GET', `/api/surveys/${surveyId}/people`)).data.people[0];
+  check('or a personal link', (await fetch(`${BASE}/beta/q/${sam.token}`)).status === 404);
+  check('the old /o/ address forwards', (await fetch(`${BASE}/o/alpha/s/${surveySlug}`, { redirect: 'manual' })).status === 301);
 }
 
 // --- help: every page has help, and every picture it names exists ----------

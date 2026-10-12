@@ -20,12 +20,18 @@ async function processOne(db, org, row) {
 
   const headers = [];
   let invite = null;
+  let surveyInvite = null;
   if (row.invite_id) {
     invite = db.prepare('SELECT * FROM invites WHERE id = ?').get(row.invite_id);
     const event = row.event_id ? db.prepare('SELECT * FROM events WHERE id = ?').get(row.event_id) : null;
     if (invite && event) {
       const links = buildLinks(org.slug, event, invite);
       headers.push({ header: 'List-Unsubscribe', value: `<${links.unsub}>` });
+    }
+  } else if (row.survey_invite_id) {
+    surveyInvite = db.prepare('SELECT * FROM survey_invites WHERE id = ?').get(row.survey_invite_id);
+    if (surveyInvite) {
+      headers.push({ header: 'List-Unsubscribe', value: `<${publicUrl(org.slug, `/u/${surveyInvite.token}`)}>` });
     }
   } else if (row.broadcast_id && row.kind === 'broadcast') {
     const contact = db.prepare('SELECT id FROM contacts WHERE email = ?').get((row.to_email || '').toLowerCase());
@@ -59,10 +65,16 @@ async function processOne(db, org, row) {
     if (invite && row.kind === 'invitation') {
       db.prepare("UPDATE invites SET email_status = 'sent' WHERE id = ?").run(invite.id);
     }
+    if (surveyInvite && row.kind === 'survey') {
+      db.prepare("UPDATE survey_invites SET email_status = 'sent' WHERE id = ?").run(surveyInvite.id);
+    }
   } else {
     db.prepare("UPDATE email_log SET status = 'failed', error = ? WHERE id = ?").run(result.error || 'Unknown error', row.id);
     if (invite && row.kind === 'invitation') {
       db.prepare("UPDATE invites SET email_status = 'failed' WHERE id = ?").run(invite.id);
+    }
+    if (surveyInvite && row.kind === 'survey') {
+      db.prepare("UPDATE survey_invites SET email_status = 'failed' WHERE id = ?").run(surveyInvite.id);
     }
   }
 }

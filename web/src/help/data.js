@@ -62,3 +62,13 @@ export const SENT_BROADCASTS = [
   { id: 'election', title: 'Election Info', sent: '2026-08-16' },
   { id: 'endorse', title: 'County Endorsements', sent: '2026-08-02' },
 ];
+
+// The survey the Help pictures show, with the answers seven members gave.
+export const SURVEY = {
+  title: 'Fall priorities',
+  night: 'Which night suits you best for meetings?',
+  nights: [['Monday', 4], ['Tuesday', 2], ['Thursday', 1]],
+  speakers: 'Put these speakers in order of preference',
+  ranked: [['Sean G.', 18, 1.4, 4], ['Sandra F.', 14, 2, 2], ['Congressman JR', 10, 2.6, 1]],
+  fundraiser: 'How interested are you in a fall fundraiser?',
+};

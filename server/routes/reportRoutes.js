@@ -6,6 +6,7 @@ import { toCsv } from '../lib/csv.js';
 import { getSetting } from '../lib/db.js';
 import { getInvitesForEvent, inviteEmail, inviteName, publicUrl, eventUrl, previewRecipients, broadcastSentEmails } from '../lib/sending.js';
 import { formatWhen } from '../lib/format.js';
+import { surveyState, surveyStats } from '../lib/surveys.js';
 
 export const reportRouter = Router();
 
@@ -52,8 +53,16 @@ reportRouter.get('/dashboard', wrap(async (req, res) => {
     web_version: Boolean(b.web_version), sent_at: b.sent_at, updated_at: b.updated_at,
     stats: broadcastStats(db, b.id),
   }));
+  // Surveys taking answers now. A closing date that has passed closes one
+  // without changing its row, so the state is worked out for each.
+  const surveys = db.prepare(
+    "SELECT * FROM surveys WHERE status = 'open' ORDER BY opened_at DESC, id DESC LIMIT 20"
+  ).all().filter((sv) => surveyState(sv) === 'open').slice(0, 5).map((sv) => ({
+    id: sv.id, title: sv.title, closes_on: sv.closes_on, anonymous: Boolean(sv.anonymous),
+    stats: surveyStats(db, sv.id),
+  }));
   const quota = await getQuota(orgApiKey(db));
-  res.json({ counts, upcoming, recent, broadcasts, month_emails: monthEmailCount(db), quota });
+  res.json({ counts, upcoming, recent, broadcasts, surveys, month_emails: monthEmailCount(db), quota });
 }));
 
 // Dry-run: how many emails a recipient selection would actually send (unique
@@ -195,8 +204,8 @@ reportRouter.get('/export/events/:id/guests.csv', wrap(async (req, res) => {
 reportRouter.get('/export/emails.csv', wrap(async (req, res) => {
   const rows = req.db.prepare(`
     SELECT l.created_at, l.sent_at, l.kind, l.to_name, l.to_email, l.subject, l.status, l.error,
-           e.title AS event_title
-    FROM email_log l LEFT JOIN events e ON e.id = l.event_id
+           e.title AS event_title, s.title AS survey_title
+    FROM email_log l LEFT JOIN events e ON e.id = l.event_id LEFT JOIN surveys s ON s.id = l.survey_id
     ORDER BY l.id DESC LIMIT 10000
   `).all();
   sendCsv(res, 'emails.csv', toCsv(rows, [
@@ -209,6 +218,7 @@ reportRouter.get('/export/emails.csv', wrap(async (req, res) => {
     { key: 'status', label: 'status' },
     { key: 'error', label: 'error' },
     { key: 'event_title', label: 'event' },
+    { key: 'survey_title', label: 'survey' },
   ]));
 }));
 
@@ -235,8 +245,11 @@ reportRouter.get('/export/backup.json', wrap(async (req, res) => {
     events: all('SELECT * FROM events'),
     invites: all('SELECT * FROM invites'),
     broadcasts: all('SELECT * FROM broadcasts'),
-    email_log: all(`SELECT id, event_id, invite_id, broadcast_id, kind, to_name, to_email, subject, status,
-      error, provider_id, created_at, sent_at FROM email_log`),
+    surveys: all('SELECT * FROM surveys'),
+    survey_invites: all('SELECT * FROM survey_invites'),
+    survey_responses: all('SELECT * FROM survey_responses'),
+    email_log: all(`SELECT id, event_id, invite_id, broadcast_id, survey_id, survey_invite_id, kind, to_name, to_email,
+      subject, status, error, provider_id, created_at, sent_at FROM email_log`),
     uploads: all('SELECT * FROM uploads'),
   };
   res.setHeader('Content-Disposition', `attachment; filename="backup_${req.org.slug}.json"`);

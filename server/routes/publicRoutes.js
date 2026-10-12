@@ -7,6 +7,7 @@
 //   /<org>/i/<token>/accept|decline   one-click buttons from emails
 //   /<org>/u/<token>       unsubscribe
 //   /<org>/files/<token>   uploaded images, and broadcasts' attached files
+//   /<org>/s/<code>, /<org>/q/<token>   surveys (surveyPublicRoutes.js)
 //
 // A public meeting's page is at its date so anyone can find it. A private
 // one (shareable link off) adds a random code; see eventSlug.js. Once a
@@ -38,6 +39,7 @@ import { personName } from '../lib/contacts.js';
 import { take } from '../lib/ratelimit.js';
 import { isValidEmail } from '../lib/validate.js';
 import { downloadDisposition } from '../lib/attachments.js';
+import { surveyPublicRouter } from './surveyPublicRoutes.js';
 
 export const publicRouter = Router({ mergeParams: true });
 
@@ -521,9 +523,18 @@ publicRouter.get('/i/:token/ics', (req, res) => {
 
 // --- unsubscribe -----------------------------------------------------------
 
+// The invitation an unsubscribe link came from: a meeting's, or a survey's.
+// Both kinds of token are long and random, so the two never meet.
+function unsubInvite(db, token) {
+  if (!/^[A-Za-z0-9]{10,64}$/.test(String(token))) return null;
+  return inviteByToken(db, token)
+    || db.prepare('SELECT * FROM survey_invites WHERE token = ?').get(token)
+    || null;
+}
+
 publicRouter.get('/u/:token', (req, res) => {
   const db = req.pub.db;
-  const invite = inviteByToken(db, req.params.token);
+  const invite = unsubInvite(db, req.params.token);
   if (!invite) return notFoundPage(res);
   const email = invite.contact_id
     ? db.prepare('SELECT email FROM contacts WHERE id = ?').get(invite.contact_id)?.email
@@ -543,7 +554,7 @@ publicRouter.get('/u/:token', (req, res) => {
 publicRouter.post('/u/:token', (req, res) => {
   const db = req.pub.db;
   if (!take(`unsub:${req.ip}`, 30, 60 * 60 * 1000)) return res.status(429).send('Too many requests');
-  const invite = inviteByToken(db, req.params.token);
+  const invite = unsubInvite(db, req.params.token);
   if (!invite) return notFoundPage(res);
   const email = (invite.contact_id
     ? db.prepare('SELECT email FROM contacts WHERE id = ?').get(invite.contact_id)?.email
@@ -675,6 +686,10 @@ publicRouter.get('/files/:token', (req, res) => {
   res.sendFile(file);
 });
 
+// --- surveys ---------------------------------------------------------------
+
+publicRouter.use(surveyPublicRouter);
+
 // --- event addresses -------------------------------------------------------
 
 // The addresses events had before. eventPage redirects to the new one.
@@ -683,7 +698,7 @@ publicRouter.post('/e/:slug/rsvp', eventRsvp);
 publicRouter.get('/e/:slug/ics', eventIcs);
 
 // An event's address is one word after the organization. These come last,
-// so the fixed words above (i, u, b, bu, files) always win.
+// so the fixed words above (i, u, b, bu, files, s, q) always win.
 publicRouter.get('/:slug', eventPage);
 publicRouter.post('/:slug/rsvp', eventRsvp);
 publicRouter.get('/:slug/ics', eventIcs);

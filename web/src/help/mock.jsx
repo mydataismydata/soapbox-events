@@ -8,7 +8,7 @@ import Icon from '../icons.jsx';
 import { Badge, Card, EmailStatusBadge } from '../ui.jsx';
 import { GROUPS, ME, ORG, PEOPLE } from './data.js';
 
-const TABS = ['Dashboard', 'Events', 'Broadcasts', 'Contacts', 'Groups'];
+const TABS = ['Dashboard', 'Events', 'Broadcasts', 'Surveys', 'Contacts', 'Groups'];
 const MENU = [
   ['Venues', 'pin'],
   ['Templates', 'file'],
@@ -203,6 +203,7 @@ export function WizardFoot({ next = true }) {
 
 export const EVENT_STEPS = ['Event details', 'RSVP options', 'Invitation & flyer', 'Guests', 'Review & send'];
 export const BROADCAST_STEPS = ['Details', 'Design & message', 'Recipients', 'Review & send'];
+export const SURVEY_STEPS = ['Details', 'Questions', 'Invitation', 'People', 'Review & send'];
 
 // The people picker from the event and broadcast wizards and the Add guests
 // dialog. `groups` are the group ids picked, `out` the people unticked from

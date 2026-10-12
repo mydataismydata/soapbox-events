@@ -309,4 +309,101 @@ export const ORG_MIGRATIONS = [
       syncEventSlug(db, event);
     }
   },
+
+  // Migration 9: surveys. A survey is sent like a meeting invitation, but
+  // asks questions instead of taking an RSVP.
+  //
+  //   surveys           the questions are JSON on the survey (surveyQuestions.js)
+  //   survey_invites    one per person asked, with their personal link
+  //   survey_responses  one per set of answers, keyed by question id
+  //
+  // An anonymous survey's responses have no invite_id, so nothing in the
+  // database says whose they are. Their ids are random rather than counted,
+  // and their times are only a day, so the order people answered in can't
+  // pair them up with the invites either.
+  //
+  // email_log gains a survey_id and a survey_invite_id, and its kind CHECK
+  // gains the two survey emails, so it is rebuilt as migration 3 did.
+  `
+  CREATE TABLE surveys (
+    id INTEGER PRIMARY KEY,
+    slug TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    description TEXT,
+    questions TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'open', 'closed')),
+    share_enabled INTEGER NOT NULL DEFAULT 0,
+    anonymous INTEGER NOT NULL DEFAULT 0,
+    closes_on TEXT,
+    email_subject TEXT,
+    email_body TEXT,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    opened_at TEXT,
+    closed_at TEXT
+  );
+
+  CREATE TABLE survey_invites (
+    id INTEGER PRIMARY KEY,
+    survey_id INTEGER NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
+    contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+    guest_name TEXT,
+    guest_email TEXT COLLATE NOCASE,
+    token TEXT NOT NULL UNIQUE,
+    source TEXT NOT NULL DEFAULT 'email' CHECK (source IN ('email', 'link', 'manual')),
+    email_status TEXT NOT NULL DEFAULT 'not_sent'
+      CHECK (email_status IN ('not_sent', 'queued', 'sent', 'failed')),
+    responded_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (survey_id, contact_id)
+  );
+  CREATE INDEX idx_survey_invites_survey ON survey_invites(survey_id);
+  CREATE INDEX idx_survey_invites_email ON survey_invites(guest_email);
+
+  CREATE TABLE survey_responses (
+    id INTEGER PRIMARY KEY,
+    survey_id INTEGER NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
+    invite_id INTEGER UNIQUE REFERENCES survey_invites(id) ON DELETE SET NULL,
+    answers TEXT NOT NULL DEFAULT '{}',
+    submitted_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX idx_survey_responses_survey ON survey_responses(survey_id);
+
+  CREATE TABLE email_log_new (
+    id INTEGER PRIMARY KEY,
+    event_id INTEGER REFERENCES events(id) ON DELETE SET NULL,
+    invite_id INTEGER REFERENCES invites(id) ON DELETE SET NULL,
+    broadcast_id INTEGER REFERENCES broadcasts(id) ON DELETE SET NULL,
+    survey_id INTEGER REFERENCES surveys(id) ON DELETE SET NULL,
+    survey_invite_id INTEGER REFERENCES survey_invites(id) ON DELETE SET NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('invitation', 'follow_up', 'nudge', 'cancellation', 'test', 'broadcast',
+      'survey', 'survey_reminder')),
+    to_name TEXT,
+    to_email TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    html TEXT NOT NULL,
+    body_text TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'queued'
+      CHECK (status IN ('queued', 'sending', 'sent', 'simulated', 'failed')),
+    error TEXT,
+    provider_id TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    sent_at TEXT,
+    attachment TEXT
+  );
+  INSERT INTO email_log_new
+    (id, event_id, invite_id, broadcast_id, kind, to_name, to_email, subject, html, body_text, status, error,
+     provider_id, created_at, sent_at, attachment)
+    SELECT id, event_id, invite_id, broadcast_id, kind, to_name, to_email, subject, html, body_text, status, error,
+     provider_id, created_at, sent_at, attachment
+    FROM email_log;
+  DROP TABLE email_log;
+  ALTER TABLE email_log_new RENAME TO email_log;
+  CREATE INDEX idx_email_log_status ON email_log(status);
+  CREATE INDEX idx_email_log_event ON email_log(event_id);
+  CREATE INDEX idx_email_log_broadcast ON email_log(broadcast_id);
+  CREATE INDEX idx_email_log_survey ON email_log(survey_id);
+  `,
 ];

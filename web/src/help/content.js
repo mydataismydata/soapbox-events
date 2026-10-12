@@ -145,6 +145,63 @@ const BROADCAST_WIZARD = {
   ],
 };
 
+const SURVEY_WIZARD = {
+  title: 'Creating a survey',
+  intro: 'The survey wizard has five steps, listed down the left. Continue saves the step you are on and moves to the next. Save & exit keeps everything as a draft to finish later.',
+  sections: [
+    {
+      heading: '1. Details',
+      steps: [
+        'Type the title. People see it at the top of the survey and in the email.',
+        'Write an introduction if you like. It shows above the questions.',
+        'Pick a closing date, or leave it empty and close the survey yourself.',
+      ],
+      points: [
+        'Public survey: anyone with the survey’s link can answer, as well as the people you email. Leave it off and only the people you email can answer, each through their own link.',
+        'Anonymous: answers are kept with no link to who gave them. You see who has answered, never what they said. People can’t change an anonymous answer once it is sent.',
+      ],
+    },
+    {
+      heading: '2. Questions',
+      text: [
+        'Pick a type under Add a question, then type the question. People answer in the order the questions are listed. The arrows move a question up or down.',
+      ],
+      points: [
+        'Yes / No: two buttons.',
+        'Single choice: people pick one. Multiple choice: people pick any number, or up to the most you set.',
+        'Ranking: people put the choices in order of preference, by tapping them in turn.',
+        'Preference scale: a row of 3 to 10 points, with a label at each end, such as Not interested at all and Very interested.',
+        'Written answer: one line, or a paragraph.',
+        'Offer “Other” adds a last choice with a box to type in.',
+        'Untick Required to let people skip a question.',
+        'Once anyone has answered, the questions are locked. You can still fix the wording. To ask something different, duplicate the survey.',
+      ],
+      scene: 'survey-questions',
+    },
+    {
+      heading: '3. The invitation',
+      text: [
+        'Write the email that goes with the survey. Every email ends with a button to the person’s own survey page, so you never add a link.',
+        'The grey buttons under the message are placeholders. First name becomes Fred in Fred P.’s copy.',
+      ],
+    },
+    {
+      heading: '4. People',
+      text: [
+        'Pick groups and people the same way as an event’s guests. Nobody is added twice.',
+      ],
+    },
+    {
+      heading: '5. Review & send',
+      text: [
+        'Send survey emails everyone picked who hasn’t been sent it yet, after a five-second pause you can cancel. The survey starts taking answers straight away.',
+        'A public survey can also open without sending, to be shared by its link alone.',
+        'Send test email sends you a copy first.',
+      ],
+    },
+  ],
+};
+
 export const HELP = {
   '/': {
     title: 'Dashboard',
@@ -153,7 +210,7 @@ export const HELP = {
       {
         heading: 'Getting around',
         text: [
-          'The tabs along the top are for what you send and who you send it to: Events, Broadcasts, Contacts and Groups.',
+          'The tabs along the top are for what you send and who you send it to: Events, Broadcasts, Surveys, Contacts and Groups.',
           'Your name, at the top right, opens a menu with Venues, Templates, the Email log, Settings and Sign out.',
           'Help, beside it, explains the page you are on.',
         ],
@@ -166,6 +223,7 @@ export const HELP = {
           'Upcoming events lists your next events. Coming counts guests and the people they are bringing, and Waiting counts guests who have not answered.',
           'Recent responses shows the newest replies first, as guests click Accept or Decline.',
           'Broadcasts shows your latest email blasts and whether each has gone out.',
+          'Open surveys appears while a survey is taking answers, with how many people have answered.',
         ],
         scene: 'dashboard',
       },
@@ -325,6 +383,64 @@ export const HELP = {
           'Send a copy emails the broadcast to one more address.',
           'Duplicate starts a new draft from this broadcast.',
           'Edit reopens the wizard. Sending it again sends everyone a fresh copy.',
+        ],
+      },
+    ],
+  },
+
+  '/surveys': {
+    title: 'Surveys',
+    intro: 'A survey is emailed like an invitation, but asks questions instead of taking an RSVP. Everyone gets their own link, and the results add up as they answer.',
+    sections: [
+      {
+        heading: 'Your surveys',
+        text: [
+          'Surveys are split into Open, Drafts and Closed. Each row counts the responses, and how many of the people asked have answered.',
+          'Click a survey to see its results.',
+        ],
+        scene: 'surveys-list',
+      },
+      {
+        heading: 'Starting a new survey',
+        text: [
+          'Click New survey. The wizard has five steps: the details, the questions, the invitation, the people to ask, and a last check before sending.',
+        ],
+      },
+    ],
+  },
+
+  '/surveys/new': SURVEY_WIZARD,
+  '/surveys/:id/edit': SURVEY_WIZARD,
+
+  '/surveys/:id': {
+    title: 'A survey',
+    intro: 'A survey’s page shows its results, everyone asked, and every email sent for it.',
+    sections: [
+      {
+        heading: 'Results',
+        text: [
+          'The four numbers count the people asked, the people who have answered, the people still to answer, and the share who have.',
+          'Results has a card for each question. Choices show how many people picked each one. A ranking lists the choices by points: first place earns the most. A scale shows how many picked each point, and the average.',
+          'Export responses downloads a spreadsheet with one row for each set of answers.',
+        ],
+        scene: 'survey-results',
+      },
+      {
+        heading: 'Responses and people',
+        points: [
+          'Responses lists each set of answers. View shows them all. The bin takes one out of the results, such as a joke answer on a public survey.',
+          'People lists everyone asked, and whether each has answered. An anonymous survey shows who has answered, never what they said.',
+          'Add people puts more people on the list. The green button then emails just them.',
+          'Copy link copies one person’s own survey link, to send another way.',
+        ],
+      },
+      {
+        heading: 'Reminders, closing and reopening',
+        points: [
+          'Reminders emails everyone who was sent the survey and hasn’t answered.',
+          'Close survey stops it taking answers from every link. A closing date does the same when the day ends.',
+          'Reopen starts it taking answers again, with a new closing date if you give one.',
+          'Duplicate starts a new draft with the same questions and nobody on it.',
         ],
       },
     ],

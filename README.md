@@ -1,7 +1,7 @@
 # Soapbox
 
 A self-hosted replacement for eVite: events, designed invitations, RSVPs,
-contact lists, and email delivery — with **no ads, no tracking, and no selling
+surveys, contact lists, and email delivery — with **no ads, no tracking, and no selling
 of anyone's email address**. Built to serve **several completely independent
 organizations from one installation**, with hard isolation between them.
 
@@ -61,6 +61,28 @@ organizations from one installation**, with hard isolation between them.
 - Email logs everywhere — per event, per broadcast, and an organization-wide
   one — filterable by recipient, type and status, sortable on every column,
   and paginated
+
+**Surveys**
+- Sent like an invitation, but asks questions instead of taking an RSVP.
+  Everyone asked gets their own link, and the results add up as they answer.
+- Six kinds of question: Yes / No, single choice, multiple choice (with an
+  optional limit), ranking, a preference scale of 3 to 10 points with a label
+  at each end, and a written answer of one line or a paragraph. Choice
+  questions can offer "Other" with a box to type in. Any question can be
+  optional.
+- A five-step wizard: details → questions → invitation → people → review & send
+- Public surveys also take answers at a shared link, behind the same bot
+  traps as the open RSVP form. Private ones answer only personal links.
+- Named answers can be changed until the survey closes. Anonymous answers are
+  stored with no link to the person, a random id and only the day they were
+  given, so nothing in the database pairs them back up.
+- Results per question: counts and shares for choices, points and average
+  place for rankings, the spread and average for a scale, and every written
+  answer. A spreadsheet export has one row per response.
+- Reminders to people who haven't answered, a closing date or a Close button,
+  and reopening
+- Once anyone has answered, the questions are locked to their wording, so an
+  answer never changes meaning
 
 **People**
 - Contact list with names, emails, phone numbers, and notes
@@ -213,6 +235,8 @@ reached through an unguessable code:
 /<org>/u/<token>             unsubscribe (event invitation)
 /<org>/b/<slug>              broadcast web version ("view in browser")
 /<org>/bu/<token>            unsubscribe (broadcast)
+/<org>/s/<code>              survey's shared page (answers it if the survey is public)
+/<org>/q/<token>             personal survey page (answer, or change answers)
 ```
 
 A meeting with no start time is at its date alone (`/<org>/2026-oct-27`).

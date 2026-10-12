@@ -4,7 +4,7 @@ import React from 'react';
 import { Card } from '../ui.jsx';
 import EmailLog from '../components/EmailLog.jsx';
 
-const KINDS = ['invitation', 'nudge', 'follow_up', 'cancellation', 'broadcast', 'test'];
+const KINDS = ['invitation', 'nudge', 'follow_up', 'cancellation', 'broadcast', 'survey', 'survey_reminder', 'test'];
 
 export default function Emails() {
   return (

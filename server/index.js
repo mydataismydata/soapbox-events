@@ -16,6 +16,7 @@ import { groupRouter } from './routes/groupRoutes.js';
 import { templateRouter } from './routes/templateRoutes.js';
 import { eventRouter } from './routes/eventRoutes.js';
 import { broadcastRouter } from './routes/broadcastRoutes.js';
+import { surveyRouter } from './routes/surveyRoutes.js';
 import { venueRouter } from './routes/venueRoutes.js';
 import { flyerRouter } from './routes/flyerRoutes.js';
 import { uploadRouter } from './routes/uploadRoutes.js';
@@ -67,6 +68,7 @@ api.use(groupRouter);
 api.use(templateRouter);
 api.use(eventRouter);
 api.use(broadcastRouter);
+api.use(surveyRouter);
 api.use(venueRouter);
 api.use(flyerRouter);
 api.use(uploadRouter);
@@ -89,6 +91,10 @@ for (const pkg of ['ibm-plex-sans', 'ibm-plex-mono']) {
   app.use(`/fonts/${pkg}`, express.static(path.join(config.root, 'node_modules', '@fontsource', pkg, 'files'),
     { index: false, maxAge: '365d', immutable: true }));
 }
+
+// The guest pages' own scripts, such as the survey form's helper. "assets"
+// is a reserved word, so no organization can be called it.
+app.use('/assets', express.static(path.join(config.root, 'server', 'assets'), { index: false, maxAge: '1h' }));
 
 // --- admin SPA -------------------------------------------------------------
 

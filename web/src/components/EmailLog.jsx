@@ -15,6 +15,8 @@ const KIND_LABELS = {
   follow_up: 'Follow-up',
   cancellation: 'Cancellation',
   broadcast: 'Broadcast',
+  survey: 'Survey',
+  survey_reminder: 'Survey reminder',
   test: 'Test',
 };
 
@@ -25,7 +27,7 @@ export function kindLabel(kind) {
 }
 
 export default function EmailLog({
-  scope = {}, // fixed query params: { event_id } / { broadcast_id } / {}
+  scope = {}, // fixed query params: { event_id } / { broadcast_id } / { survey_id } / {}
   kinds, // which type filters to offer
   showType = false,
   showSubject = false,
@@ -151,7 +153,7 @@ export default function EmailLog({
               <tr>
                 <SortTh label="When" k="when" sort={sort} onSort={sortBy} startDir="desc" />
                 {showType ? <SortTh label="Type" k="kind" sort={sort} onSort={sortBy} /> : null}
-                {showSource ? <SortTh label="Event / broadcast" k="source" sort={sort} onSort={sortBy} /> : null}
+                {showSource ? <SortTh label="Sent for" k="source" sort={sort} onSort={sortBy} /> : null}
                 <SortTh label="To" k="recipient" sort={sort} onSort={sortBy} />
                 {showSubject ? <SortTh label="Subject" k="subject" sort={sort} onSort={sortBy} /> : null}
                 <SortTh label="Status" k="status" sort={sort} onSort={sortBy} />
@@ -169,6 +171,8 @@ export default function EmailLog({
                         <Link className="t-main" to={`/events/${e.event_id}`}>{e.event_title}</Link>
                       ) : e.broadcast_id ? (
                         <Link className="t-main" to={`/broadcasts/${e.broadcast_id}`}>{e.broadcast_title}</Link>
+                      ) : e.survey_id ? (
+                        <Link className="t-main" to={`/surveys/${e.survey_id}`}>{e.survey_title}</Link>
                       ) : <span className="t-sub">—</span>}
                     </td>
                   ) : null}

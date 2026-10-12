@@ -13,6 +13,9 @@ import EventWizard from './pages/EventWizard.jsx';
 import BroadcastsList from './pages/BroadcastsList.jsx';
 import BroadcastDetail from './pages/BroadcastDetail.jsx';
 import BroadcastWizard from './pages/BroadcastWizard.jsx';
+import SurveysList from './pages/SurveysList.jsx';
+import SurveyDetail from './pages/SurveyDetail.jsx';
+import SurveyWizard from './pages/SurveyWizard.jsx';
 import Contacts from './pages/Contacts.jsx';
 import Groups from './pages/Groups.jsx';
 import Venues from './pages/Venues.jsx';
@@ -36,6 +39,7 @@ const PRIMARY = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/events', label: 'Events' },
   { to: '/broadcasts', label: 'Broadcasts' },
+  { to: '/surveys', label: 'Surveys' },
   { to: '/contacts', label: 'Contacts' },
   { to: '/groups', label: 'Groups' },
 ];
@@ -228,6 +232,10 @@ export default function App() {
               <Route path="/broadcasts/new" element={<BroadcastWizard />} />
               <Route path="/broadcasts/:id" element={<BroadcastDetail />} />
               <Route path="/broadcasts/:id/edit" element={<BroadcastWizard />} />
+              <Route path="/surveys" element={<SurveysList />} />
+              <Route path="/surveys/new" element={<SurveyWizard />} />
+              <Route path="/surveys/:id" element={<SurveyDetail />} />
+              <Route path="/surveys/:id/edit" element={<SurveyWizard />} />
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/groups" element={<Groups />} />
               <Route path="/venues" element={<Venues />} />

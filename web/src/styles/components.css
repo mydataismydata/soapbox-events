@@ -1425,3 +1425,154 @@ button.chip.active,
   font-size: var(--fs-sm);
 }
 .attach-line a { color: var(--c-ink); font-weight: 500; }
+
+/* === survey question editor (QuestionEditor.jsx) ========================== */
+.qe { display: flex; flex-direction: column; gap: var(--sp-3); }
+.qe-q {
+  border: 1px solid var(--c-line);
+  background: var(--c-surface);
+  padding: var(--sp-4);
+}
+.qe-q .field:last-child { margin-bottom: 0; }
+.qe-head { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-3); }
+.qe-n {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--c-muted);
+  min-width: 26px;
+}
+.qe-kind { width: auto; min-width: 180px; }
+.qe-required {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-base);
+  color: var(--c-ink-2);
+  cursor: pointer;
+  margin-left: var(--sp-2);
+}
+.qe-tools { display: flex; gap: 2px; margin-left: auto; }
+.qe-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--c-muted);
+  margin-bottom: var(--sp-2);
+}
+.qe-choices { margin-top: var(--sp-1); }
+.qe-choice { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: 6px; }
+.qe-choice .input { flex: 1 1 auto; min-width: 0; }
+.qe-choice-tools { display: flex; gap: 2px; flex: none; }
+.qe-mark {
+  flex: 0 0 22px;
+  display: inline-flex;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--c-muted);
+}
+.qe-dot, .qe-box { width: 14px; height: 14px; border: 1.5px solid var(--c-line-strong); }
+.qe-dot { border-radius: 50%; }
+.qe-box { border-radius: 2px; }
+.qe-add-choice { margin: 2px 0 0 30px; }
+.qe-choices .checkbox { margin-bottom: var(--sp-1); }
+.qe-inline { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; font-size: var(--fs-base); color: var(--c-ink-2); }
+.qe-radio { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.qe-scale-preview { max-width: 460px; margin-top: var(--sp-1); }
+.qe-stops { position: relative; display: grid; grid-template-columns: repeat(var(--points), minmax(0, 1fr)); }
+.qe-stops::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  height: 2px;
+  background: var(--c-line-strong);
+  left: calc(50% / var(--points));
+  right: calc(50% / var(--points));
+}
+.qe-stops span {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--c-muted);
+}
+.qe-stops i {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--c-line-strong);
+  background: var(--c-surface);
+}
+.qe-ends { display: flex; justify-content: space-between; gap: var(--sp-3); font-size: var(--fs-sm); color: var(--c-muted); margin-top: 2px; }
+.qe-add { border: 1px dashed var(--c-line-strong); padding: var(--sp-3) var(--sp-4) var(--sp-4); }
+.qe-add-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-2); }
+.qe-add-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 9px 12px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.qe-add-btn:hover { border-color: var(--c-accent); background: var(--c-accent-soft); }
+.qe-add-btn:focus-visible { outline: none; box-shadow: var(--ring); border-color: var(--c-accent); }
+.qe-add-btn .t { font-size: var(--fs-base); font-weight: 600; color: var(--c-ink); }
+.qe-add-btn .s { font-size: var(--fs-sm); color: var(--c-muted); }
+
+/* === survey results (SurveyResults.jsx) =================================== */
+.svr .card { margin-bottom: var(--sp-4); }
+.svr-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) 92px;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 7px 0;
+}
+.svr-row + .svr-row { border-top: 1px solid var(--c-line); }
+.svr-label { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: var(--fs-md); min-width: 0; }
+.svr-lead { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--c-muted); }
+.svr-sub { flex-basis: 100%; font-size: var(--fs-sm); color: var(--c-muted); }
+.svr-bar { height: 10px; background: var(--c-surface-3); }
+.svr-bar span { display: block; height: 100%; background: var(--c-accent); transition: width 0.3s; }
+.svr-num { text-align: right; font-family: var(--font-mono); font-size: var(--fs-base); white-space: nowrap; }
+.svr-num span { color: var(--c-muted); margin-left: 4px; }
+.svr-note { margin: var(--sp-2) 0 0; }
+.svr-other { padding: var(--sp-2) 0 0; }
+.svr-text { list-style: none; margin: 0 0 var(--sp-2); padding: 0; }
+.svr-text li { padding: 9px 0; border-bottom: 1px solid var(--c-line); }
+.svr-text li:last-child { border-bottom: 0; }
+.svr-quote { white-space: pre-wrap; font-size: var(--fs-md); }
+.svr-scale {
+  display: grid;
+  grid-template-columns: repeat(var(--points), minmax(0, 1fr));
+  gap: var(--sp-2);
+  max-width: 560px;
+  align-items: end;
+}
+.svr-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.svr-col-bar { width: 100%; max-width: 44px; height: 110px; background: var(--c-surface-3); display: flex; align-items: flex-end; }
+.svr-col-bar span { display: block; width: 100%; background: var(--c-accent); transition: height 0.3s; }
+.svr-col-n { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--c-ink); }
+.svr-col-p { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--c-muted); }
+.svr-ends { display: flex; justify-content: space-between; gap: var(--sp-3); max-width: 560px; font-size: var(--fs-sm); color: var(--c-muted); margin-top: 4px; }
+.svr-facts { display: flex; gap: var(--sp-5); margin-top: var(--sp-3); font-size: var(--fs-md); color: var(--c-ink-2); }
+.svr-facts strong { font-family: var(--font-mono); color: var(--c-ink); }
+
+@media (max-width: 700px) {
+  .qe-add-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qe-tools { margin-left: 0; }
+  .svr-row { grid-template-columns: minmax(0, 1fr) 80px; }
+  .svr-bar { grid-column: 1 / -1; grid-row: 2; }
+}

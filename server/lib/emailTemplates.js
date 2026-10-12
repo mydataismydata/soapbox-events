@@ -242,6 +242,49 @@ export function renderBroadcastEmail({ org, title, toEmail, bodyText, viewUrl, u
   return { html, text };
 }
 
+// A survey's invitation and its reminder: the message, then one button to
+// the person's own survey page, and the closing date under it. The button
+// takes the accent blue, as the guest pages' main buttons do.
+export function renderSurveyEmail({ kind, org, survey, toEmail, bodyText, links, unsubUrl, imageUrl }) {
+  const closes = survey.closes_on ? `Open until ${formatDate(survey.closes_on)}.` : '';
+  const label = kind === 'survey_reminder' ? 'Answer the survey' : 'Take the survey';
+  const content = `
+    ${bodyBlock(bodyText, imageUrl)}
+    <div style="text-align:center; padding:24px 0 4px;">
+      <div style="font-size:17px; font-weight:600; color:#172334; padding-bottom:14px;">${esc(survey.title)}</div>
+      ${button(links.answer, label, LINK_COLOR)}
+      <div style="padding-top:14px; font-size:13px; color:#566276;">
+        ${closes ? `${esc(closes)} ` : ''}This link is just for you.
+      </div>
+    </div>
+  `;
+  const html = shell({
+    preheader: `${kind === 'survey_reminder' ? 'Reminder' : 'Survey'}: ${survey.title}`,
+    contentHtml: content,
+    footerHtml: footer({ orgName: org.name, toEmail, unsubUrl }),
+  });
+  const text = textBlocks(
+    bodyToText(bodyText),
+    [survey.title, `${label}: ${links.answer}`, closes],
+    [`Sent to ${toEmail} by ${org.name}.`, unsubUrl ? `Unsubscribe: ${unsubUrl}` : ''],
+  );
+  return { html, text };
+}
+
+export const DEFAULT_SURVEY_BODY =
+`Hi {{first_name}},
+
+{{org_name}} would like to hear what you think. The survey only takes a few minutes.
+
+Please use the button below to answer.`;
+
+export const DEFAULT_SURVEY_REMINDER_BODY =
+`Hi {{first_name}},
+
+Just a reminder: we would still like your answers to {{survey_title}}.
+
+It only takes a few minutes. Use the button below to answer.`;
+
 export const DEFAULT_BROADCAST_BODY =
 `Hi {{first_name}},
 

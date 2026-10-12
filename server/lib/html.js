@@ -193,6 +193,8 @@ const PUBLIC_CSS = `
   .pub-field input:focus, .pub-field select:focus, .pub-field textarea:focus {
     outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(31, 95, 191, 0.22);
   }
+  /* The bot trap in the RSVP form (botGuard.js): off the screen, not hidden. */
+  .pub-trap { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
   .pub-banner { border: 1px solid transparent; border-radius: 0; padding: 12px 16px;
     font-size: 14.5px; font-weight: 600; margin: 0 0 16px; }
   .pub-banner-ok { background: var(--ok-soft); border-color: var(--ok-line); color: var(--ok); }
@@ -224,13 +226,16 @@ const PUBLIC_CSS = `
   }
 `;
 
-export function publicPage({ title, bodyHtml, footerHtml = '' }) {
+// Guest pages stay out of search engines unless the caller says otherwise.
+// Only a public meeting's own page is meant to be found; it passes
+// `canonical`, its address, so redirects to it are not indexed twice.
+export function publicPage({ title, bodyHtml, footerHtml = '', canonical = '' }) {
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
+${canonical ? `<link rel="canonical" href="${esc(canonical)}">` : '<meta name="robots" content="noindex">'}
 <title>${esc(title)}</title>
 <link rel="icon" href="data:,">
 <style>${PUBLIC_CSS}</style>

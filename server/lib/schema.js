@@ -300,4 +300,13 @@ export const ORG_MIGRATIONS = [
       if (RANDOM_SLUG_RE.test(event.slug)) syncEventSlug(db, event);
     }
   },
+
+  // Migration 8: a private meeting (shareable link off) is at its date plus
+  // a random code, and stops answering at any address a stranger could
+  // guess. Migration 7 gave private meetings plain date addresses too.
+  (db) => {
+    for (const event of db.prepare('SELECT * FROM events WHERE share_enabled = 0 ORDER BY id').all()) {
+      syncEventSlug(db, event);
+    }
+  },
 ];

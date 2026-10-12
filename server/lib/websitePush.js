@@ -60,11 +60,18 @@ export function websiteConfigured(db) {
   return Boolean(url && token);
 }
 
-/** Every event the website should currently be showing. */
+/**
+ * Every event the website should currently be showing.
+ *
+ * A private meeting (shareable link off) is never sent. The website is
+ * public, and a private meeting's address is meant to reach only the people
+ * it was given to.
+ */
 function publishableEvents(db) {
   return db.prepare(
     `SELECT * FROM events
       WHERE status = 'published'
+        AND share_enabled = 1
         AND date IS NOT NULL AND date != ''
         AND date >= ?
       ORDER BY date ASC`

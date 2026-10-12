@@ -8,6 +8,11 @@
 //   /<org>/u/<token>       unsubscribe
 //   /<org>/files/<token>   uploaded images, and broadcasts' attached files
 //
+// A public meeting's page is at its date so anyone can find it. A private
+// one (shareable link off) adds a random code; see eventSlug.js. Once a
+// meeting is over, nothing here takes a reply (clock.js). The open RSVP form
+// carries bot traps (botGuard.js).
+//
 // The router is also mounted at /o/<org>, where these pages began. Emails
 // already sent carry those addresses, so they answer for good, and an old
 // event address (/o/<org>/e/<slug>) redirects to the new one.
@@ -18,7 +23,9 @@ import { getOrg, orgDb, uploadsDir, insertId } from '../lib/db.js';
 import { resolveSession } from '../lib/auth.js';
 import { esc, textToHtml, publicPage, expandImageMarkers } from '../lib/html.js';
 import { renderFlyer } from '../lib/flyer.js';
-import { EVENT_SLUG_RE, eventUidKey } from '../lib/eventSlug.js';
+import { EVENT_SLUG_RE, eventUidKey, isPublicEvent } from '../lib/eventSlug.js';
+import { localToday, meetingOver } from '../lib/clock.js';
+import { trapFields, checkSubmission } from '../lib/botGuard.js';
 import {
   parseFlyer, eventUrl, flyerImageUrls, flyerBgUrl, verifyContactToken, orgImageUrl, PREVIEW_UNSUB,
 } from '../lib/sending.js';
@@ -56,10 +63,6 @@ function notFoundPage(res, message = "This link doesn't point to anything.") {
 
 // --- helpers ---------------------------------------------------------------
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function nowSql() {
   return new Date().toISOString().slice(0, 19).replace('T', ' ');
 }
@@ -77,8 +80,14 @@ function inviteByToken(db, token) {
   return db.prepare('SELECT * FROM invites WHERE token = ?').get(token) || null;
 }
 
+// The deadline is a day where the meetings are, and replies close when it ends.
 function deadlinePassed(event) {
-  return Boolean(event.rsvp_deadline && event.rsvp_deadline < todayIso());
+  return Boolean(event.rsvp_deadline && event.rsvp_deadline < localToday());
+}
+
+// No reply is taken once the deadline has passed or the meeting is over.
+function repliesClosed(event) {
+  return deadlinePassed(event) || meetingOver(event);
 }
 
 function acceptedSeats(db, eventId, excludeInviteId = null) {
@@ -102,7 +111,7 @@ function flyerHtmlFor(req, event) {
 }
 
 function calendarButtons(req, event, icsPath) {
-  if (!event.date || event.status === 'cancelled') return '';
+  if (!event.date || event.status === 'cancelled' || meetingOver(event)) return '';
   const gcal = googleCalendarUrl({ event, url: eventUrl(req.pub.org.slug, event) });
   return `<div class="pub-actions">
     <a class="pub-btn pub-btn-ghost" href="${esc(gcal)}" target="_blank" rel="noopener">Add to Google Calendar</a>
@@ -207,12 +216,16 @@ function eventPage(req, res) {
   if (req.originalUrl.split('?')[0] !== own) return res.redirect(301, own);
 
   const cancelled = event.status === 'cancelled';
+  const over = !cancelled && meetingOver(event);
   const closed = deadlinePassed(event);
   const left = seatsLeft(db, event);
   const full = left !== null && left <= 0;
 
   let rsvpCard = '';
-  if (!cancelled && event.rsvp_mode === 'open') {
+  if (over) {
+    rsvpCard = `<div class="pub-card"><h2>This meeting is over</h2>
+      <p class="pub-muted">It no longer takes replies.</p></div>`;
+  } else if (!cancelled && event.rsvp_mode === 'open') {
     rsvpCard = `<div class="pub-card"><h2>No RSVP needed</h2>
       <p class="pub-muted">This is an open event — just show up! Add it to your calendar so you don't miss it.</p>
       ${calendarButtons(req, event, `/${esc(req.pub.org.slug)}/${esc(event.slug)}/ics`)}</div>`;
@@ -227,22 +240,7 @@ function eventPage(req, res) {
       rsvpCard = `<div class="pub-card"><h2>Event is full</h2>
         <p class="pub-muted">All ${esc(String(event.capacity))} places have been taken. Contact the host if you have questions.</p></div>`;
     } else {
-      rsvpCard = `<div class="pub-card"><h2>Will you be there?</h2>
-        <form method="post" action="/${esc(req.pub.org.slug)}/${esc(event.slug)}/rsvp">
-          <div class="pub-field"><label for="name">Your name</label>
-            <input id="name" name="name" required maxlength="200" autocomplete="name"></div>
-          <div class="pub-field"><label for="email">Your email</label>
-            <input id="email" name="email" type="email" required maxlength="254" autocomplete="email"></div>
-          ${partySelect(event)}
-          <div class="pub-field"><label for="note">Message for the host (optional)</label>
-            <input id="note" name="note" maxlength="500"></div>
-          <div class="pub-actions">
-            <button class="pub-btn pub-btn-yes" type="submit" name="attending" value="yes">&#10003;&nbsp; I'll be there</button>
-            <button class="pub-btn pub-btn-no" type="submit" name="attending" value="no">&#10007;&nbsp; Can't make it</button>
-          </div>
-        </form>
-        ${left !== null ? `<p class="pub-muted" style="margin-top:12px;">${esc(String(left))} of ${esc(String(event.capacity))} places remaining.</p>` : ''}
-      </div>`;
+      rsvpCard = rsvpFormCard(req, event, { left });
     }
   }
 
@@ -254,11 +252,36 @@ function eventPage(req, res) {
       ${flyerHtmlFor(req, event)}
       ${detailsCard(event)}
       ${rsvpCard}
-      ${!cancelled && event.rsvp_mode === 'rsvp' ? `<div class="pub-card">${calendarButtons(req, event, `/${esc(req.pub.org.slug)}/${esc(event.slug)}/ics`) || '<p class="pub-muted">Calendar links appear once the event has a date.</p>'}</div>` : ''}
+      ${!cancelled && !over && event.rsvp_mode === 'rsvp' ? `<div class="pub-card">${calendarButtons(req, event, `/${esc(req.pub.org.slug)}/${esc(event.slug)}/ics`) || '<p class="pub-muted">Calendar links appear once the event has a date.</p>'}</div>` : ''}
       ${guestListCard(db, event)}
     `,
     footerHtml: orgFooter(req),
+    // A public meeting is meant to be found. See publicPage().
+    canonical: event.status === 'published' && isPublicEvent(event) ? eventUrl(req.pub.org.slug, event) : '',
   }));
+}
+
+// The public RSVP form. `values` refills it when it is drawn again.
+function rsvpFormCard(req, event, { left = null, values = {}, intro = '' } = {}) {
+  const party = Number(values.party_size) || 1;
+  return `<div class="pub-card"><h2>Will you be there?</h2>
+    ${intro ? `<p class="pub-muted" style="margin-bottom:14px;">${esc(intro)}</p>` : ''}
+    <form method="post" action="/${esc(req.pub.org.slug)}/${esc(event.slug)}/rsvp">
+      <div class="pub-field"><label for="name">Your name</label>
+        <input id="name" name="name" required maxlength="200" autocomplete="name" value="${esc(values.name || '')}"></div>
+      <div class="pub-field"><label for="email">Your email</label>
+        <input id="email" name="email" type="email" required maxlength="254" autocomplete="email" value="${esc(values.email || '')}"></div>
+      ${partySelect(event, party)}
+      <div class="pub-field"><label for="note">Message for the host (optional)</label>
+        <input id="note" name="note" maxlength="500" value="${esc(values.note || '')}"></div>
+      ${trapFields(event.id)}
+      <div class="pub-actions">
+        <button class="pub-btn pub-btn-yes" type="submit" name="attending" value="yes">&#10003;&nbsp; I'll be there</button>
+        <button class="pub-btn pub-btn-no" type="submit" name="attending" value="no">&#10007;&nbsp; Can't make it</button>
+      </div>
+    </form>
+    ${left !== null ? `<p class="pub-muted" style="margin-top:12px;">${esc(String(left))} of ${esc(String(event.capacity))} places remaining.</p>` : ''}
+  </div>`;
 }
 
 // Open RSVP from the shareable link: creates (or updates) an invite keyed by
@@ -268,10 +291,32 @@ function eventRsvp(req, res) {
   const event = eventBySlug(db, req.params.slug);
   if (!event || event.status !== 'published') return notFoundPage(res);
   if (event.rsvp_mode !== 'rsvp' || !event.share_enabled) return notFoundPage(res);
+  if (repliesClosed(event)) return res.redirect(303, `/${req.pub.org.slug}/${event.slug}`);
   if (!take(`rsvp:${req.ip}`, 30, 60 * 60 * 1000)) {
     return res.status(429).send(publicPage({
       title: 'Slow down', bodyHtml: `<div class="pub-card"><h2>Too many requests</h2>
       <p class="pub-muted">Please wait a little while and try again.</p></div>`,
+    }));
+  }
+
+  // The bot traps. See botGuard.js.
+  const verdict = checkSubmission(event.id, req.body);
+  if (verdict === 'bot') {
+    console.log(`rsvp: kept nothing from a likely bot on /${req.pub.org.slug}/${event.slug}`);
+    return res.send(publicPage({
+      title: 'Thank you',
+      bodyHtml: `<div class="pub-card"><h2>Thank you</h2><p class="pub-muted">We have your reply.</p></div>`,
+      footerHtml: orgFooter(req),
+    }));
+  }
+  if (verdict === 'retry') {
+    return res.send(publicPage({
+      title: event.title,
+      bodyHtml: `${rsvpFormCard(req, event, {
+        values: req.body,
+        intro: 'Your reply has not been sent yet. Check your details, then press your answer again.',
+      })}`,
+      footerHtml: orgFooter(req),
     }));
   }
 
@@ -289,8 +334,6 @@ function eventRsvp(req, res) {
       <p class="pub-muted">Please go back and enter your name and a valid email address.</p></div>`,
     }));
   }
-  if (deadlinePassed(event)) return res.redirect(303, `/${req.pub.org.slug}/${event.slug}`);
-
   // Reuse an existing invite for this email (personal invite or earlier link
   // RSVP); otherwise create a fresh one.
   let invite = db.prepare(`
@@ -346,9 +389,7 @@ function eventIcs(req, res) {
 
 function respondCard(req, event, invite) {
   const db = req.pub.db;
-  const closed = deadlinePassed(event);
-  const cancelled = event.status === 'cancelled';
-  if (cancelled || closed) return '';
+  if (event.status === 'cancelled' || repliesClosed(event)) return '';
   const base = `/${esc(req.pub.org.slug)}/i/${esc(invite.token)}`;
   const left = seatsLeft(db, event, invite.id);
   const yesDisabled = left !== null && left <= 0 && invite.response !== 'yes';
@@ -383,8 +424,10 @@ publicRouter.get('/i/:token', (req, res) => {
 
   const name = firstName(invite.guest_name || '') || 'there';
   const q = req.query;
+  const over = meetingOver(event);
   let banner = '';
   if (event.status === 'cancelled') banner = statusBanner('This event has been cancelled.', 'no');
+  else if (over) banner = statusBanner('This meeting is over, so it no longer takes replies.', 'warn');
   else if (q.full !== undefined) banner = statusBanner('Sorry — the event has filled up, so we could not register your acceptance.', 'warn');
   else if (q.closed !== undefined) banner = statusBanner('The RSVP deadline has passed, so responses can no longer be changed.', 'warn');
   else if (q.done === 'accept' || q.thanks !== undefined && invite.response === 'yes') banner = statusBanner(`Wonderful, ${esc(name)} — you're on the list! We've saved your RSVP.`, 'ok');
@@ -401,12 +444,12 @@ publicRouter.get('/i/:token', (req, res) => {
       ${flyerHtmlFor(req, event)}
       ${detailsCard(event)}
       ${event.rsvp_mode === 'rsvp' ? respondCard(req, event, invite) : ''}
-      ${invite.response !== 'no' && event.status !== 'cancelled'
+      ${invite.response !== 'no' && event.status !== 'cancelled' && !over
         ? `<div class="pub-card">${calendarButtons(req, event, `/${esc(req.pub.org.slug)}/i/${esc(invite.token)}/ics`) || '<p class="pub-muted">Calendar links appear once the event has a date.</p>'}</div>`
         : ''}
       ${guestListCard(db, event)}
-      <div class="pub-card"><p class="pub-muted">Shareable event page:
-        <a href="/${esc(req.pub.org.slug)}/${esc(event.slug)}">${esc(eventUrl(req.pub.org.slug, event))}</a></p></div>
+      ${isPublicEvent(event) ? `<div class="pub-card"><p class="pub-muted">Shareable event page:
+        <a href="/${esc(req.pub.org.slug)}/${esc(event.slug)}">${esc(eventUrl(req.pub.org.slug, event))}</a></p></div>` : ''}
     `,
     footerHtml: orgFooter(req),
   }));
@@ -422,7 +465,7 @@ function recordResponse(req, res, answer) {
 
   if (event.status === 'cancelled') return res.redirect(303, base);
   if (event.rsvp_mode !== 'rsvp') return res.redirect(303, base);
-  if (deadlinePassed(event)) return res.redirect(303, `${base}?closed=1`);
+  if (repliesClosed(event)) return res.redirect(303, `${base}?closed=1`);
   if (answer === 'yes') {
     const left = seatsLeft(db, event, invite.id);
     if (left !== null && invite.party_size > left) return res.redirect(303, `${base}?full=1`);
@@ -442,7 +485,7 @@ publicRouter.post('/i/:token', (req, res) => {
   if (!invite) return notFoundPage(res);
   const event = db.prepare('SELECT * FROM events WHERE id = ?').get(invite.event_id);
   if (!event || event.status !== 'published') return notFoundPage(res);
-  if (deadlinePassed(event)) return res.redirect(303, `/${req.pub.org.slug}/i/${invite.token}?closed=1`);
+  if (repliesClosed(event)) return res.redirect(303, `/${req.pub.org.slug}/i/${invite.token}?closed=1`);
 
   let party = Number(req.body.party_size || invite.party_size);
   if (!Number.isInteger(party) || party < 1) party = invite.party_size;

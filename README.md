@@ -200,11 +200,13 @@ scripts/              create-org, reset-password, seed-demo, smoke-test, backup
 data/                 runtime state: core.db + one directory per organization
 ```
 
-Public guest URLs are namespaced per organization. An event page is at the
-meeting's date and start time; everything personal is token-based:
+Public guest URLs are namespaced per organization. A public meeting's page
+is at its date and start time, so anyone can find it. Everything else is
+reached through an unguessable code:
 
 ```
-/<org>/2026-oct-27-17-30     landing page + open RSVP form
+/<org>/2026-oct-27-17-30     public meeting: landing page + open RSVP form
+/<org>/2026-oct-27-17-30-x7k2m9qp4d   private meeting (shareable link off)
 /<org>/i/<invite-token>      personal RSVP page
 /<org>/i/<token>/accept      one-click accept (from email button)
 /<org>/i/<token>/decline     one-click decline
@@ -216,6 +218,19 @@ meeting's date and start time; everything personal is token-based:
 A meeting with no start time is at its date alone (`/<org>/2026-oct-27`).
 Two meetings at the same time get `-2`, `-3` on the end. A meeting that
 moves gets a new address, and the old one redirects to it.
+
+A private meeting never answers at an address a stranger could guess. It is
+left off the organization's website, and its pages tell search engines not
+to list them. Only a public meeting's own page may be indexed.
+
+Once a meeting is over, its page and every invitation link stop taking
+replies. Unsubscribe links keep working. "Over" is the end time, or two
+hours after the start time, read in `TIMEZONE` (default `America/New_York`).
+
+The open RSVP form carries two bot traps: a field people never see, and a
+signed timestamp that must be at least two seconds old. A filled-in trap
+gets a thank-you page and nothing is kept. A missing, stale or too-quick
+timestamp gets the form back, filled in, to send again.
 
 These pages began under `/o/<org>/…`, and every old address still works:
 `/o/<org>/e/<slug>` redirects to the event's current page, and the rest

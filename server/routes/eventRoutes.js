@@ -135,8 +135,9 @@ eventRouter.put('/events/:id', wrap(async (req, res) => {
   req.db.prepare(`UPDATE events SET ${sets}, updated_at = datetime('now') WHERE id = ?`)
     .run(...Object.keys(fields).map((k) => fields[k] === '' ? null : fields[k]), event.id);
   let updated = req.db.prepare('SELECT * FROM events WHERE id = ?').get(event.id);
-  // The address follows the date and time. The old one keeps redirecting.
-  if ((updated.date || '') !== (event.date || '') || (updated.start_time || '') !== (event.start_time || '')) {
+  // The address follows the date, the time and whether the meeting is
+  // public. See syncEventSlug() for which old addresses keep redirecting.
+  if (['date', 'start_time', 'share_enabled'].some((k) => String(updated[k] ?? '') !== String(event[k] ?? ''))) {
     withTx(req.db, () => syncEventSlug(req.db, updated));
     updated = req.db.prepare('SELECT * FROM events WHERE id = ?').get(event.id);
   }

@@ -10,14 +10,14 @@ const steps = [
   { at: 4000, tap: 'deadline', say: 'Replies close after this date', set: { focus: 'deadline', deadline: '10/16/2026' } },
   { at: 5800, tap: 'party', say: 'The most each guest can bring', side: 'above', set: { focus: 'party', partyOpen: true } },
   { at: 6900, tap: 'party-2', say: null, set: { partyOpen: false, focus: '', party: '2' } },
-  { at: 7900, point: 'share', say: 'Anyone with the link can reply', side: 'below' },
+  { at: 7900, point: 'share', say: 'Anyone can find it and reply', side: 'below' },
   { at: 9700, tap: 'continue', say: 'On to the invitation', side: 'left' },
 ];
 
 export default function WizardRsvp() {
   return (
     <Scene width={560} height={512} length={12000} start={start} steps={steps}
-      label="Step 2 of the event wizard. Collect RSVPs is chosen rather than Open event. The RSVP deadline is set to October 16, Allow plus-ones is ticked with a largest party size of 2, and Shareable link is ticked. Continue moves on to the invitation.">
+      label="Step 2 of the event wizard. Collect RSVPs is chosen rather than Open event. The RSVP deadline is set to October 16, Allow plus-ones is ticked with a largest party size of 2, and Public meeting is ticked. Continue moves on to the invitation.">
       {(s) => (
         <Screen bare>
           <Wizard labels={EVENT_STEPS} step={1}>
@@ -51,8 +51,8 @@ export default function WizardRsvp() {
               </Field>
               <label className="checkbox" data-t="share">
                 <Check on />
-                <span><span className="cb-label">Shareable link</span>
-                  <div className="cb-sub">Anyone with the event link can view it and RSVP — perfect for forwarding.</div></span>
+                <span><span className="cb-label">Public meeting</span>
+                  <div className="cb-sub">Anyone can find its page by its date and RSVP there, and it goes on your website.</div></span>
               </label>
             </Card>
             <WizardFoot />

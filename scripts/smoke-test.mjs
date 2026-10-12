@@ -13,6 +13,7 @@ import path from 'node:path';
 import { sendQueue, sendLabel, sendSummary } from '../web/src/components/sendQueue.js';
 import { personName, splitPersonName } from '../server/lib/contacts.js';
 import { fetchRemoteImage } from '../server/lib/remoteImage.js';
+import { meetingEnd, meetingOver } from '../server/lib/clock.js';
 import { allScenes, helpFor, sectionsFor } from '../web/src/help/content.js';
 
 const PORT = 3870 + Math.floor(Math.random() * 100);
@@ -27,6 +28,8 @@ const ENV = {
   // A website delivery waits this long for more changes. The checks below
   // give it 600ms to land.
   WEBSITE_PUSH_SETTLE_MS: '150',
+  // How old the RSVP form must be before a reply counts (botGuard.js).
+  RSVP_MIN_FILL_MS: '300',
 };
 
 let passed = 0;
@@ -72,6 +75,24 @@ class Client {
     try { data = await res.json(); } catch { /* non-json */ }
     return { status: res.status, data };
   }
+}
+
+// The public RSVP form takes a reply only from a form drawn a moment ago
+// (botGuard.js). This loads the page, waits like a person, and sends it.
+const FILL_MS = 350;
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+async function formStamp(pagePath) {
+  const html = await (await fetch(`${BASE}${pagePath}`)).text();
+  return html.match(/name="t" value="([^"]+)"/)?.[1] || '';
+}
+async function rsvpByForm(pagePath, fields, { wait = FILL_MS, stamp } = {}) {
+  const t = stamp ?? await formStamp(pagePath);
+  if (wait) await pause(wait);
+  return fetch(`${BASE}${pagePath}/rsvp`, {
+    method: 'POST', redirect: 'manual',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ ...(t ? { t } : {}), ...fields }).toString(),
+  });
 }
 
 async function waitForServer() {
@@ -351,12 +372,8 @@ let guests = [];
 
 // --- share-link RSVP (new person) ------------------------------------------
 {
-  const res = await fetch(`${BASE}/alpha/${eventSlug}/rsvp`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ name: 'Walk In', email: 'walkin@guest.test', attending: 'yes', party_size: '2', note: 'Found the link!' }).toString(),
-    redirect: 'manual',
-  });
+  const res = await rsvpByForm(`/alpha/${eventSlug}`,
+    { name: 'Walk In', email: 'walkin@guest.test', attending: 'yes', party_size: '2', note: 'Found the link!' });
   check('share-link RSVP redirects to personal page', res.status === 303 && (res.headers.get('location') || '').startsWith('/alpha/i/'));
   const g = await A.api('GET', `/api/events/${eventId}/guests`);
   const walkin = g.data.guests.find((x) => x.email === 'walkin@guest.test');
@@ -779,11 +796,7 @@ let guests = [];
   const icsAfter = await (await fetch(`${BASE}/alpha/2031-mar-04-19-00/ics`)).text();
   check('its calendar entry keeps its identity', uid(icsBefore) && uid(icsBefore) === uid(icsAfter),
     `${uid(icsBefore)} / ${uid(icsAfter)}`);
-  const rsvp = await fetch(`${BASE}/alpha/2031-mar-04-17-30/rsvp`, {
-    method: 'POST', redirect: 'manual',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ name: 'Late Reader', email: 'late@guest.test', attending: 'yes' }).toString(),
-  });
+  const rsvp = await rsvpByForm('/alpha/2031-mar-04-17-30', { name: 'Late Reader', email: 'late@guest.test', attending: 'yes' });
   check('an RSVP sent to the old address is taken',
     rsvp.status === 303 && (rsvp.headers.get('location') || '').startsWith('/alpha/i/'), rsvp.headers.get('location'));
 
@@ -804,6 +817,126 @@ let guests = [];
     JSON.stringify(apiMiss.data));
 }
 
+// --- private meetings ------------------------------------------------------
+{
+  const code = '[a-hjkmnp-z2-9]{10}';
+  const priv = await A.api('POST', '/api/events', { title: 'Board Only', date: '2031-04-01', start_time: '19:00', share_enabled: false });
+  const pslug = priv.data?.event?.slug || '';
+  check('a private meeting is at its date plus a random code', new RegExp(`^2031-apr-01-19-00-${code}$`).test(pslug), pslug);
+  const pid = priv.data.event.id;
+  await A.api('POST', `/api/events/${pid}/publish`, {});
+  const page = await fetch(`${BASE}/alpha/${pslug}`);
+  const html = await page.text();
+  check('its page answers there', page.status === 200 && html.includes('Board Only'));
+  check('and tells search engines not to list it', html.includes('<meta name="robots" content="noindex">') && !html.includes('rel="canonical"'));
+  check('and takes no open RSVPs', !html.includes('Will you be there?') && html.includes('by personal invitation'));
+  check('the date alone does not find it', (await fetch(`${BASE}/alpha/2031-apr-01-19-00`)).status === 404);
+
+  // Public, then private: every address a stranger could guess goes away.
+  const pub = await A.api('POST', '/api/events', { title: 'Going Private', date: '2031-04-02', start_time: '19:00' });
+  const gid = pub.data.event.id;
+  await A.api('POST', `/api/events/${gid}/publish`, {});
+  const pubHtml = await (await fetch(`${BASE}/alpha/2031-apr-02-19-00`)).text();
+  check('a public meeting’s page may be listed by search engines',
+    pubHtml.includes(`<link rel="canonical" href="${BASE}/alpha/2031-apr-02-19-00">`) && !pubHtml.includes('noindex'));
+  await A.api('PUT', `/api/events/${gid}`, { start_time: '18:00' }); // leaves 19:00 as an old address
+  const hidden = await A.api('PUT', `/api/events/${gid}`, { share_enabled: false });
+  const hslug = hidden.data?.event?.slug || '';
+  check('a meeting made private moves to a private address', new RegExp(`^2031-apr-02-18-00-${code}$`).test(hslug), hslug);
+  for (const p of ['/alpha/2031-apr-02-18-00', '/alpha/2031-apr-02-19-00', '/o/alpha/e/2031-apr-02-18-00']) {
+    const r = await fetch(`${BASE}${p}`, { redirect: 'manual' });
+    check(`its public address ${p} no longer answers`, r.status === 404, String(r.status));
+  }
+  const shown = await A.api('PUT', `/api/events/${gid}`, { share_enabled: true });
+  check('made public again it is back at its date', shown.data?.event?.slug === '2031-apr-02-18-00', shown.data?.event?.slug);
+  const fromPrivate = await fetch(`${BASE}/alpha/${hslug}`, { redirect: 'manual' });
+  check('and its private address redirects there', fromPrivate.status === 301
+    && fromPrivate.headers.get('location') === '/alpha/2031-apr-02-18-00', fromPrivate.headers.get('location'));
+}
+
+// --- the bot traps on the open RSVP form -----------------------------------
+{
+  const made = await A.api('POST', '/api/events', { title: 'Trap Test', date: '2031-05-06', start_time: '18:30' });
+  const tid = made.data.event.id;
+  await A.api('POST', `/api/events/${tid}/publish`, {});
+  const pagePath = '/alpha/2031-may-06-18-30';
+  const guests = async () => (await A.api('GET', `/api/events/${tid}/guests`)).data.guests;
+  const person = { name: 'Real Person', email: 'real@guest.test', attending: 'yes' };
+
+  const pageHtml = await (await fetch(`${BASE}${pagePath}`)).text();
+  check('the form carries a trap field people never see',
+    /<div class="pub-trap" aria-hidden="true">[\s\S]*name="website"[\s\S]*tabindex="-1"/.test(pageHtml));
+
+  const trapped = await rsvpByForm(pagePath, { ...person, website: 'http://spam.example' });
+  const trappedHtml = await trapped.text();
+  check('a filled-in trap is thanked', trapped.status === 200 && trappedHtml.includes('We have your reply'));
+  check('and nothing is kept', (await guests()).length === 0);
+
+  const linkName = await rsvpByForm(pagePath, { ...person, name: 'Cheap pills https://spam.example' });
+  check('a web address for a name is thanked and dropped', linkName.status === 200 && (await guests()).length === 0);
+
+  const noStamp = await rsvpByForm(pagePath, person, { stamp: '', wait: 0 });
+  const noStampHtml = await noStamp.text();
+  check('a post that never loaded the form gets the form back',
+    noStamp.status === 200 && noStampHtml.includes('has not been sent yet') && noStampHtml.includes('value="real@guest.test"'));
+  check('and nothing is kept until it is sent again', (await guests()).length === 0);
+
+  const quick = await rsvpByForm(pagePath, person, { wait: 0 });
+  check('a reply sent the moment the page loads gets the form back', (await quick.text()).includes('has not been sent yet'));
+
+  const good = await formStamp(pagePath);
+  const forged = good.replace(/.$/, (c) => (c === '0' ? '1' : '0'));
+  check('a forged stamp gets the form back', (await (await rsvpByForm(pagePath, person, { stamp: forged })).text()).includes('has not been sent yet'));
+  const otherStamp = await formStamp(`/alpha/${eventSlug}`);
+  check('a stamp from another meeting’s form gets the form back',
+    (await (await rsvpByForm(pagePath, person, { stamp: otherStamp })).text()).includes('has not been sent yet'));
+
+  const ok = await rsvpByForm(pagePath, person);
+  check('a person who filled in the form is recorded',
+    ok.status === 303 && (await guests()).some((g) => g.email === 'real@guest.test' && g.response === 'yes'));
+}
+
+// --- a meeting that is over takes no replies -------------------------------
+{
+  check('a meeting with an end time is over then', meetingEnd({ date: '2031-01-01', start_time: '18:00', end_time: '21:00' }) === '2031-01-01 21:00');
+  check('one without runs two hours', meetingEnd({ date: '2031-01-01', start_time: '18:00' }) === '2031-01-01 20:00');
+  check('one ending after midnight ends the next day', meetingEnd({ date: '2031-12-31', start_time: '22:00', end_time: '01:00' }) === '2032-01-01 01:00');
+  check('one with no time runs to the end of its day', meetingEnd({ date: '2031-01-01' }) === '2031-01-02 00:00');
+  // 7pm Eastern on the day, while a 6pm meeting is running, and 8:01pm after it.
+  check('a meeting is not over while it runs', !meetingOver({ date: '2031-01-15', start_time: '18:00' }, new Date('2031-01-16T00:00:00Z')));
+  check('and is over once it ends', meetingOver({ date: '2031-01-15', start_time: '18:00' }, new Date('2031-01-16T01:01:00Z')));
+
+  const past = new Date(Date.now() - 3 * 86400_000).toISOString().slice(0, 10);
+  const made = await A.api('POST', '/api/events', { title: 'Last Week', date: past, start_time: '18:00' });
+  const oid = made.data.event.id;
+  const pagePath = `/alpha/${made.data.event.slug}`;
+  await A.api('POST', `/api/events/${oid}/guests`, { contact_ids: [contactIds[0]] });
+  await A.api('POST', `/api/events/${oid}/publish`, {});
+
+  const html = await (await fetch(`${BASE}${pagePath}`)).text();
+  check('its page says it is over', html.includes('This meeting is over'));
+  check('with no form and no calendar links', !html.includes('<form') && !html.includes('Add to Google Calendar'));
+  const late = await rsvpByForm(pagePath, { name: 'Too Late', email: 'late2@guest.test', attending: 'yes' }, { stamp: '', wait: 0 });
+  check('a reply posted to it is turned away', late.status === 303 && late.headers.get('location') === pagePath);
+
+  const guest = (await A.api('GET', `/api/events/${oid}/guests`)).data.guests[0];
+  const accept = await fetch(`${BASE}/alpha/i/${guest.token}/accept`, { redirect: 'manual' });
+  check('an Accept button in an invitation changes nothing',
+    accept.status === 303 && (accept.headers.get('location') || '').endsWith('?closed=1'));
+  const update = await fetch(`${BASE}/alpha/i/${guest.token}`, {
+    method: 'POST', redirect: 'manual',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ party_size: '3', note: 'after the fact' }).toString(),
+  });
+  check('nor does the party-size form', update.status === 303 && (update.headers.get('location') || '').endsWith('?closed=1'));
+  const after = (await A.api('GET', `/api/events/${oid}/guests`)).data.guests;
+  check('the guest list is as it was', after.length === 1 && after[0].response === null && after[0].note === '');
+  const invitePage = await (await fetch(`${BASE}/alpha/i/${guest.token}`)).text();
+  check('the invitation page says it is over and offers no buttons',
+    invitePage.includes('This meeting is over') && !invitePage.includes('/accept"') && !invitePage.includes('/decline"'));
+  check('a personal page is never listed by search engines', invitePage.includes('<meta name="robots" content="noindex">'));
+}
+
 // --- events made before date addresses move to them ------------------------
 {
   const r = spawnSync('node', ['scripts/create-org.mjs',
@@ -819,6 +952,8 @@ let guests = [];
   add.run('n3nuw7b5wz', 'Sent Meeting', 'published', '2031-10-27', '17:30');
   add.run('q9fgz2frpt', 'Undated Draft', 'draft', null, null);
   add.run('monthly-meeting', 'Kept Website Address', 'published', '2031-11-03', '18:00');
+  add.run('k4m8p2r6t9', 'Private Meeting', 'published', '2031-10-28', '18:00');
+  db.exec(`UPDATE events SET share_enabled = 0 WHERE slug = 'k4m8p2r6t9'`);
   db.close();
 
   const moved = await fetch(`${BASE}/gamma/n3nuw7b5wz`, { redirect: 'manual' });
@@ -831,6 +966,11 @@ let guests = [];
   check('its calendar identity is unchanged', ics.includes('UID:n3nuw7b5wz@'), ics.match(/UID:.*/)?.[0]);
   const kept = await fetch(`${BASE}/gamma/monthly-meeting`, { redirect: 'manual' });
   check('a meeting on a website address stays on it', kept.status === 200);
+  const priv = await fetch(`${BASE}/gamma/k4m8p2r6t9`, { redirect: 'manual' });
+  check('a private meeting moves to its date plus its code',
+    priv.status === 301 && priv.headers.get('location') === '/gamma/2031-oct-28-18-00-k4m8p2r6t9', priv.headers.get('location'));
+  const guessed = await fetch(`${BASE}/gamma/2031-oct-28-18-00`, { redirect: 'manual' });
+  check('and is not at its date alone', guessed.status === 404);
 }
 
 // --- users admin -----------------------------------------------------------
@@ -1579,6 +1719,16 @@ let guests = [];
     await settle();
     check('a save that changes nothing on the website sends nothing', received.length === before + 1);
   }
+
+  // A private meeting is not for the public website.
+  await A.api('PUT', `/api/events/${id}`, { share_enabled: false });
+  await settle();
+  check('a meeting made private drops out of the payload',
+    !received.at(-1).doc.events.some((e) => e.title === 'County Meeting'));
+  const again = await A.api('PUT', `/api/events/${id}`, { share_enabled: true });
+  await settle();
+  check('and comes back at its date address when it is public again', again.data?.event?.slug === slug
+    && received.at(-1).doc.events.some((e) => e.slug === slug), again.data?.event?.slug);
 
   await A.api('POST', `/api/events/${id}/cancel`, { notify: false });
   await settle();

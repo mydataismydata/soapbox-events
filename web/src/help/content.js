@@ -33,7 +33,8 @@ const EVENT_WIZARD = {
         'Capacity: the most people who can come, counting plus-ones. Accepting stops once it is full.',
         'Allow plus-ones: guests say how many people they are bringing, up to the largest party size you set.',
         'Show the guest list: the event page lists the first names of everyone coming.',
-        'Shareable link: anyone with the event’s link can reply, not only the people you invited.',
+        'Public meeting: its page is at its date, so anyone can find it and reply, and it goes on your website. Turn it off for an invitation-only meeting. Its page then gets a private address, and only the people you invite can reply.',
+        'Once a meeting is over, its page and its invitation links stop taking replies.',
       ],
       scene: 'wizard-rsvp',
     },
@@ -269,7 +270,7 @@ export const HELP = {
       {
         heading: 'Sharing and changing the event',
         points: [
-          'Shareable link: paste it into a newsletter or a text message. People who reply through it join the guest list, marked via link.',
+          'Shareable link: a public meeting’s address. Paste it into a newsletter or a text message. People who reply through it join the guest list, marked via link.',
           'View page opens the public event page.',
           'Edit reopens the wizard. Duplicate starts a new draft with the same flyer and settings and an empty guest list.',
           'Cancel event puts a notice on the event page and closes replies. It can email everyone who was invited.',

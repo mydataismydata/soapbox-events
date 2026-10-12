@@ -227,6 +227,12 @@ event's email log. Broadcasts also export to CSV
   link anywhere; new RSVPs appear in your guest list automatically, marked
   "via link". If you change the meeting's date or time, its address changes
   to match, and the old address still takes people to it.
+- **Public or private.** A public meeting is at its date, goes on your
+  website, and anyone can find it. Untick **Public meeting** in the wizard
+  for an invitation-only meeting. Its page then gets a private address with
+  a random code on the end, and it stays off the website.
+- **After the meeting.** Once a meeting is over, its page and the buttons in
+  every invitation stop taking replies.
 - Guests can **change their response** any time until the deadline via their
   personal link. After the deadline the page says responses are closed.
 - Cancelling an event puts a clear banner on the page and (optionally)

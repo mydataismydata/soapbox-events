@@ -49,6 +49,19 @@ function loadOrCreateSecret() {
   return secret;
 }
 
+// Event times are wall-clock times with no zone attached. This is the zone
+// they are read in when deciding whether a meeting is over.
+function loadTimezone() {
+  const zone = process.env.TIMEZONE || 'America/New_York';
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone });
+    return zone;
+  } catch {
+    console.error(`TIMEZONE "${zone}" is not a time zone this system knows; using America/New_York.`);
+    return 'America/New_York';
+  }
+}
+
 const baseUrl = (process.env.BASE_URL || `http://localhost:${port}`).replace(/\/+$/, '');
 
 // The bare hostname, used as the namespace for calendar UIDs so two
@@ -69,6 +82,10 @@ export const config = {
   dataDir,
   orgsDir: path.join(dataDir, 'orgs'),
   sessionSecret: loadOrCreateSecret(),
+  timezone: loadTimezone(),
+  // How long the public RSVP form must be open before a reply counts. A bot
+  // posts at once. Only the smoke test changes this, so it need not wait.
+  rsvpMinFillMs: Math.max(0, Number(process.env.RSVP_MIN_FILL_MS || 2000)),
   sessionDays: Math.max(1, Number(process.env.SESSION_DAYS || 14)),
   smtp2goApiKey: process.env.SMTP2GO_API_KEY || '',
   // Only the smoke test changes this, to point sending at a stand-in it can read.

@@ -387,8 +387,8 @@ export default function EventWizard() {
               <label className="checkbox">
                 <input type="checkbox" checked={ev.share_enabled}
                   onChange={(e) => patch({ share_enabled: e.target.checked })} />
-                <span><span className="cb-label">Shareable link</span>
-                  <div className="cb-sub">Anyone with the event link can view it{ev.rsvp_mode === 'rsvp' ? ' and RSVP — perfect for forwarding' : ''}. Turn off to limit responses to personal invitations.</div></span>
+                <span><span className="cb-label">Public meeting</span>
+                  <div className="cb-sub">Anyone can find its page by its date{ev.rsvp_mode === 'rsvp' ? ' and RSVP there' : ''}, and it goes on your website. Turn off for an invitation-only meeting: its page gets a private address{ev.rsvp_mode === 'rsvp' ? ', and only the people you invite can reply' : ''}.</div></span>
               </label>
             </Card>
           ) : null}

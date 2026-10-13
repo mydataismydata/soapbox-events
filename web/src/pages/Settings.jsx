@@ -332,16 +332,29 @@ function UsersCard() {
   const toast = useToast();
   const { user: me, refresh } = useAuth();
   const [users, setUsers] = useState(null);
-  // {type:'new'} | {type:'password', value, name} | {type:'rename', id, was}
-  const [modal, setModal] = useState(null);
+  const [modal, setModal] = useState(null); // {type:'new'} | {type:'password', value, name}
+  const [editing, setEditing] = useState(null); // {id, name} while a name is being typed
   const [form, setForm] = useState({ name: '', email: '', role: 'member' });
   const [busy, setBusy] = useState(false);
 
   async function load() {
     setUsers((await api.get('/api/users')).users);
   }
-  // Also reload when your own name changes in Your account below.
-  useEffect(() => { load().catch(() => setUsers([])); }, [me.name]);
+  useEffect(() => { load().catch(() => setUsers([])); }, []);
+
+  async function saveName() {
+    const { id, name } = editing;
+    const was = users.find((u) => u.id === id)?.name;
+    setEditing(null);
+    if (!name.trim() || name.trim() === was) return;
+    try {
+      await api.put(`/api/users/${id}`, { name });
+      toast('Name changed');
+      load();
+      // The header shows your own name from the session.
+      if (id === me.id) refresh();
+    } catch (err) { toast(err.message, 'bad'); }
+  }
 
   if (!users) return <div className="card card-pad"><Spinner /></div>;
 
@@ -362,7 +375,23 @@ function UsersCard() {
               <tr key={u.id}>
                 <td>
                   <div className="row" style={{ gap: 6 }}>
-                    <span className="t-main">{u.name}</span>
+                    {editing?.id === u.id ? (
+                      <input className="input inline-edit" value={editing.name} maxLength={200} autoFocus
+                        aria-label={`New name for ${u.name}`}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') e.currentTarget.blur();
+                          if (e.key === 'Escape') { e.currentTarget.dataset.cancel = '1'; e.currentTarget.blur(); }
+                        }}
+                        onBlur={(e) => (e.currentTarget.dataset.cancel ? setEditing(null) : saveName())} />
+                    ) : (
+                      <>
+                        <span className="t-main">{u.name}</span>
+                        <button type="button" className="edit-link" aria-label={`Edit ${u.name}’s name`}
+                          onClick={() => setEditing({ id: u.id, name: u.name })}>edit</button>
+                      </>
+                    )}
                     {u.id === me.id ? <span className="muted">(you)</span> : null}
                     {!u.active ? <Badge tone="gray" dot>Deactivated</Badge> : null}
                   </div>
@@ -372,10 +401,6 @@ function UsersCard() {
                 <td className="t-sub">{u.last_login_at ? timeAgo(u.last_login_at) : 'never'}</td>
                 <td>
                   <div className="t-actions">
-                    <button className="btn btn-sm" disabled={busy} onClick={() => {
-                      setForm({ ...form, name: u.name });
-                      setModal({ type: 'rename', id: u.id, was: u.name });
-                    }}>Rename</button>
                     {u.id !== me.id ? (
                       <>
                         <button className="btn btn-sm" disabled={busy} onClick={async () => {
@@ -432,34 +457,6 @@ function UsersCard() {
               <option value="member">Member — full access except settings & users</option>
               <option value="admin">Admin — everything</option>
             </select>
-          </Field>
-        </Modal>
-      ) : null}
-
-      {modal?.type === 'rename' ? (
-        <Modal title={`Rename ${modal.was}`} onClose={() => setModal(null)}
-          footer={
-            <>
-              <button className="btn" onClick={() => setModal(null)}>Cancel</button>
-              <button className="btn btn-primary"
-                disabled={busy || !form.name.trim() || form.name.trim() === modal.was}
-                onClick={async () => {
-                  setBusy(true);
-                  try {
-                    await api.put(`/api/users/${modal.id}`, { name: form.name });
-                    toast('Name changed');
-                    setModal(null);
-                    load();
-                    // The sidebar shows your own name from the session.
-                    if (modal.id === me.id) refresh();
-                  } catch (err) { toast(err.message, 'bad'); }
-                  finally { setBusy(false); }
-                }}>Save</button>
-            </>
-          }>
-          <Field label="Name" required hint="Shown in the sidebar and on the team list. Their email and sign-in stay the same.">
-            <input value={form.name} maxLength={200} autoFocus
-              onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </Field>
         </Modal>
       ) : null}
@@ -589,54 +586,31 @@ function AppIconCard({ isAdmin }) {
 
 function AccountCard() {
   const toast = useToast();
-  const { user, refresh } = useAuth();
-  const [name, setName] = useState(user.name);
-  // An admin can also rename themselves from Team members above.
-  useEffect(() => setName(user.name), [user.name]);
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [busy, setBusy] = useState(false);
   return (
     <Card title="Your account">
       <div className="field-row">
-        <Field label="Your name" hint="Shown in the sidebar and on the team list.">
-          <input value={name} maxLength={200} autoComplete="name"
-            onChange={(e) => setName(e.target.value)} />
+        <Field label="Current password">
+          <input type="password" value={current} autoComplete="current-password"
+            onChange={(e) => setCurrent(e.target.value)} />
+        </Field>
+        <Field label="New password" hint="At least 10 characters.">
+          <input type="password" value={next} autoComplete="new-password"
+            onChange={(e) => setNext(e.target.value)} />
         </Field>
       </div>
-      <button className="btn" disabled={busy || !name.trim() || name.trim() === user.name}
+      <button className="btn" disabled={busy || next.length < 10 || !current}
         onClick={async () => {
           setBusy(true);
           try {
-            const d = await api.put('/api/account', { name });
-            setName(d.name);
-            await refresh();
-            toast('Name changed');
+            await api.post('/api/account/password', { current, next });
+            toast('Password changed');
+            setCurrent(''); setNext('');
           } catch (err) { toast(err.message, 'bad'); }
           finally { setBusy(false); }
-        }}>Save name</button>
-      <div className="divider mt" style={{ paddingTop: 'var(--sp-4)' }}>
-        <div className="field-row">
-          <Field label="Current password">
-            <input type="password" value={current} autoComplete="current-password"
-              onChange={(e) => setCurrent(e.target.value)} />
-          </Field>
-          <Field label="New password" hint="At least 10 characters.">
-            <input type="password" value={next} autoComplete="new-password"
-              onChange={(e) => setNext(e.target.value)} />
-          </Field>
-        </div>
-        <button className="btn" disabled={busy || next.length < 10 || !current}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              await api.post('/api/account/password', { current, next });
-              toast('Password changed');
-              setCurrent(''); setNext('');
-            } catch (err) { toast(err.message, 'bad'); }
-            finally { setBusy(false); }
-          }}>Change password</button>
-      </div>
+        }}>Change password</button>
     </Card>
   );
 }

@@ -528,6 +528,27 @@ a.t-main:hover { color: var(--c-accent-text); }
   align-items: center;
 }
 
+/* A small "edit" beside a value in a table cell. Clicking it swaps the value
+   for an .inline-edit box in the same spot. */
+.edit-link {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--c-accent-text);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.edit-link:hover { text-decoration: underline; }
+.input.inline-edit {
+  width: 220px;
+  min-height: var(--control-h-sm);
+  padding: 4px 8px;
+  font-size: var(--fs-base);
+  /* Overhang the cell's padding so the row keeps its height while editing. */
+  margin: -6px 0;
+}
+
 /* Clickable rows: a click anywhere in the row opens its record. The row's
    primary link is stretched over the whole row with an ::after overlay; other
    controls in the row sit above that overlay and keep working. */

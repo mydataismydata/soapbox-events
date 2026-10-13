@@ -4,13 +4,6 @@ import { requireAdmin, hashPassword, verifyPassword, generatePassword, createUse
 
 export const userRouter = Router();
 
-// Any signed-in user may change their own name.
-userRouter.put('/account', wrap(async (req, res) => {
-  const name = v.str(req.body.name, { label: 'Name', max: 200 });
-  req.db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name, req.user.id);
-  res.json({ ok: true, name });
-}));
-
 // Any signed-in user may change their own password.
 userRouter.post('/account/password', wrap(async (req, res) => {
   const current = v.str(req.body.current, { label: 'Current password', max: 200 });

@@ -636,7 +636,7 @@ export const HELP = {
         ],
         points: [
           'A member can do everything except change settings and team members.',
-          'Rename changes the name shown for someone. Their email and password stay the same.',
+          'Click edit beside a name to change it. Press Enter to save, or Esc to cancel.',
           'Reset password makes a new temporary password.',
           'Deactivate stops someone signing in, and keeps everything they made.',
         ],
@@ -656,13 +656,12 @@ export const HELP = {
         heading: 'Settings for administrators',
         roles: ['member'],
         text: [
-          'Only administrators can change the organization’s settings. You can see them here, and change your own name and password.',
+          'Only administrators can change the organization’s settings. You can see them here, and change your own password.',
         ],
       },
       {
         heading: 'Your account',
         text: [
-          'Change your name here, then click Save name. It shows in the sidebar and on the team list.',
           'Change your password here. Type the current one, then a new one of at least 10 characters.',
         ],
       },

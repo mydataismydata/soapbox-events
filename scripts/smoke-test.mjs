@@ -988,6 +988,21 @@ let guests = [];
   check('member cannot access user admin', forbidden.status === 403);
   const selfDemote = await A.api('PUT', `/api/users/${(await A.api('GET', '/api/auth/me')).data.user.id}`, { role: 'member' });
   check('cannot demote self', selfDemote.status === 400);
+
+  const renamed = await memberClient.api('PUT', '/api/account', { name: '  Renamed Member  ' });
+  const memberMe = (await memberClient.api('GET', '/api/auth/me')).data.user;
+  check('member renames self', renamed.status === 200 && memberMe.name === 'Renamed Member', memberMe.name);
+  const blank = await memberClient.api('PUT', '/api/account', { name: '   ' });
+  check('a blank name is refused', blank.status === 400);
+  const adminRename = await memberClient.api('PUT', `/api/users/${nu.data.user.id}`, { name: 'Sneaky' });
+  check('member cannot rename through user admin', adminRename.status === 403);
+  const byAdmin = await A.api('PUT', `/api/users/${nu.data.user.id}`, { name: 'Member Two' });
+  const listed = (await A.api('GET', '/api/users')).data.users.find((u) => u.id === nu.data.user.id);
+  check('admin renames a user', byAdmin.status === 200 && listed?.name === 'Member Two'
+    && listed.role === 'member' && listed.active === true, listed);
+  const relogin = new Client();
+  const again = await relogin.api('POST', '/api/auth/login', { email: 'member@alpha.test', password: nu.data.temp_password });
+  check('a renamed user signs in as before', again.status === 200);
 }
 
 // --- app icon: an admin's image beside "Soapbox" in the header -------------

@@ -153,6 +153,8 @@ const B = new Client();
   check('login succeeds and resolves org from email', ok.status === 200 && ok.data?.org?.slug === 'alpha');
   const me = await A.api('GET', '/api/auth/me');
   check('me returns user', me.status === 200 && me.data?.user?.role === 'admin');
+  check('login returns the build, the same as me does',
+    ok.data?.app?.build > 0 && ok.data.app.build === me.data?.app?.build, JSON.stringify(ok.data?.app));
   const okB = await B.api('POST', '/api/auth/login', { email: 'admin@beta.test', password: 'correct-horse-battery' });
   check('org B login succeeds and resolves to beta', okB.status === 200 && okB.data?.org?.slug === 'beta');
 }

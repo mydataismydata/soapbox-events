@@ -11,6 +11,11 @@ export const authRouter = Router();
 // password — otherwise "email exists somewhere" would be detectable by timing.
 const DUMMY_HASH = hashPassword('soapbox-placeholder-not-a-real-password');
 
+// What the app shows about itself, including the build in the top bar.
+function appInfo() {
+  return { name: config.appName, base_url: config.baseUrl, version: config.version, build: config.build };
+}
+
 authRouter.post('/auth/login', wrap(async (req, res) => {
   const email = v.email(req.body.email, { label: 'Email' });
   const password = v.str(req.body.password, { label: 'Password', max: 200 });
@@ -51,6 +56,9 @@ authRouter.post('/auth/login', wrap(async (req, res) => {
   res.json({
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
     org: { slug: org.slug, name: org.name, icon_url: appIconPath(db, org.slug) },
+    // The same as /auth/me sends, so the top bar shows the build straight
+    // after signing in rather than only after a reload.
+    app: appInfo(),
   });
 }));
 
@@ -70,6 +78,6 @@ authRouter.get('/auth/me', wrap(async (req, res) => {
       role: resolved.user.role,
     },
     org: { slug: resolved.org.slug, name: resolved.org.name, icon_url: appIconPath(resolved.db, resolved.org.slug) },
-    app: { name: config.appName, base_url: config.baseUrl, version: config.version, build: config.build },
+    app: appInfo(),
   });
 }));

@@ -406,4 +406,10 @@ export const ORG_MIGRATIONS = [
   CREATE INDEX idx_email_log_broadcast ON email_log(broadcast_id);
   CREATE INDEX idx_email_log_survey ON email_log(survey_id);
   `,
+
+  // Migration 10: a delivery that landed can still have gone without some
+  // flyers to fit under the website's size limit, and the log says so.
+  `
+  ALTER TABLE website_deliveries ADD COLUMN note TEXT;
+  `,
 ];

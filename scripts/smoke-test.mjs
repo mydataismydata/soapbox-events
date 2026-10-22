@@ -948,9 +948,11 @@ let guests = [];
   // event a real one would. The server has not opened it yet.
   const { DatabaseSync } = await import('node:sqlite');
   const db = new DatabaseSync(path.join(DATA_DIR, 'orgs', 'gamma', 'org.db'));
-  // Back to version 6: undo migration 7's table, and the survey tables
-  // migration 9 makes (its email_log rebuild simply runs again).
+  // Back to version 6: undo migration 7's table, the survey tables
+  // migration 9 makes (its email_log rebuild simply runs again), and the
+  // delivery log's note column from migration 10.
   db.exec(`DROP TABLE event_slugs; DROP TABLE survey_responses; DROP TABLE survey_invites; DROP TABLE surveys;
+    ALTER TABLE website_deliveries DROP COLUMN note;
     PRAGMA user_version = 6;`);
   const add = db.prepare('INSERT INTO events (slug, title, status, date, start_time) VALUES (?, ?, ?, ?, ?)');
   add.run('n3nuw7b5wz', 'Sent Meeting', 'published', '2031-10-27', '17:30');
@@ -1652,6 +1654,10 @@ let guests = [];
   const HOOK = `http://127.0.0.1:${HOOK_PORT}/soapbox-hook.php`;
   const TOKEN = 'smoke-token-abcdefghij';
   const received = [];
+  // The largest body the stub's "web server" lets through, as shared hosting
+  // does in front of the real receiver. Refusals come back as Apache's page.
+  let ceiling = Infinity;
+  const refused = [];
   const hook = http.createServer((req, res) => {
     let body = '';
     req.on('data', (c) => { body += c; });
@@ -1660,6 +1666,13 @@ let guests = [];
         res.writeHead(code, { 'content-type': 'application/json' });
         res.end(JSON.stringify(obj));
       };
+      if (Buffer.byteLength(body) >= ceiling) {
+        refused.push(Buffer.byteLength(body));
+        res.writeHead(413, { 'content-type': 'text/html; charset=iso-8859-1' });
+        return res.end('<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">\n'
+          + '<html><head>\n<title>413 Request Entity Too Large</title>\n</head><body>\n'
+          + '<h1>Request Entity Too Large</h1>\n</body></html>\n');
+      }
       if (req.method !== 'POST') return json(405, { error: 'Use POST.' });
       if (req.headers['x-soapbox-token'] !== TOKEN) return json(401, { error: 'Unauthorized.' });
       let doc;
@@ -1846,6 +1859,72 @@ let guests = [];
       }
     }
     await settle(); // let those deletions' deliveries land before the next test
+  }
+
+  // 5c. Shared hosting refuses a body of 1 MiB or more before the website's
+  //     own script sees it. Flyers give way, oldest meeting first, so the
+  //     meetings still land.
+  {
+    const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+    // A PNG signature and enough after it to weigh 220 KB, about 290 KB once
+    // encoded. Three fit under Soapbox's limit, and four are over the host's.
+    const heavy = Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.alloc(220_000)]).toString('base64');
+    const meeting = (slug, date) => ({
+      slug, title: `Heavy ${slug}`, description: '', status: 'published', date,
+      start_time: '18:30', end_time: '', timezone_note: '',
+      venue: { name: '', address: '', phone: '', map_url: '' }, rsvp_mode: 'rsvp',
+      picture: { name: `${slug}.png`, data: heavy },
+    });
+    const file = {
+      format: 'rlc-meetings-export',
+      version: 1,
+      events: [
+        meeting('heavy-last-year', day(-300)),
+        meeting('heavy-last-month', day(-20)),
+        meeting('heavy-next-week', day(7)),
+        meeting('heavy-next-month', day(35)),
+      ],
+    };
+    ceiling = 1024 * 1024;
+    const before = received.length;
+    const r = await A.api('POST', '/api/events/import', { file });
+    check('four meetings with heavy flyers import', r.status === 200 && r.data.added === 4, JSON.stringify(r.data));
+    await settle();
+    const row = (await log()).deliveries[0];
+    check('a delivery too big for the host still lands', received.length === before + 1 && row?.ok === true,
+      JSON.stringify(row));
+    check('under the host\'s ceiling, with the hook never refusing it', refused.length === 0, refused.join(','));
+    const flyers = Object.keys(received.at(-1).doc.flyers || {});
+    check('upcoming meetings keep their flyers',
+      flyers.includes('heavy-next-week') && flyers.includes('heavy-next-month'), flyers.join(','));
+    check('the oldest meeting is the one that goes without',
+      !flyers.includes('heavy-last-year') && flyers.includes('heavy-last-month'), flyers.join(','));
+    check('and every meeting still goes', received.at(-1).doc.events.some((e) => e.slug === 'heavy-last-year'));
+    check('the log says a flyer was left out', row?.flyers === 3 && /Left out 1 flyer\b/.test(row?.note || ''),
+      JSON.stringify(row));
+
+    // A host stricter still refuses even that. The meetings go again without
+    // their flyers rather than not at all.
+    ceiling = 200_000;
+    const resend = await A.api('POST', '/api/settings/website/resend');
+    check('a refusal from a stricter host is followed by the meetings alone',
+      resend.data?.result?.ok === true && refused.length === 1 && !received.at(-1).doc.flyers,
+      JSON.stringify(resend.data?.result));
+    check('and the log says every flyer was left out', (await log()).deliveries[0]?.note.startsWith('Left out 4 flyers'));
+
+    // A refusal that stands is logged in words, not as a page of HTML.
+    ceiling = 100;
+    await A.api('POST', '/api/settings/website/resend');
+    const failed = (await log()).deliveries[0];
+    check('a host refusal is logged by its title',
+      failed?.status === 413 && failed.error.includes('413 Request Entity Too Large') && !failed.error.includes('<'),
+      failed?.error);
+
+    ceiling = Infinity;
+    for (const e of (await A.api('GET', '/api/events')).data.events) {
+      if (e.title.startsWith('Heavy ')) await A.api('DELETE', `/api/events/${e.id}`);
+    }
+    await settle();
   }
 
   // 6. A website that stops answering must never break Soapbox.

@@ -206,7 +206,7 @@ function DeliveryRow({ d }) {
         {d.flyers ? `, ${d.flyers} ${d.flyers === 1 ? 'flyer' : 'flyers'}` : ''}
       </td>
       <td className="t-sub">
-        {d.ok ? '' : `${asSentence(d.error)} ${d.retryable ? 'Worth trying again.' : 'Trying again will not help.'}`}
+        {d.ok ? d.note : `${asSentence(d.error)} ${d.retryable ? 'Worth trying again.' : 'Trying again will not help.'}`}
       </td>
     </tr>
   );

@@ -25,14 +25,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { config } from './env.js';
 import { getSetting, orgDb, uploadsDir } from './db.js';
+import { localToday } from './clock.js';
 import { parseFlyer, eventUrl } from './sending.js';
 
 export const PUSH_FORMAT = 'soapbox-website-push';
 export const PUSH_VERSION = 1;
 
-// Anything larger and the receiving end refuses it, so the flyers are dropped
-// and the meetings go out on their own rather than the delivery failing.
-const MAX_BODY_BYTES = 11 * 1024 * 1024;
+// The receiving script would take 12 MB, but on shared hosting it never gets
+// the chance: the web server in front of it refuses a body of 1 MiB or more
+// with a 413 page of its own. sjcrlc.org does exactly that (measured
+// 2026-10-22, when ten meetings' flyers first came to 1.04 MiB). Flyers are
+// left out until the body fits under this, with room to spare.
+const MAX_BODY_BYTES = 1_000_000;
 const MAX_FLYER_BYTES = 8 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -107,11 +111,28 @@ function readFlyerBytes(db, orgSlug, event) {
 }
 
 /**
+ * The order flyers earn their place in a delivery that cannot carry them all.
+ *
+ * Upcoming meetings come first, soonest first, because they are what people
+ * visit the website to find. Past meetings follow, newest first, so the
+ * oldest corner of the archive is the first to lose its picture.
+ */
+function flyerPriority(rows) {
+  const today = localToday();
+  const upcoming = rows.filter((event) => event.date >= today);
+  const past = rows.filter((event) => event.date < today).reverse();
+  return [...upcoming, ...past];
+}
+
+/**
  * Build the document.
  *
- * Flyers are attached last and dropped wholesale if the body would exceed the
- * size the receiver accepts. Meetings without their artwork are worth far
- * more than a delivery that fails.
+ * Returns the payload and how many flyers were left out of it.
+ *
+ * Flyers are attached last, one at a time in order of priority, and one that
+ * would take the body over MAX_BODY_BYTES is left out. A smaller one after it
+ * may still fit. Meetings without their artwork are worth far more than a
+ * delivery that fails.
  */
 export function buildPayload(db, org, { includeFlyers = true } = {}) {
   const rows = publishableEvents(db);
@@ -153,24 +174,51 @@ export function buildPayload(db, org, { includeFlyers = true } = {}) {
     events,
   };
 
-  if (!includeFlyers) return payload;
+  if (!includeFlyers) return { payload, omitted: 0 };
 
   const flyers = {};
-  for (const event of rows) {
+  payload.flyers = flyers;
+  let omitted = 0;
+  for (const event of flyerPriority(rows)) {
     const bytes = readFlyerBytes(db, org.slug, event);
-    if (bytes) {
-      flyers[event.slug] = {
-        content_type: bytes.contentType,
-        data_base64: bytes.base64,
-      };
+    if (!bytes) continue;
+    flyers[event.slug] = {
+      content_type: bytes.contentType,
+      data_base64: bytes.base64,
+    };
+    if (Buffer.byteLength(JSON.stringify(payload)) > MAX_BODY_BYTES) {
+      delete flyers[event.slug];
+      omitted++;
     }
   }
-  if (Object.keys(flyers).length) payload.flyers = flyers;
+  if (!Object.keys(flyers).length) delete payload.flyers;
+  return { payload, omitted };
+}
 
-  if (Buffer.byteLength(JSON.stringify(payload)) > MAX_BODY_BYTES) {
-    delete payload.flyers;
-  }
-  return payload;
+function countFlyers(payload) {
+  return payload.flyers ? Object.keys(payload.flyers).length : 0;
+}
+
+/** What the delivery log says about flyers a delivery went without. */
+function omittedNote(omitted) {
+  if (!omitted) return '';
+  return `Left out ${omitted} ${omitted === 1 ? 'flyer' : 'flyers'} to fit under the website's size limit.`;
+}
+
+/**
+ * The website's reason for refusing a delivery, short enough for the log.
+ *
+ * The receiving script answers in JSON. A refusal from the web server in
+ * front of it is an HTML page instead, and its title ("413 Request Entity
+ * Too Large") says what its first few hundred characters of doctype do not.
+ */
+function refusal(status, text) {
+  let body = null;
+  try { body = JSON.parse(text); } catch { /* not JSON; keep the text */ }
+  if (body?.error) return String(body.error);
+  const title = /<title[^>]*>([^<]*)<\/title>/i.exec(text)?.[1]?.trim();
+  if (title) return `The website's server answered ${title}`;
+  return text.slice(0, 300) || `HTTP ${status}`;
 }
 
 /**
@@ -230,8 +278,9 @@ export async function publishEvents(orgSlug, org, { reason = 'manual', skipUncha
   }
 
   let payload;
+  let omitted;
   try {
-    payload = buildPayload(db, org);
+    ({ payload, omitted } = buildPayload(db, org));
   } catch (err) {
     return { ok: false, status: 0, reason, error: `Could not build the payload: ${err.message}`, retryable: false };
   }
@@ -244,9 +293,59 @@ export async function publishEvents(orgSlug, org, { reason = 'manual', skipUncha
   // Until this attempt is known to have landed, nothing is known to be there.
   lastDelivered.delete(orgSlug);
 
+  let sent = payload;
+  try {
+    let res = await post(url, token, sent);
+
+    // A host with a lower ceiling than MAX_BODY_BYTES refuses before the
+    // website's own script runs. The meetings matter more than their
+    // pictures, so they go again on their own.
+    if (res.status === 413 && sent.flyers) {
+      const { flyers, ...bare } = sent;
+      omitted += Object.keys(flyers).length;
+      sent = bare;
+      res = await post(url, token, sent);
+    }
+
+    // The digest is of what this change would send, so an unchanged meeting
+    // set is still skipped after a delivery that had to go without flyers.
+    if (res.ok) lastDelivered.set(orgSlug, { url, digest });
+
+    return {
+      ok: res.ok,
+      status: res.status,
+      reason,
+      events: sent.events.length,
+      flyers: countFlyers(sent),
+      error: res.ok ? '' : refusal(res.status, res.text),
+      note: res.ok ? omittedNote(omitted) : '',
+      // 5xx and 429 are the website's problem and may clear on their own.
+      // 4xx is a configuration mistake and will fail identically forever.
+      retryable: res.status === 429 || res.status >= 500,
+      sent_at: sent.sent_at,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      reason,
+      events: sent.events.length,
+      flyers: countFlyers(sent),
+      error: unreachable(err),
+      retryable: true,
+    };
+  }
+}
+
+/**
+ * POST one document to the website.
+ *
+ * Resolves with the status and the reply as text whatever the status was.
+ * Rejects only when no answer came back at all.
+ */
+async function post(url, token, payload) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -261,34 +360,7 @@ export async function publishEvents(orgSlug, org, { reason = 'manual', skipUncha
       signal: controller.signal,
       redirect: 'error', // a redirect to another host would leak the token
     });
-
-    const text = await res.text();
-    let body = null;
-    try { body = JSON.parse(text); } catch { /* not JSON; keep the text */ }
-    if (res.ok) lastDelivered.set(orgSlug, { url, digest });
-
-    return {
-      ok: res.ok,
-      status: res.status,
-      reason,
-      events: payload.events.length,
-      flyers: payload.flyers ? Object.keys(payload.flyers).length : 0,
-      error: res.ok ? '' : (body?.error || text.slice(0, 300) || `HTTP ${res.status}`),
-      // 5xx and 429 are the website's problem and may clear on their own.
-      // 4xx is a configuration mistake and will fail identically forever.
-      retryable: res.status === 429 || res.status >= 500,
-      sent_at: payload.sent_at,
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      status: 0,
-      reason,
-      events: payload.events.length,
-      flyers: payload.flyers ? Object.keys(payload.flyers).length : 0,
-      error: unreachable(err),
-      retryable: true,
-    };
+    return { ok: res.ok, status: res.status, text: await res.text() };
   } finally {
     clearTimeout(timer);
   }
@@ -308,8 +380,8 @@ const KEEP_DELIVERIES = 200;
 /** Write one attempt to the log. Never called for a skipped delivery. */
 export function recordDelivery(db, result) {
   db.prepare(
-    `INSERT INTO website_deliveries (reason, ok, status, events, flyers, error, retryable)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO website_deliveries (reason, ok, status, events, flyers, error, note, retryable)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     String(result.reason || 'manual'),
     result.ok ? 1 : 0,
@@ -317,6 +389,7 @@ export function recordDelivery(db, result) {
     Number(result.events) || 0,
     Number(result.flyers) || 0,
     result.error ? String(result.error).slice(0, 1000) : null,
+    result.note ? String(result.note).slice(0, 1000) : null,
     result.retryable ? 1 : 0,
   );
   db.prepare(
@@ -328,7 +401,7 @@ export function recordDelivery(db, result) {
 /** The most recent attempts, newest first, for the Settings panel. */
 export function recentDeliveries(db, limit = 10) {
   return db.prepare(
-    `SELECT id, sent_at, reason, ok, status, events, flyers, error, retryable
+    `SELECT id, sent_at, reason, ok, status, events, flyers, error, note, retryable
        FROM website_deliveries ORDER BY id DESC LIMIT ?`
   ).all(Number(limit) || 10).map((row) => ({
     id: row.id,
@@ -339,6 +412,7 @@ export function recentDeliveries(db, limit = 10) {
     events: row.events,
     flyers: row.flyers,
     error: row.error || '',
+    note: row.note || '',
     retryable: Boolean(row.retryable),
   }));
 }

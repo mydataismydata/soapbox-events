@@ -2103,6 +2103,19 @@ let guests = [];
   await A.api('POST', `/api/broadcasts/${bId}/test-email`, { to: 'tester@alpha.test' });
   check('without an attachment an email has none', sends.length === before + 1 && !('attachments' in sends[before].body));
 
+  // SMTP2GO refuses a whole email when a bare name holds a comma, as in
+  // "Wade Mask, Jr.". A name with punctuation goes in quotes, the sender's
+  // as well as the recipient's.
+  await A.api('PUT', '/api/settings', { sender_name: 'Alpha Society, Inc.' });
+  const commaId = (await A.api('POST', '/api/contacts', { name: 'Comma Person, Jr.', email: 'comma@guest.test' })).data.contact.id;
+  await A.api('POST', `/api/broadcasts/${bId}/send`, { contact_ids: [commaId] });
+  const toComma = () => sends.find((m) => (m.body.to || []).some((t) => t.includes('comma@guest.test')));
+  await waitFor(() => toComma(), 'an email to a name with a comma reaches SMTP2GO');
+  check('a recipient name with a comma is quoted', toComma()?.body.to[0] === '"Comma Person, Jr." <comma@guest.test>', JSON.stringify(toComma()?.body.to));
+  check('a sender name with a comma is quoted', toComma()?.body.sender === '"Alpha Society, Inc." <meetings@alpha.test>', toComma()?.body.sender);
+  check('a plain name is not quoted', real.every((m) => /^Attach (One|Two) <attach[12]@guest\.test>$/.test(m.body.to[0])), JSON.stringify(real.map((m) => m.body.to[0])));
+  await A.api('PUT', '/api/settings', { sender_name: 'Alpha Society' });
+
   // A file that has gone missing stops the send instead of going out without it.
   const dupId = dup.data.broadcast.id;
   fs.rmSync(path.join(DATA_DIR, 'orgs', 'alpha', 'uploads', up.data.token));

@@ -44,11 +44,25 @@ export function senderFor(db, orgName, kind = 'event') {
   };
 }
 
+// "Display Name <email>", the form SMTP2GO takes for a sender or recipient.
+//
+// SMTP2GO rejects the whole request when a bare name holds a comma or a
+// semicolon ("Wade Mask, Jr." reads as two addresses), so a name with any
+// punctuation beyond what a plain name may hold goes in double quotes.
+// Quotes, angle brackets, backslashes and control characters are dropped
+// first, which leaves nothing inside the quotes that needs escaping.
+export function formatAddress(name, email) {
+  const clean = String(name || '')
+    .replace(/["<>\\\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!clean) return email;
+  const plain = /^[A-Za-z0-9!#$%&'*+\-/=?^_`{|}~ \u0080-￿]+$/.test(clean);
+  return plain ? `${clean} <${email}>` : `"${clean}" <${email}>`;
+}
+
 export function senderHeader(sender) {
-  // "Display Name <email>" with quotes stripped from the name to keep the
-  // header well-formed.
-  const cleanName = String(sender.name || '').replace(/["<>]/g, '').trim();
-  return cleanName ? `${cleanName} <${sender.email}>` : sender.email;
+  return formatAddress(sender.name, sender.email);
 }
 
 async function apiPost(path, apiKey, body, timeoutMs = 20000) {
@@ -78,10 +92,9 @@ export async function sendEmail({
   if (!sender?.email) {
     return { ok: false, error: 'Sender email is not configured (Settings → Sending).' };
   }
-  const to = toName ? `${String(toName).replace(/["<>]/g, '').trim()} <${toEmail}>` : toEmail;
   const payload = {
     sender: senderHeader(sender),
-    to: [to],
+    to: [formatAddress(toName, toEmail)],
     subject,
     html_body: html,
     text_body: text,

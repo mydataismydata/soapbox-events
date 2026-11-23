@@ -2,7 +2,7 @@
 // cards, empty states, confirm dialog. Presentation only — nothing here knows
 // anything about events, guests or email.
 import React, {
-  createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
+  createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState,
 } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './icons.jsx';
@@ -506,6 +506,95 @@ export function CopyButton({ value, label = 'Copy', copiedLabel = 'Copied' }) {
       </button>
       <span className="sr-only" role="status">{copied ? copiedLabel : ''}</span>
     </>
+  );
+}
+
+// A drop-down that picks any number of options. Closed, it reads like a
+// <select> and shows each pick as a chip; open, every option is a checkbox.
+// `options` are { value, label, meta } with `meta` an optional note on the
+// right, and `value` is the array of picked values. It closes on a click
+// outside, on Tab out, and on Escape. Escape stops here, so a modal around
+// the drop-down stays open. Pass `id` to tie a <Field htmlFor> label to it.
+export function MultiSelect({ id, options, value, onChange, placeholder = 'None', label, disabled }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  const btnRef = useRef(null);
+  const focusFirst = useRef(false);
+  const uid = useId();
+  const listId = `${uid}-list`;
+  const pickedId = `${uid}-picked`;
+  const picked = new Set(value);
+  const chosen = options.filter((o) => picked.has(o.value));
+
+  useEffect(() => {
+    if (!open) return undefined;
+    if (focusFirst.current) {
+      focusFirst.current = false;
+      wrapRef.current?.querySelector('.ms-list input')?.focus();
+    }
+    const onDown = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  // Picks keep the order of `options`, whatever order they were ticked in.
+  function toggle(v) {
+    const next = new Set(picked);
+    next.has(v) ? next.delete(v) : next.add(v);
+    onChange(options.filter((o) => next.has(o.value)).map((o) => o.value));
+  }
+
+  function onKeyDown(e) {
+    if (e.key === 'Escape' && open) {
+      e.stopPropagation();
+      setOpen(false);
+      btnRef.current?.focus();
+      return;
+    }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    if (!open) {
+      if (e.key === 'ArrowDown') { focusFirst.current = true; setOpen(true); }
+      return;
+    }
+    const boxes = Array.from(wrapRef.current.querySelectorAll('.ms-list input'));
+    const at = boxes.indexOf(document.activeElement);
+    const next = e.key === 'ArrowDown' ? Math.min(at + 1, boxes.length - 1) : at - 1;
+    if (next < 0) btnRef.current?.focus();
+    else boxes[next]?.focus();
+  }
+
+  return (
+    <div className="ms" ref={wrapRef} onKeyDown={onKeyDown}
+      onBlur={(e) => {
+        // A click on part of the list that takes no focus blurs with no
+        // relatedTarget. The outside-click listener covers those, so only
+        // a real move of focus elsewhere closes it here.
+        if (open && e.relatedTarget && !wrapRef.current.contains(e.relatedTarget)) setOpen(false);
+      }}>
+      <button type="button" id={id} ref={btnRef} className={`input ms-btn${open ? ' is-open' : ''}`}
+        disabled={disabled} aria-expanded={open} aria-controls={listId} aria-describedby={pickedId}
+        onClick={() => setOpen((o) => !o)}>
+        <span className="ms-picked" id={pickedId}>
+          {chosen.length
+            ? chosen.map((o) => <span key={o.value} className="chip">{o.label}</span>)
+            : <span className="ms-ph">{placeholder}</span>}
+        </span>
+        <Icon className="ms-caret" name="chevronDown" size={16} />
+      </button>
+      {open ? (
+        <div className="ms-list" id={listId} role="group" aria-label={label}>
+          {options.map((o) => (
+            <label key={o.value} className="ms-opt">
+              <input type="checkbox" checked={picked.has(o.value)} onChange={() => toggle(o.value)} />
+              <span className="ms-label">{o.label}</span>
+              {/* The space keeps "Choir 5" from being read out as "Choir5". */}
+              {o.meta != null ? <>{' '}<span className="ms-meta">{o.meta}</span></> : null}
+            </label>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

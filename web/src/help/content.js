@@ -456,6 +456,7 @@ export const HELP = {
           'Click Add contact.',
           'Type a first name, and a last name if you have one.',
           'Type their email address.',
+          'Open Groups and tick any groups they belong to.',
           'Click Save.',
         ],
         text: ['A person without an email address can still be invited, but not emailed.'],
@@ -481,7 +482,7 @@ export const HELP = {
         points: [
           'Search finds people by name, email or phone.',
           'The copy button beside an email address copies it.',
-          'The pencil opens a contact to change. Mark unsubscribed, at the bottom of that window, is for someone who asks not to be emailed.',
+          'The pencil opens a contact to change, groups included. Mark unsubscribed, at the bottom of that window, is for someone who asks not to be emailed.',
           'Unsubscribed people are marked in the list, left out of every send, and taken out of their groups.',
           'Export CSV downloads everyone.',
         ],

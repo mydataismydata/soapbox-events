@@ -1447,6 +1447,54 @@ let guests = [];
     JSON.stringify(g.data.group.member_ids));
 }
 
+// --- a contact's groups, set from the contact form --------------------------
+{
+  const g1 = (await A.api('POST', '/api/groups', { name: 'Form Group One' })).data.group.id;
+  const g2 = (await A.api('POST', '/api/groups', { name: 'Form Group Two' })).data.group.id;
+  const gone = (await A.api('POST', '/api/groups', { name: 'Form Group Gone' })).data.group.id;
+  await A.api('DELETE', `/api/groups/${gone}`);
+  const membersOf = async (gid) => (await A.api('GET', `/api/groups/${gid}`)).data.group.member_ids;
+  const groupsOf = async (cid) =>
+    (await A.api('GET', '/api/contacts')).data.contacts.find((c) => c.id === cid)?.group_ids;
+
+  // A deleted group's id is dropped, not refused, so the contact still saves.
+  const made = await A.api('POST', '/api/contacts', {
+    first_name: 'Grouped', last_name: 'Person', email: 'grouped@form.test', group_ids: [g1, g2, gone, g1],
+  });
+  const cid = made.data?.contact?.id;
+  check('a new contact can be put in groups as it is made',
+    made.status === 201 && JSON.stringify(made.data.contact.group_ids) === JSON.stringify([g1, g2].sort((a, b) => a - b)),
+    JSON.stringify(made.data));
+  check('the groups list them as members', (await membersOf(g1)).includes(cid) && (await membersOf(g2)).includes(cid));
+
+  const edit = await A.api('PUT', `/api/contacts/${cid}`, { phone: '555-0101', group_ids: [g2] });
+  check('editing a contact replaces their groups', edit.data?.ok && JSON.stringify(await groupsOf(cid)) === JSON.stringify([g2]),
+    JSON.stringify(edit.data));
+  check('leaving a group through the form takes them out of it', !(await membersOf(g1)).includes(cid));
+
+  await A.api('PUT', `/api/contacts/${cid}`, { notes: 'no groups sent' });
+  check('an edit that sends no groups leaves them alone', JSON.stringify(await groupsOf(cid)) === JSON.stringify([g2]));
+
+  await A.api('PUT', `/api/contacts/${cid}`, { group_ids: [] });
+  check('an empty list takes them out of every group', (await groupsOf(cid))?.length === 0);
+
+  const bad = await A.api('PUT', `/api/contacts/${cid}`, { group_ids: 'nope' });
+  check('group ids that are not a list are refused', bad.status === 400, String(bad.status));
+  const plain = await A.api('POST', '/api/contacts', { name: 'No Groups', email: 'nogroups@form.test' });
+  check('a contact made without groups is in none', plain.data?.contact?.group_ids?.length === 0);
+
+  // Another organization's group ids mean nothing here.
+  const bGroup = (await B.api('POST', '/api/groups', { name: 'B Only' })).data.group.id;
+  const bMembers = async () => (await B.api('GET', `/api/groups/${bGroup}`)).data.group.member_ids;
+  await A.api('PUT', `/api/contacts/${cid}`, { group_ids: [bGroup] });
+  check('ISOLATION: a contact cannot join another organization\'s group', (await bMembers()).length === 0);
+
+  await A.api('POST', '/api/contacts/bulk-delete', { contact_ids: [cid, plain.data.contact.id] });
+  await A.api('DELETE', `/api/groups/${g1}`);
+  await A.api('DELETE', `/api/groups/${g2}`);
+  await B.api('DELETE', `/api/groups/${bGroup}`);
+}
+
 // --- sender identity: broadcasts can use a second address ------------------
 {
   const put = await A.api('PUT', '/api/settings', {

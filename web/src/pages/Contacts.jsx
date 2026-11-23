@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import {
   Spinner, Modal, ConfirmModal, Empty, Field, useToast, Badge, Banner, Card,
-  IconButton, Icon, SortTh, useSort, sortRows, CopyButton,
+  IconButton, Icon, SortTh, useSort, sortRows, CopyButton, MultiSelect,
 } from '../ui.jsx';
 
 // Contacts arriving from a CSV or a guest list may only ever have had a single
@@ -26,20 +26,32 @@ const CONTACT_SORTS = {
   phone: (c) => c.phone || '',
 };
 
-function ContactModal({ contact, onClose, onSaved }) {
+// Order-free key for a set of group ids, to tell whether the picks changed.
+const groupKey = (ids) => [...ids].sort((a, b) => a - b).join(',');
+
+function ContactModal({ contact, groups, onClose, onSaved }) {
   const toast = useToast();
   const [form, setForm] = useState({
     ...nameParts(contact),
     email: contact?.email || '', phone: contact?.phone || '', notes: contact?.notes || '',
+    group_ids: contact?.group_ids || [],
   });
   const [busy, setBusy] = useState(false);
   const editing = Boolean(contact?.id);
+  const groupOptions = groups.map((g) => ({
+    value: g.id, label: g.name, meta: Number(g.member_count || 0),
+  }));
 
   async function save() {
     setBusy(true);
     try {
-      if (editing) await api.put(`/api/contacts/${contact.id}`, form);
-      else await api.post('/api/contacts', form);
+      // The groups go only when they changed. Saving an edit for some other
+      // reason then can't undo a group change someone else made meanwhile.
+      const { group_ids, ...fields } = form;
+      const body = groupKey(group_ids) !== groupKey(contact?.group_ids || [])
+        ? { ...fields, group_ids } : fields;
+      if (editing) await api.put(`/api/contacts/${contact.id}`, body);
+      else await api.post('/api/contacts', body);
       toast(editing ? 'Contact updated' : 'Contact added');
       onSaved();
     } catch (err) {
@@ -94,6 +106,12 @@ function ContactModal({ contact, onClose, onSaved }) {
             onChange={(e) => setForm({ ...form, phone: e.target.value })} />
         </Field>
       </div>
+      <Field label="Groups" htmlFor="contact-groups"
+        hint={groups.length ? null : 'Make groups on the Groups tab, then come back to add people to them.'}>
+        <MultiSelect id="contact-groups" label="Groups" options={groupOptions} value={form.group_ids}
+          placeholder={groups.length ? 'Not in any group' : 'No groups yet'} disabled={!groups.length}
+          onChange={(group_ids) => setForm({ ...form, group_ids })} />
+      </Field>
       <Field label="Notes">
         <textarea rows={3} value={form.notes} maxLength={2000}
           onChange={(e) => setForm({ ...form, notes: e.target.value })} />
@@ -377,7 +395,7 @@ export default function Contacts() {
       </Card>
 
       {modal?.type === 'new' || modal?.type === 'edit' ? (
-        <ContactModal contact={modal.contact}
+        <ContactModal contact={modal.contact} groups={groups}
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); load(); }} />
       ) : null}

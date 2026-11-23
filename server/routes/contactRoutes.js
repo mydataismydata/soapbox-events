@@ -57,6 +57,23 @@ function listContacts(db, q) {
   return rows.map((c) => ({ ...c, group_ids: byContact.get(c.id) || [] }));
 }
 
+// The contact form sends the whole set of groups a person belongs to, so this
+// replaces their memberships rather than adding to them. An id whose group has
+// gone (deleted while the form was open) is dropped rather than refused, so it
+// can't block saving the rest of the contact.
+function setContactGroups(db, contactId, groupIds) {
+  db.prepare('DELETE FROM group_members WHERE contact_id = ?').run(contactId);
+  const add = db.prepare(
+    'INSERT OR IGNORE INTO group_members (group_id, contact_id) SELECT id, ? FROM groups WHERE id = ?'
+  );
+  for (const gid of new Set(groupIds)) add.run(contactId, gid);
+}
+
+function contactGroupIds(db, contactId) {
+  return db.prepare('SELECT group_id FROM group_members WHERE contact_id = ? ORDER BY group_id')
+    .all(contactId).map((r) => Number(r.group_id));
+}
+
 contactRouter.get('/contacts', wrap(async (req, res) => {
   const q = v.optStr(req.query.q, { max: 200 });
   res.json({ contacts: listContacts(req.db, q) });
@@ -64,13 +81,18 @@ contactRouter.get('/contacts', wrap(async (req, res) => {
 
 contactRouter.post('/contacts', wrap(async (req, res) => {
   const f = contactFields(req.body);
+  const groupIds = v.intArray(req.body.group_ids, { label: 'group_ids' });
   if (f.email) {
     const dup = req.db.prepare('SELECT id FROM contacts WHERE email = ?').get(f.email);
     if (dup) throw new ApiError(409, 'A contact with this email already exists.');
   }
-  const id = contactInserter(req.db)(f);
+  const id = withTx(req.db, () => {
+    const newId = contactInserter(req.db)(f);
+    if (groupIds.length) setContactGroups(req.db, newId, groupIds);
+    return newId;
+  });
   const contact = req.db.prepare('SELECT * FROM contacts WHERE id = ?').get(id);
-  res.status(201).json({ contact: { ...contact, group_ids: [] } });
+  res.status(201).json({ contact: { ...contact, group_ids: contactGroupIds(req.db, id) } });
 }));
 
 contactRouter.put('/contacts/:id', wrap(async (req, res) => {
@@ -78,17 +100,24 @@ contactRouter.put('/contacts/:id', wrap(async (req, res) => {
   const existing = req.db.prepare('SELECT * FROM contacts WHERE id = ?').get(id);
   if (!existing) throw new ApiError(404, 'Contact not found.');
   const f = contactFields(req.body, { partial: true, base: existing });
+  // Left out, the groups stay as they are: only the contact form sends them.
+  const groupIds = req.body.group_ids !== undefined
+    ? v.intArray(req.body.group_ids, { label: 'group_ids' })
+    : null;
   if (f.email) {
     const dup = req.db.prepare('SELECT id FROM contacts WHERE email = ? AND id != ?').get(f.email, id);
     if (dup) throw new ApiError(409, 'Another contact already uses this email.');
   }
   const merged = { ...existing, ...f };
-  req.db.prepare(
-    `UPDATE contacts SET name = ?, first_name = ?, last_name = ?, email = ?, phone = ?, notes = ?,
-            updated_at = datetime('now') WHERE id = ?`
-  ).run(merged.name, merged.first_name, merged.last_name,
-    merged.email || null, merged.phone || null, merged.notes || null, id);
-  res.json({ ok: true });
+  withTx(req.db, () => {
+    req.db.prepare(
+      `UPDATE contacts SET name = ?, first_name = ?, last_name = ?, email = ?, phone = ?, notes = ?,
+              updated_at = datetime('now') WHERE id = ?`
+    ).run(merged.name, merged.first_name, merged.last_name,
+      merged.email || null, merged.phone || null, merged.notes || null, id);
+    if (groupIds) setContactGroups(req.db, id, groupIds);
+  });
+  res.json({ ok: true, group_ids: contactGroupIds(req.db, id) });
 }));
 
 contactRouter.post('/contacts/:id/unsubscribe', wrap(async (req, res) => {

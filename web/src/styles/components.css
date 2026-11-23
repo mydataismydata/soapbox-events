@@ -370,6 +370,60 @@ select.search-input {
   margin-top: 6px;
 }
 
+/* Multi-select drop-down (ui.jsx MultiSelect): a <select>-looking button
+   that holds the picks as chips, over a list of checkboxes. */
+.ms { position: relative; }
+.ms-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  text-align: left;
+  cursor: pointer;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.ms-btn:hover:not(:disabled) { border-color: var(--c-faint); }
+.ms-btn.is-open { border-color: var(--c-accent); box-shadow: var(--ring); }
+.ms-btn:disabled { background: var(--c-surface-3); color: var(--c-muted); cursor: not-allowed; }
+.ms-picked { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 5px; }
+.ms-ph { color: var(--c-faint); padding: 2px 0; }
+.ms-caret { flex: none; color: var(--c-muted); transition: transform var(--transition); }
+.ms-btn.is-open .ms-caret { transform: rotate(180deg); }
+.ms-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 5;
+  max-height: 232px;
+  overflow-y: auto;
+  padding: var(--sp-1);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  box-shadow: var(--sh-md);
+  animation: menu-in 120ms ease-out;
+}
+.ms-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 7px var(--sp-2);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-md);
+  color: var(--c-ink-2);
+  cursor: pointer;
+}
+.ms-opt:hover { background: var(--c-surface-2); color: var(--c-ink); }
+.ms-opt input[type='checkbox'] { width: 15px; flex: none; }
+.ms-label { min-width: 0; overflow-wrap: anywhere; }
+.ms-meta {
+  margin-left: auto;
+  padding-left: var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--c-faint);
+}
+
 .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
 .field-row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
 
